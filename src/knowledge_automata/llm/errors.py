@@ -4,6 +4,8 @@ Messages never contain API keys, prompts or artifact text. Provider error messag
 included only where they describe our request (``LLMRequestError``).
 """
 
+from knowledge_automata.llm.interfaces import Usage
+
 
 class LLMError(Exception):
     """Base class for every error raised by the LLM service layer."""
@@ -38,4 +40,12 @@ class LLMUnavailableError(LLMError):
 
 
 class LLMResponseError(LLMError):
-    """The response is not usable: not JSON, not a JSON object, truncated or incomplete."""
+    """The response is not usable: not JSON, not a JSON object, truncated or incomplete.
+
+    ``usage`` carries the billed units when the provider charged for the unusable response,
+    so the event log still records the cost.
+    """
+
+    def __init__(self, message: str, *, usage: Usage | None = None) -> None:
+        super().__init__(message)
+        self.usage = usage
