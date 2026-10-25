@@ -46,10 +46,50 @@ jobs:
       - run: uv export --frozen --all-extras --no-emit-project --format requirements-txt -o requirements-audit.txt
       - run: uv run --no-sync pip-audit -r requirements-audit.txt --require-hashes --disable-pip
 
+  # Schemas must load from a normal (non-editable) install, not only from the source checkout.
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15"
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.13.5"
+          python-version: "3.15"
+      # Builds the sdist, then the wheel from the sdist, so both must contain the schemas.
+      - run: uv build --out-dir dist
+      - run: uv export --frozen --no-emit-project --format requirements-txt -o runtime-requirements.txt
+      - name: Install the wheel into a clean environment
+        run: |
+          uv venv "$RUNNER_TEMP/wheel-check"
+          uv pip install --python "$RUNNER_TEMP/wheel-check" --require-hashes -r runtime-requirements.txt
+          uv pip install --python "$RUNNER_TEMP/wheel-check" --no-deps dist/*.whl
+      - name: Load every schema from the installed wheel
+        working-directory: ${{ runner.temp }}
+        run: |
+          "$RUNNER_TEMP/wheel-check/bin/python" - <<'PY'
+          import os
+          from pathlib import Path
+
+          import knowledge_automata
+          from knowledge_automata.core import schemas
+
+          root = schemas.schemas_root()
+          assert root == Path(knowledge_automata.__file__).parent / "schemas", root
+          repo_schemas = Path(os.environ["GITHUB_WORKSPACE"], "schemas")
+          expected = sorted(p.relative_to(repo_schemas).as_posix() for p in repo_schemas.rglob("*.json"))
+          assert schemas.list_schemas() == expected, schemas.list_schemas()
+          for name in expected:
+              schemas.load_schema(name)
+          print(f"Loaded {len(expected)} schemas from {root}")
+          PY
+
   # The only required status check, so matrix changes never break branch protection.
   ci-ok:
     if: always()
-    needs: [test, audit]
+    needs: [test, audit, package]
     runs-on: ubuntu-latest
     steps:
       - name: Fail unless every needed job succeeded

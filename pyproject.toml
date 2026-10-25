@@ -31,6 +31,10 @@ path = "src/knowledge_automata/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/knowledge_automata"]
 
+# schemas/ stays at the repository root as the language-neutral contract; the wheel ships a copy.
+[tool.hatch.build.targets.wheel.force-include]
+"schemas" = "knowledge_automata/schemas"
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
