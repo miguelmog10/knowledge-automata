@@ -62,7 +62,7 @@ No formal threat model, no benchmarks, no full coverage target. These are listed
 
 ## Definition of done (per change)
 
-Tests pass, ruff passes, docs updated in the same change, `dev/STATUS.md` updated at the end of the session, new decisions captured as ADRs.
+Tests pass, ruff passes, docs updated in the same change, README.md updated if the change is visible to users (status, setup, features), `dev/STATUS.md` updated at the end of the session, new decisions captured as ADRs.
 
 ## Commit conventions
 

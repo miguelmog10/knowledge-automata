@@ -19,4 +19,5 @@
 - [ ] Tests pass (`pytest`)
 - [ ] Ruff passes (`ruff check` and `ruff format --check`)
 - [ ] Docs updated in the same change
+- [ ] README.md updated if the change is visible to users (status, setup, features)
 - [ ] `dev/STATUS.md` updated
