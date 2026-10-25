@@ -15,6 +15,7 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = [
+    "pip-audit",
     "pytest",
     "ruff==0.17.2",
 ]
