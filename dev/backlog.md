@@ -37,6 +37,9 @@
 - mypy type checking.
 - Coverage report.
 - Evaluation job against real Cohere models that runs manually or on `main` only, never on pull requests from forks.
+- Cost tracking automation: test whether the VS Code chat export includes per-request credits; if so, script it into `dev/costs.md`.
+- Cohere token costs in `dev/costs.md` once the pipeline makes real calls.
+- Write the Knowledge Automata case study in the principles repo at v0.1.0.
 
 ### When collaborators join
 

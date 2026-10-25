@@ -47,7 +47,7 @@ On macOS or Linux, activate with `source .venv/bin/activate` and copy with `cp .
 
 ## How this project is built
 
-Knowledge Automata is built by a human-led team: Miguel (owner) with two AI assistants, Claude (discovery, architecture, review) and Copilot (implementation), following the [AI-Assisted Software Engineering principles](https://github.com/miguelmog10/ai-assisted-software-engineering/blob/0d523881152cd622924aa800caf5264bb5e9ed81/PRINCIPLES.md). Decisions are recorded in [docs/decisions/](docs/decisions/) and the working process lives in [dev/](dev/). Team rules are in [AGENTS.md](AGENTS.md).
+Knowledge Automata is built by a human-led team: Miguel (owner) with two AI assistants, Claude (discovery, architecture, review) and Copilot (implementation), following the [AI-Assisted Software Engineering principles](https://github.com/miguelmog10/ai-assisted-software-engineering/blob/main/PRINCIPLES.md). Decisions are recorded in [docs/decisions/](docs/decisions/) and the working process lives in [dev/](dev/). Team rules are in [AGENTS.md](AGENTS.md).
 
 ## Background
 

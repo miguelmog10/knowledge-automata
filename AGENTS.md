@@ -22,6 +22,7 @@ Humans own requirements, architecture, quality and outcomes. AI generates and pr
 - `dev/STATUS.md`: where we are now. **Read this first at the start of every session; update it at the end.**
 - `dev/backlog.md`: what's next, what's later, open questions, technical debt.
 - `dev/principles-in-practice.md` and `dev/tool-feedback.md`: running logs (see below).
+- `dev/costs.md`: Copilot credits used per pull request.
 - `dev/handoffs/`: prompts handed between team members, committed for traceability.
 
 Nothing important should exist only in a chat session.
@@ -62,7 +63,7 @@ No formal threat model, no benchmarks, no full coverage target. These are listed
 
 ## Definition of done (per change)
 
-Tests pass, ruff passes, docs updated in the same change, `dev/STATUS.md` updated at the end of the session, new decisions captured as ADRs.
+Tests pass, ruff passes, docs updated in the same change, README.md updated if the change is visible to users (status, setup, features), `dev/STATUS.md` updated at the end of the session, new decisions captured as ADRs.
 
 ## Commit conventions
 
@@ -90,7 +91,7 @@ Tests pass, ruff passes, docs updated in the same change, `dev/STATUS.md` update
 - Do not use em dashes; use commas, colons or parentheses instead.
 - Pair every themed role name with its plain role the first time it appears in a document, for example "Governor (orchestrator)".
 - Use "institutional memory" or "collective memory" for the general idea, and "project" only when talking about the project-management domain.
-- Name the team as Miguel, Claude and Copilot. Mention the underlying model only in commit trailers.
+- Name the team as Miguel, Claude and Copilot. Mention the underlying model only in commit trailers and in `dev/costs.md`.
 
 ## Clean-room rule
 

@@ -13,6 +13,21 @@ Suggested improvement: what would have helped.
 
 ## Entries
 
+### 2026-10-24: GitHub (missing)
+
+Note: secret scanning was the only security setting on by default for a new public repository. Dependabot alerts, Dependabot security updates and private vulnerability reporting needed manual setup.
+Suggested improvement: offer a one-click secure baseline for new public repositories.
+
+### 2026-10-24: GitHub (confusing)
+
+Note: a ruleset can only require a status check that has already run, so required checks cannot be configured before the first pull request.
+Suggested improvement: allow typing a check name in advance, or explain the limitation in the ruleset UI.
+
+### 2026-10-24: GitHub (confusing)
+
+Note: the squash merge pre-filled one `Co-authored-by:` trailer per commit, so identical trailers were duplicated and had to be trimmed by hand.
+Suggested improvement: deduplicate identical trailers in the squash commit message.
+
 ### 2026-10-25: GitHub Copilot web fetch in VS Code (missing)
 
 Note: fetching the raw `versions-manifest.json` from `actions/python-versions` (to check which Python versions `setup-python` supports) failed with "Failed to extract meaningful content". The GitHub releases API for the same repository worked and gave the answer.
