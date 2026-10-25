@@ -21,7 +21,7 @@ Key facts:
   - **Claude (claude.ai project):** discovery, architecture, schemas, review and second opinion.
   - **Opus (you, in VS Code):** planning and implementation.
 
-**The framework.** Full text: <PRINCIPLES.md>. Link to it from `README.md` (section 6) and from `AGENTS.md`. The principles, as referenced by
+**The framework.** Full text: [PRINCIPLES.md](https://github.com/miguelmog10/ai-assisted-software-engineering/blob/0d523881152cd622924aa800caf5264bb5e9ed81/PRINCIPLES.md). Link to it from `README.md` (section 6) and from `AGENTS.md`. The principles, as referenced by
 number (P1 to P16) in this repo:
 
 | # | Principle | # | Principle |
@@ -398,7 +398,7 @@ Miguel configures the GitHub settings in B.1 by hand; Opus implements B.2 to B.4
 - **AGENTS.md:** add a *Branches and pull requests* section summarising B.2.
 - **dev/principles-in-practice.md:** add entry, 2026-10-24, **P5 AI generates, humans own** (teamwork): branch protection means every AI-generated change reaches `main` only through a pull request the owner merges. Evidence: `.github/pull_request_template.md`, repository ruleset.
 
-- Add a second entry, 2026-10-24, **Core thesis: AI lowers the cost of engineering discipline** (teamwork): the owner, a mechatronics engineer rather than a career software developer, set up industry-standard repository practice (branch protection, PR-only workflow, squash merges, secret scanning, CI as a required check) in one conversation, with an AI explaining each setting and flagging traps such as required reviews locking out a solo owner. Expert guidance on demand made proper engineering the cheap default, as argued in the LinkedIn post. Caveat: the AI is a strong second opinion, not an authority; important settings are still verified by the owner (P5). Evidence: Addendum B, repository ruleset.
+- Add a second entry, 2026-10-24, **Core thesis: AI lowers the cost of engineering discipline** (teamwork): the owner, a mechatronics engineer rather than a career software developer, set up industry-standard repository practice (branch protection, PR-only workflow, squash merges, secret scanning, CI as a required check) in one conversation, with an AI explaining each setting and flagging traps such as required reviews locking out a solo owner. Expert guidance on demand made proper engineering the cheap default, as argued in the [LinkedIn post](https://github.com/miguelmog10/ai-assisted-software-engineering/blob/0d523881152cd622924aa800caf5264bb5e9ed81/posts/linkedin-launch-post.md). Caveat: the AI is a strong second opinion, not an authority; important settings are still verified by the owner (P5). Evidence: Addendum B, repository ruleset.
 
 # Handoff 001 Addendum C: Supply-chain security baseline
 
