@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "knowledge-automata"
+dynamic = ["version"]
+description = "Knowledge on autopilot: the living memory of any group that makes decisions together."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Miguel Morales" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pip-audit",
+    "pytest",
+    "ruff==0.17.2",
+]
+
+[project.urls]
+Repository = "https://github.com/miguelmog10/knowledge-automata"
+
+[tool.hatch.version]
+path = "src/knowledge_automata/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/knowledge_automata"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
