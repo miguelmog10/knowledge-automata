@@ -86,3 +86,8 @@ Evidence: ADR-0010.
 
 Copilot reviewed Claude's handoff before implementation and caught several inconsistencies (PR ownership, handoff recommit, CI triggers, version duplication); the owner resolved them.
 Evidence: PR description for handoff 001.
+
+### 2026-10-25: P10 Distrust the happy path (product)
+
+One aggregate required check (`ci-ok`) avoids the stale-check and skipped-check traps: changing the Python matrix never leaves branch protection waiting on an old check name, and a skipped job cannot count as a pass.
+Evidence: `.github/workflows/ci.yml`.
