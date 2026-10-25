@@ -1,0 +1,71 @@
+{
+  "id": "RSK-0001",
+  "register": "risk-register",
+  "schema_version": "1.0",
+  "record_status": "active",
+  "revision": 2,
+  "created_at": "2026-03-12T18:30:00Z",
+  "updated_at": "2026-03-19T17:05:12.250+01:00",
+  "content": {
+    "title": "Water connection permit delayed",
+    "event": "The city's permits office may delay the water connection permit.",
+    "kind": "threat",
+    "status": "open",
+    "effect": "The planting date would be pushed back by several weeks.",
+    "probability": "high",
+    "impact": "medium",
+    "owner": "Ana Ruiz",
+    "category": "external",
+    "response_strategy": "mitigate",
+    "response_actions": [
+      "Call the permits office every week.",
+      "Escalate to the council if there is no answer by 1 April."
+    ],
+    "triggers": ["No answer from the permits office by 1 April."]
+  },
+  "sources": [
+    {
+      "artifact_id": "ART-0001",
+      "artifact_date": "2026-03-12",
+      "excerpt": "\"the city's permits office may delay the water connection permit\"",
+      "added_at": "2026-03-12T18:30:00Z"
+    },
+    {
+      "artifact_id": "ART-0002",
+      "excerpt": "A delay of three weeks would be manageable.",
+      "added_at": "2026-03-19T17:05:12.250+01:00"
+    }
+  ],
+  "history": [
+    {
+      "revision": 1,
+      "at": "2026-03-12T18:30:00Z",
+      "change": "new",
+      "artifact_id": "ART-0001",
+      "fields": [
+        "title",
+        "event",
+        "kind",
+        "status",
+        "effect",
+        "probability",
+        "owner",
+        "category",
+        "response_strategy",
+        "response_actions",
+        "triggers"
+      ],
+      "model": "example-model",
+      "prompt_version": "risk-registrar.v1"
+    },
+    {
+      "revision": 2,
+      "at": "2026-03-19T17:05:12.250+01:00",
+      "change": "update",
+      "artifact_id": "ART-0002",
+      "fields": ["impact"],
+      "model": "example-model",
+      "prompt_version": "risk-registrar.v1"
+    }
+  ]
+}

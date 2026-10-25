@@ -1,0 +1,23 @@
+{
+  "content": {
+    "title": "Water connection permit delayed",
+    "event": "The city's permits office may delay the water connection permit.",
+    "kind": "threat",
+    "status": "open",
+    "effect": "The planting date would be pushed back by several weeks.",
+    "probability": "high",
+    "owner": "Ana Ruiz",
+    "category": "external",
+    "response_strategy": "mitigate",
+    "response_actions": [
+      "Call the permits office every week.",
+      "Escalate to the council if there is no answer by 1 April."
+    ],
+    "triggers": ["No answer from the permits office by 1 April."]
+  },
+  "evidence": [
+    "\"the city's permits office may delay the water connection permit\"",
+    "Ana will call the permits office every week and will escalate to the council...",
+    "He thinks this is quite likely"
+  ]
+}

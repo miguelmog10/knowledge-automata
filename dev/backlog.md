@@ -2,7 +2,6 @@
 
 ## Now (v0.1, first working slice)
 
-- Decision and Risk register schemas, PMI-mapped (design with Claude first).
 - LLM service layer with a Cohere adapter and a fake adapter for tests.
 - Structured event logging for every LLM call, plus a dated price table and token-to-cost function.
 - Sensor (intake and input guardrail) with deterministic checks (empty, unsupported format, oversized, encoding, duplicate hash), Artifact Ledger and quarantine path.
@@ -11,7 +10,6 @@
 - Decision Registrar and Risk Registrar (specialist record keepers).
 - Fictional sample project in `examples/`, doubling as a small evaluation set with expected records.
 - CLI entry point to run the pipeline over a folder.
-- Lock file, added with the first runtime dependency (the Cohere SDK).
 - Release workflow that generates a CycloneDX SBOM and attaches it to the v0.1.0 tag.
 
 ## Stretch (v0.1)
@@ -40,6 +38,11 @@
 - Cost tracking automation: test whether the VS Code chat export includes per-request credits; if so, script it into `dev/costs.md`.
 - Cohere token costs in `dev/costs.md` once the pipeline makes real calls.
 - Write the Knowledge Automata case study in the principles repo at v0.1.0.
+- Issue log Registrar, including proposals and open questions found in artifacts (dropped in v0.1, ADR-0011) and risks that occurred.
+- Operator (human in the loop) review of evidence-check rejections.
+- Remaining PMBOK risk fields: urgency, proximity, contingency and fallback plans, residual and secondary risks, reserves.
+- Typed Python models for records, only with a test that keeps them in sync with the schema files.
+- Store the envelope version in each record before the first envelope change.
 
 ### When collaborators join
 
@@ -52,8 +55,8 @@
 
 ## Open questions
 
-- Which PMBOK edition should the schemas cite? This includes whether that edition names the decision log as an artifact (see ADR-0007).
 - Storage details for records and the ledger (JSON files per record, one file per register, or SQLite).
+- Artifact Ledger status when some of an artifact's records are rejected (for example a `processed` status with a list of rejections).
 
 ## Technical debt
 

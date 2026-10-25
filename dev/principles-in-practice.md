@@ -91,3 +91,23 @@ Evidence: PR description for handoff 001.
 
 One aggregate required check (`ci-ok`) avoids the stale-check and skipped-check traps: changing the Python matrix never leaves branch protection waiting on an old check name, and a skipped job cannot count as a pass.
 Evidence: `.github/workflows/ci.yml`.
+
+### 2026-10-25: P2 Architecture is a first-class deliverable (product)
+
+The record schemas were designed by Miguel and Claude before implementation, as language-neutral JSON Schema files, and handed to Copilot as a contract rather than generated while coding.
+Evidence: `schemas/`, `dev/handoffs/002-register-schemas.md`.
+
+### 2026-10-25: P5 AI generates. Humans own (teamwork)
+
+Miguel's review of Claude's record design caught that links between records are also LLM judgements. The design changed so code checks the Comparator's proposed links instead of trusting them.
+Evidence: ADR-0011.
+
+### 2026-10-25: P10 Distrust the happy path (product)
+
+Every record must carry quotes from its artifact, and code checks they really appear there, so a record invented from nothing is rejected by a cheap, deterministic check.
+Evidence: ADR-0011, `src/knowledge_automata/core/evidence.py`.
+
+### 2026-10-25: P5 AI generates. Humans own (teamwork)
+
+Copilot's plan review of handoff 002 caught three problems before any code was written: `enum` fields without `"type": "string"` (every Cohere structured-output example pairs them), a `date-time` check based on `datetime.fromisoformat` alone, which would have accepted loose forms such as `2026-10-25 11:43`, and a conflict between the handoff ("no README change") and the definition of done in `AGENTS.md` once the lock file changed the setup steps. Miguel decided each one and committed the schema fix before implementation started.
+Evidence: handoff 002 "Revised" line, commit `62d0dc6`, `src/knowledge_automata/core/validation.py`.

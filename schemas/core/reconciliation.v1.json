@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:knowledge-automata:schema:core:reconciliation:v1",
+  "x-version": "1.0",
+  "title": "Reconciliation result",
+  "description": "What the Comparator (reconciliation) returns for one work order: how the new input relates to existing records. This is an LLM judgement; code checks it before acting on it.",
+  "type": "object",
+  "properties": {
+    "classification": {
+      "type": "string",
+      "enum": ["new", "update", "reaffirmation", "supersession"],
+      "description": "new: no existing record covers this. update: adds to or changes an existing record without replacing it. reaffirmation: restates an existing record with nothing new. supersession: replaces an existing record with a different one."
+    },
+    "target_id": {
+      "type": "string",
+      "description": "ID of the existing record this input relates to. Must be one of the candidate IDs provided. Omit when classification is new."
+    },
+    "reason": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "One or two sentences explaining the classification."
+    }
+  },
+  "required": ["classification", "reason"],
+  "additionalProperties": false
+}

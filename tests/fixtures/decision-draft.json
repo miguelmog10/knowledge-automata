@@ -1,0 +1,16 @@
+{
+  "content": {
+    "title": "Buy the drip irrigation kit from supplier A",
+    "statement": "Buy the drip irrigation kit from supplier A; supplier B is rejected for this season.",
+    "context": "Choosing a supplier for the drip irrigation kit.",
+    "rationale": "Supplier A guarantees delivery before the April planting; supplier B could not commit to a delivery date.",
+    "alternatives": ["Buy the kit from supplier B"],
+    "decided_by": ["Steering group"],
+    "decided_on": "2026-03-12",
+    "impacts": "The irrigation can be installed before the April planting."
+  },
+  "evidence": [
+    "the group agreed to buy the drip irrigation kit from supplier A, because they guarantee delivery before the April planting.",
+    "Supplier B is rejected for this season."
+  ]
+}
