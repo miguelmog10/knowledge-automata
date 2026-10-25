@@ -109,5 +109,5 @@ Evidence: ADR-0011, `src/knowledge_automata/core/evidence.py`.
 
 ### 2026-10-25: P5 AI generates. Humans own (teamwork)
 
-Copilot's plan review of handoff 002 caught three problems before any code was written: `enum` fields without `"type": "string"` (every Cohere structured-output example pairs them), a `date-time` check that would have accepted timestamps without a timezone, and a conflict between the handoff ("no README change") and the definition of done in `AGENTS.md` once the lock file changed the setup steps. Miguel decided each one and committed the schema fix before implementation started.
+Copilot's plan review of handoff 002 caught three problems before any code was written: `enum` fields without `"type": "string"` (every Cohere structured-output example pairs them), a `date-time` check based on `datetime.fromisoformat` alone, which would have accepted loose forms such as `2026-10-25 11:43`, and a conflict between the handoff ("no README change") and the definition of done in `AGENTS.md` once the lock file changed the setup steps. Miguel decided each one and committed the schema fix before implementation started.
 Evidence: handoff 002 "Revised" line, commit `62d0dc6`, `src/knowledge_automata/core/validation.py`.
