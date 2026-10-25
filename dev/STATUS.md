@@ -6,7 +6,7 @@
 
 ## Current phase
 
-Scaffolding and CI follow-ups merged (PR #1 and PR #2). Handoff 002 (Decision log and Risk register schemas) is in design with Claude.
+Handoff 002 (Decision log and Risk register schemas) implemented on `feat/register-schemas`, ready for Miguel to open the pull request.
 
 ## Done
 
@@ -23,15 +23,21 @@ Scaffolding and CI follow-ups merged (PR #1 and PR #2). Handoff 002 (Decision lo
   - README links to the principles on `main`.
   - Definition of done and PR checklist include README updates for user-visible changes.
   - `dev/costs.md` for Copilot credits per pull request.
+- Handoff 002 on `feat/register-schemas` (not merged yet):
+  - Five JSON Schema files in `schemas/` (record envelope, draft, reconciliation, decision, risk), revised after Copilot's plan review.
+  - `jsonschema` as the first runtime dependency, `uv.lock`, CI and Dependabot switched to uv, README setup uses `uv sync`.
+  - Schema files packaged into the wheel; new CI `package` job builds the wheel and loads every schema from it; `ci-ok` now also needs `package`.
+  - Core: register specs, schema loading, evidence quote check, record, draft and reconciliation validators (RFC 3339 `date-time` with a timezone). Project-management domain: decision log and risk register specs.
+  - ADR-0011 (record model and write rules); ADR-0007 amended to cite the PMBOK Guide, Eighth Edition.
 
 ## In progress
 
-- Handoff 002: Decision log and Risk register schemas, PMI-mapped. Design agreed between Miguel and Claude; handoff written in `dev/handoffs/002-register-schemas.md`.
+- Pull request for handoff 002 (Miguel opens, reviews and merges).
 
 ## Next
 
-- Copilot plans and implements handoff 002 on `feat/register-schemas`.
-- LLM service layer with a Cohere adapter and a fake adapter for tests.
+- LLM service layer with a Cohere adapter and a fake adapter for tests. The adapter removes validation-only keywords and annotations before sending a schema (ADR-0011).
+- Check the Cohere `response_format` field name (`schema` in the guide, `json_schema` in the API reference) with a real call when the adapter is built.
 
 ## Blockers
 
@@ -40,4 +46,5 @@ None.
 ## Notes for the next session
 
 - Add `ci-ok` as the only required status check in the `main` ruleset, if not done yet (it has now run on PR #2).
-- Python 3.15 is new in CI. If a dependency fails to install there, fall back to the newest version that works and log it in `backlog.md` and `tool-feedback.md`. The first runtime dependency with compiled wheels (expected in handoff 002) is the first real test.
+- Check the first CI run of the handoff 002 PR: the new `package` job, the uv-based `audit` job, and the first compiled runtime dependency (`rpds-py`, via `jsonschema`) on Python 3.15. If 3.15 fails, fall back to the newest version that works and log it in `backlog.md` and `tool-feedback.md`.
+- Local setup is now `uv sync --all-extras`; after changing dependencies in `pyproject.toml`, run `uv lock` and commit `uv.lock`.
