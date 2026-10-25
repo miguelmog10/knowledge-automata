@@ -471,3 +471,76 @@ Each commit includes its tests and ends with a `Co-authored-by:` trailer. Run `r
 ## 11. Out of scope
 
 Agents and their prompts (the Decision Registrar is handoff 004), storage, the Sensor and Artifact Ledger, Markdown views, plain-text chat, budget guards and evaluation runs.
+
+---
+
+# Handoff 003 Addendum A: event log additions
+
+- **From:** Claude, with Miguel's approval
+- **Date:** 2026-10-25
+- **Why an addendum:** Miguel approved these additions before handoff 003 was sent, but a file-transfer fault on Claude's side delivered the earlier version of this handoff and of `schemas/core/llm-event.v1.json` to the repository (see `dev/tool-feedback.md`). They are added here rather than by rewriting the handoff that was sent. Implement them on `feat/llm-service-layer` before the smoke-results commit (commit 8).
+
+## A.1 What Miguel decided
+
+- **Every unit the API returns is recorded,** even when no price is known, so cost can be computed later: billed units and, when reported, raw token counts. Also the provider's response ID, for support requests.
+- **The agent that made the call** is recorded (already done), plus a **run ID** that groups the calls of one run (one smoke check, later one pipeline run). It is called a run, not a session, to avoid confusion with chat sessions.
+- **The event log is append-only and survives across runs:** lines are only ever added, never rewritten or rotated in v0.1. If the file is deleted, the next call starts a new one.
+- **Every event carries the event schema version,** so old lines stay readable after the format changes (the lesson from the envelope version in handoff 002).
+- **If a default model stops working** (not available to trial keys, no structured-output support, or errors), log why in `dev/tool-feedback.md`, fall back to the previous version (`command-a-03-2025`, `embed-v4.0`, `rerank-v4.0-pro` or `rerank-v3.5`) and record it in `dev/STATUS.md`. Only if no Cohere model works for a role, ask Miguel. (The current defaults all worked in the smoke check, so this is a rule for later, recorded in STATUS.)
+
+## A.2 Event schema
+
+Miguel commits the corrected `schemas/core/llm-event.v1.json` with this addendum. Compared with the first version it adds:
+
+- required `schema_version` (`MAJOR.MINOR`, filled from the schema's `x-version`, now "1.0") and `run_id` (UUID);
+- optional `request_id`, `raw_input_tokens` and `raw_output_tokens`.
+
+It stays version 1.0, because nothing has been released. Delete the local smoke-check events in `runtime/logs/` before the new run, since they do not have the new required fields.
+
+## A.3 Code
+
+- `Usage` gains `raw_input_tokens` and `raw_output_tokens` (processed tokens, when reported separately from billed ones). `ChatResult`, `EmbedResult` and `RerankResult` gain `request_id: str | None`.
+- The Cohere adapter reads raw token counts where the response reports them (*verify*: for chat, `usage.tokens`), and the response ID into `request_id`.
+- `ObservedLLM` takes a `run_id`; every event it writes carries that `run_id` and `schema_version`, plus `request_id` and the raw token counts when present.
+- `build_llm(settings, *, run_id=None, sink=None)` generates a UUID 4 `run_id` when none is passed. The smoke script prints its `run_id`.
+- `JsonlFileSink` is append-only: for each event it opens the file in append mode, writes one line (UTF-8, ending in a newline) and closes it, creating the folder and the file if they are missing. It never truncates, rewrites or rotates the file. One writing process at a time is assumed in v0.1.
+
+## A.4 Tests
+
+- All events from one `ObservedLLM` share its `run_id`, and two `build_llm` calls produce different ones; every event has `schema_version` and validates against the corrected schema.
+- Raw token counts and `request_id` reach the event when the adapter reports them, and are omitted when it does not.
+- The JSONL sink leaves existing lines byte for byte unchanged after new events; if the file is deleted between two events, the second event creates a new file containing only itself.
+
+## A.5 Documentation
+
+- **ADR-0012:** replace the observation bullet with: "An observation wrapper records one event per call as JSON Lines, validated against `schemas/core/llm-event.v1.json`. Events hold metadata only (timing, model, the billed and raw units the provider reports, estimated cost, agent, artifact ID, a run ID grouping the calls of one run, and the event schema version), never prompts, artifact text or output." Add a bullet: "The event log is append-only and survives across runs: lines are only ever added, never rewritten. If the file is deleted, the next call starts a new one." Add to the cost bullet: "the units are always recorded, so cost can be computed later."
+- **`docs/architecture.md` (Observability):** mention `run_id`, raw and billed units, and the append-only log.
+- **`dev/backlog.md`:**
+  - In the thin slice item (handoff 004), add: "with the decision log's Markdown view, so the result can be browsed on GitHub".
+  - Start the Markdown view generator item with: "(decision log view in handoff 004; risk register view with the Risk Registrar)".
+  - Under *Later*, add: "Event log rotation or archiving, if the file grows large." and "A small report that sums calls, units and cost per run, per agent and per artifact from the event log."
+- **`dev/STATUS.md` (Notes for the next session):** add the model fallback rule from A.1.
+- **`dev/tool-feedback.md`:** add this entry:
+
+```markdown
+### 2026-10-25: Claude file bridge to the local computer (bug)
+
+Note: several files Claude wrote into the repository and into Miguel's journal arrived as an earlier version, although every write reported success. The pattern was a second write of the same file: the revised handoff 003 and event schema were lost this way, so Copilot implemented the first version, and journal entries disappeared several times (first blamed, wrongly, on an editor). Found when Claude re-read the files from the computer and compared them.
+Suggested improvement (Claude): verify the delivered content against what was sent, or fail the write; meanwhile Claude writes each version under a new name and reads it back from the computer to confirm it arrived.
+```
+
+- **`dev/principles-in-practice.md`:** add this entry:
+
+```markdown
+### 2026-10-25: P11 Build evidence, not just confidence (teamwork)
+
+A "success" message from a tool was not evidence. Several of Claude's file writes reported success but delivered an older version, and the revised handoff 003 never reached Copilot. Re-reading the files from the computer exposed it; the missing work was recovered as Addendum A instead of being silently lost. Claude now verifies every file it delivers by reading it back.
+Evidence: handoff 003 Addendum A, `dev/tool-feedback.md`.
+```
+
+## A.6 Commits
+
+1. `feat: add run ID, schema version, raw units and request ID to LLM events` (code and tests, implements Addendum A)
+2. `docs: apply handoff 003 Addendum A to the ADR, architecture, backlog and logs`
+
+Then rerun the smoke check once (about six calls, including the `json_schema` test), confirm the new fields appear in the events, and do commit 8 as planned.
