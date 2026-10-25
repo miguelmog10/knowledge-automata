@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:knowledge-automata:schema:core:record:v1",
+  "x-version": "1.0",
   "title": "Record envelope",
   "description": "Every stored record. Code owns every field here. Only 'content' holds LLM-drafted data, and it is validated separately against the content schema of the record's register. Never sent to an LLM provider.",
   "type": "object",
@@ -17,6 +18,7 @@
       "description": "Version (MAJOR.MINOR) of the content schema the content was validated against."
     },
     "record_status": {
+      "type": "string",
       "enum": ["active", "superseded"],
       "description": "Record lifecycle, set by code. Domain states (for example a risk being open or closed) live in content."
     },
@@ -112,6 +114,7 @@
         "revision": { "type": "integer", "minimum": 1 },
         "at": { "type": "string", "format": "date-time" },
         "change": {
+          "type": "string",
           "enum": ["new", "update", "reaffirmation", "supersession", "superseded"],
           "description": "'supersession' is written on the new record; 'superseded' on the record it replaces."
         },

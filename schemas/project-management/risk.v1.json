@@ -18,10 +18,12 @@
       "description": "The uncertain event itself, without its cause or effect. Example: The supplier may deliver the sensors late."
     },
     "kind": {
+      "type": "string",
       "enum": ["threat", "opportunity"],
       "description": "threat: would harm objectives if it happens. opportunity: would benefit them."
     },
     "status": {
+      "type": "string",
       "enum": ["open", "occurred", "closed"],
       "description": "open: could still happen. occurred: it has happened. closed: no longer relevant, or the response is complete. Use open for a newly identified risk."
     },
@@ -36,10 +38,12 @@
       "description": "What would happen to objectives if the event occurs."
     },
     "probability": {
+      "type": "string",
       "enum": ["very_low", "low", "medium", "high", "very_high"],
       "description": "Likelihood of the event, only if the artifact gives or clearly implies one."
     },
     "impact": {
+      "type": "string",
       "enum": ["very_low", "low", "medium", "high", "very_high"],
       "description": "Size of the effect if the event occurs, only if the artifact gives or clearly implies one."
     },
@@ -54,6 +58,7 @@
       "description": "Short category if one is stated or obvious, for example technical, schedule, cost, supplier, people or external."
     },
     "response_strategy": {
+      "type": "string",
       "enum": ["escalate", "avoid", "transfer", "mitigate", "exploit", "share", "enhance", "accept"],
       "description": "Agreed response. For threats: escalate, avoid, transfer, mitigate or accept. For opportunities: escalate, exploit, share, enhance or accept."
     },

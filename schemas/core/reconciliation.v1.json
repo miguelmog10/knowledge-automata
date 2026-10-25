@@ -7,6 +7,7 @@
   "type": "object",
   "properties": {
     "classification": {
+      "type": "string",
       "enum": ["new", "update", "reaffirmation", "supersession"],
       "description": "new: no existing record covers this. update: adds to or changes an existing record without replacing it. reaffirmation: restates an existing record with nothing new. supersession: replaces an existing record with a different one."
     },

@@ -5,6 +5,7 @@
 - **Owner and approver:** Miguel
 - **Date:** 2026-10-25
 - **Branch:** `feat/register-schemas`
+- **Revised:** 2026-10-25, after Copilot's plan review: `"type": "string"` added to every `enum` field, and `"x-version": "1.0"` added to the record envelope. Versions stay 1.0, because nothing has been released. No other changes.
 - **Scope:** the record schemas for the decision log and the risk register, the core record envelope, the Registrar draft and Comparator result formats, and the code that validates them. No LLM calls, no storage, no agents.
 
 ---
@@ -129,6 +130,7 @@ These are committed by Miguel. They are reproduced here so the handoff is a comp
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:knowledge-automata:schema:core:record:v1",
+  "x-version": "1.0",
   "title": "Record envelope",
   "description": "Every stored record. Code owns every field here. Only 'content' holds LLM-drafted data, and it is validated separately against the content schema of the record's register. Never sent to an LLM provider.",
   "type": "object",
@@ -145,6 +147,7 @@ These are committed by Miguel. They are reproduced here so the handoff is a comp
       "description": "Version (MAJOR.MINOR) of the content schema the content was validated against."
     },
     "record_status": {
+      "type": "string",
       "enum": ["active", "superseded"],
       "description": "Record lifecycle, set by code. Domain states (for example a risk being open or closed) live in content."
     },
@@ -240,6 +243,7 @@ These are committed by Miguel. They are reproduced here so the handoff is a comp
         "revision": { "type": "integer", "minimum": 1 },
         "at": { "type": "string", "format": "date-time" },
         "change": {
+          "type": "string",
           "enum": ["new", "update", "reaffirmation", "supersession", "superseded"],
           "description": "'supersession' is written on the new record; 'superseded' on the record it replaces."
         },
@@ -309,6 +313,7 @@ These are committed by Miguel. They are reproduced here so the handoff is a comp
   "type": "object",
   "properties": {
     "classification": {
+      "type": "string",
       "enum": ["new", "update", "reaffirmation", "supersession"],
       "description": "new: no existing record covers this. update: adds to or changes an existing record without replacing it. reaffirmation: restates an existing record with nothing new. supersession: replaces an existing record with a different one."
     },
@@ -410,10 +415,12 @@ These are committed by Miguel. They are reproduced here so the handoff is a comp
       "description": "The uncertain event itself, without its cause or effect. Example: The supplier may deliver the sensors late."
     },
     "kind": {
+      "type": "string",
       "enum": ["threat", "opportunity"],
       "description": "threat: would harm objectives if it happens. opportunity: would benefit them."
     },
     "status": {
+      "type": "string",
       "enum": ["open", "occurred", "closed"],
       "description": "open: could still happen. occurred: it has happened. closed: no longer relevant, or the response is complete. Use open for a newly identified risk."
     },
@@ -428,10 +435,12 @@ These are committed by Miguel. They are reproduced here so the handoff is a comp
       "description": "What would happen to objectives if the event occurs."
     },
     "probability": {
+      "type": "string",
       "enum": ["very_low", "low", "medium", "high", "very_high"],
       "description": "Likelihood of the event, only if the artifact gives or clearly implies one."
     },
     "impact": {
+      "type": "string",
       "enum": ["very_low", "low", "medium", "high", "very_high"],
       "description": "Size of the effect if the event occurs, only if the artifact gives or clearly implies one."
     },
@@ -446,6 +455,7 @@ These are committed by Miguel. They are reproduced here so the handoff is a comp
       "description": "Short category if one is stated or obvious, for example technical, schedule, cost, supplier, people or external."
     },
     "response_strategy": {
+      "type": "string",
       "enum": ["escalate", "avoid", "transfer", "mitigate", "exploit", "share", "enhance", "accept"],
       "description": "Agreed response. For threats: escalate, avoid, transfer, mitigate or accept. For opportunities: escalate, exploit, share, enhance or accept."
     },
