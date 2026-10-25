@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:knowledge-automata:schema:project-management:decision:v1",
+  "x-version": "1.0",
+  "x-pmi-mapping": "Decision log: a widely used project-management practice, not an artifact named in the PMBOK Guide, Eighth Edition (see ADR-0007).",
+  "title": "Decision log entry",
+  "description": "One decision the group actually made, including a decision to reject an option. Proposals and open questions without an outcome are not decisions. Use only information stated or clearly implied in the artifact; omit any optional field that is not.",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "maxLength": 120,
+      "description": "Short label for the decision, about ten words or fewer."
+    },
+    "statement": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "What was decided, as one plain sentence. A decision not to do something is valid, for example: Do not use supplier B for the pilot."
+    },
+    "context": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "The question or problem the decision answers."
+    },
+    "rationale": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Why this option was chosen, as stated in the artifact."
+    },
+    "alternatives": {
+      "type": "array",
+      "maxItems": 10,
+      "items": { "type": "string", "maxLength": 200 },
+      "description": "Options that were considered and not chosen."
+    },
+    "decided_by": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "type": "string", "maxLength": 100 },
+      "description": "People, roles or groups who made the decision, as named in the artifact."
+    },
+    "decided_on": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the decision was made, only if the artifact states it. Never use today's date."
+    },
+    "impacts": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "What changes as a result, for example work, scope, cost, schedule or other decisions affected."
+    }
+  },
+  "required": ["title", "statement"],
+  "additionalProperties": false
+}

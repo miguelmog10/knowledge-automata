@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:knowledge-automata:schema:core:draft:v1",
+  "x-version": "1.0",
+  "title": "Registrar draft",
+  "description": "What a Registrar (specialist record keeper) returns for one work order. At runtime, code replaces the 'content' placeholder with the content schema of the target register.",
+  "type": "object",
+  "properties": {
+    "content": {
+      "type": "object",
+      "description": "Placeholder for the register's content schema."
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": { "type": "string", "maxLength": 500 },
+      "description": "Quotes copied word for word from the artifact that support the content. Copy the exact words; do not paraphrase, translate or join separate sentences. Prefer one short sentence per quote."
+    }
+  },
+  "required": ["content", "evidence"],
+  "additionalProperties": false
+}

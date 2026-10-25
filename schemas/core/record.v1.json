@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:knowledge-automata:schema:core:record:v1",
+  "title": "Record envelope",
+  "description": "Every stored record. Code owns every field here. Only 'content' holds LLM-drafted data, and it is validated separately against the content schema of the record's register. Never sent to an LLM provider.",
+  "type": "object",
+  "properties": {
+    "id": { "$ref": "#/$defs/record_id" },
+    "register": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Register name, for example decision-log or risk-register."
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "description": "Version (MAJOR.MINOR) of the content schema the content was validated against."
+    },
+    "record_status": {
+      "enum": ["active", "superseded"],
+      "description": "Record lifecycle, set by code. Domain states (for example a risk being open or closed) live in content."
+    },
+    "revision": { "type": "integer", "minimum": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "content": {
+      "type": "object",
+      "description": "Register-specific content drafted by a Registrar (specialist record keeper)."
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "relations": { "$ref": "#/$defs/relations" },
+    "history": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/history_entry" }
+    }
+  },
+  "required": [
+    "id",
+    "register",
+    "schema_version",
+    "record_status",
+    "revision",
+    "created_at",
+    "updated_at",
+    "content",
+    "sources",
+    "history"
+  ],
+  "additionalProperties": false,
+  "if": {
+    "properties": { "record_status": { "const": "superseded" } },
+    "required": ["record_status"]
+  },
+  "then": {
+    "required": ["relations"],
+    "properties": { "relations": { "required": ["superseded_by"] } }
+  },
+  "$defs": {
+    "record_id": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}-[0-9]{4,}$",
+      "description": "Register prefix and sequence number, for example DEC-0001. Assigned by code."
+    },
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^ART-[0-9]{4,}$",
+      "description": "Artifact Ledger ID, for example ART-0001. Assigned by code."
+    },
+    "source": {
+      "type": "object",
+      "description": "One verified quote from one artifact. A record has one source entry per verified quote.",
+      "properties": {
+        "artifact_id": { "$ref": "#/$defs/artifact_id" },
+        "artifact_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Artifact date copied from the Artifact Ledger, when known."
+        },
+        "excerpt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "The quote as drafted, after it passed the evidence check."
+        },
+        "added_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["artifact_id", "excerpt", "added_at"],
+      "additionalProperties": false
+    },
+    "relations": {
+      "type": "object",
+      "description": "Links between records. Proposed by the Comparator (reconciliation), checked and written by code.",
+      "properties": {
+        "supersedes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/record_id" }
+        },
+        "superseded_by": { "$ref": "#/$defs/record_id" }
+      },
+      "additionalProperties": false
+    },
+    "history_entry": {
+      "type": "object",
+      "description": "One change to the record. Append-only.",
+      "properties": {
+        "revision": { "type": "integer", "minimum": 1 },
+        "at": { "type": "string", "format": "date-time" },
+        "change": {
+          "enum": ["new", "update", "reaffirmation", "supersession", "superseded"],
+          "description": "'supersession' is written on the new record; 'superseded' on the record it replaces."
+        },
+        "artifact_id": { "$ref": "#/$defs/artifact_id" },
+        "fields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Content fields set or changed in this revision."
+        },
+        "related_id": {
+          "$ref": "#/$defs/record_id",
+          "description": "The other record in a supersession."
+        },
+        "model": {
+          "type": "string",
+          "description": "Model that drafted this revision, if an LLM was involved."
+        },
+        "prompt_version": {
+          "type": "string",
+          "description": "Version of the Registrar prompt used, if an LLM was involved."
+        }
+      },
+      "required": ["revision", "at", "change", "artifact_id"],
+      "additionalProperties": false
+    }
+  }
+}

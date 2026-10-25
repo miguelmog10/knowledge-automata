@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:knowledge-automata:schema:project-management:risk:v1",
+  "x-version": "1.0",
+  "x-pmi-mapping": "Risk register, PMBOK Guide, Eighth Edition (see ADR-0007). v0.1 covers identification, qualitative assessment and response planning; urgency, proximity, contingency and fallback plans, residual and secondary risks and reserves are deferred.",
+  "title": "Risk register entry",
+  "description": "One uncertain event that could affect the group's objectives, negatively (threat) or positively (opportunity). An event that has already happened and was never uncertain is an issue, not a risk. Use only information stated or clearly implied in the artifact; omit any optional field that is not.",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "maxLength": 120,
+      "description": "Short label for the risk, about ten words or fewer."
+    },
+    "event": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "The uncertain event itself, without its cause or effect. Example: The supplier may deliver the sensors late."
+    },
+    "kind": {
+      "enum": ["threat", "opportunity"],
+      "description": "threat: would harm objectives if it happens. opportunity: would benefit them."
+    },
+    "status": {
+      "enum": ["open", "occurred", "closed"],
+      "description": "open: could still happen. occurred: it has happened. closed: no longer relevant, or the response is complete. Use open for a newly identified risk."
+    },
+    "cause": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "The condition or fact that makes the event possible."
+    },
+    "effect": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "What would happen to objectives if the event occurs."
+    },
+    "probability": {
+      "enum": ["very_low", "low", "medium", "high", "very_high"],
+      "description": "Likelihood of the event, only if the artifact gives or clearly implies one."
+    },
+    "impact": {
+      "enum": ["very_low", "low", "medium", "high", "very_high"],
+      "description": "Size of the effect if the event occurs, only if the artifact gives or clearly implies one."
+    },
+    "owner": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Person or role responsible for monitoring and responding, as named in the artifact."
+    },
+    "category": {
+      "type": "string",
+      "maxLength": 60,
+      "description": "Short category if one is stated or obvious, for example technical, schedule, cost, supplier, people or external."
+    },
+    "response_strategy": {
+      "enum": ["escalate", "avoid", "transfer", "mitigate", "exploit", "share", "enhance", "accept"],
+      "description": "Agreed response. For threats: escalate, avoid, transfer, mitigate or accept. For opportunities: escalate, exploit, share, enhance or accept."
+    },
+    "response_actions": {
+      "type": "array",
+      "maxItems": 10,
+      "items": { "type": "string", "maxLength": 300 },
+      "description": "Specific actions agreed to carry out the response."
+    },
+    "triggers": {
+      "type": "array",
+      "maxItems": 10,
+      "items": { "type": "string", "maxLength": 300 },
+      "description": "Warning signs that the event is about to happen or has happened."
+    }
+  },
+  "required": ["title", "event", "kind", "status"],
+  "additionalProperties": false
+}
