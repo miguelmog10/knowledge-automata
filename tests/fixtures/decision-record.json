@@ -1,0 +1,53 @@
+{
+  "id": "DEC-0001",
+  "register": "decision-log",
+  "schema_version": "1.0",
+  "record_status": "active",
+  "revision": 1,
+  "created_at": "2026-03-12T18:30:00Z",
+  "updated_at": "2026-03-12T18:30:00Z",
+  "content": {
+    "title": "Buy the drip irrigation kit from supplier A",
+    "statement": "Buy the drip irrigation kit from supplier A; supplier B is rejected for this season.",
+    "context": "Choosing a supplier for the drip irrigation kit.",
+    "rationale": "Supplier A guarantees delivery before the April planting; supplier B could not commit to a delivery date.",
+    "alternatives": ["Buy the kit from supplier B"],
+    "decided_by": ["Steering group"],
+    "decided_on": "2026-03-12",
+    "impacts": "The irrigation can be installed before the April planting."
+  },
+  "sources": [
+    {
+      "artifact_id": "ART-0001",
+      "artifact_date": "2026-03-12",
+      "excerpt": "the group agreed to buy the drip irrigation kit from supplier A, because they guarantee delivery before the April planting.",
+      "added_at": "2026-03-12T18:30:00Z"
+    },
+    {
+      "artifact_id": "ART-0001",
+      "artifact_date": "2026-03-12",
+      "excerpt": "Supplier B is rejected for this season.",
+      "added_at": "2026-03-12T18:30:00Z"
+    }
+  ],
+  "history": [
+    {
+      "revision": 1,
+      "at": "2026-03-12T18:30:00Z",
+      "change": "new",
+      "artifact_id": "ART-0001",
+      "fields": [
+        "title",
+        "statement",
+        "context",
+        "rationale",
+        "alternatives",
+        "decided_by",
+        "decided_on",
+        "impacts"
+      ],
+      "model": "example-model",
+      "prompt_version": "decision-registrar.v1"
+    }
+  ]
+}
