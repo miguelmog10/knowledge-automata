@@ -11,6 +11,7 @@ never prints the settings or the key.
 
 import dataclasses
 import sys
+import uuid
 from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
@@ -28,6 +29,7 @@ from knowledge_automata.llm import (
     MemorySink,
     build_llm,
 )
+from knowledge_automata.llm.cohere_adapter import RESPONSE_SCHEMA_FIELD
 
 ARTIFACT = (
     Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "artifact-steering-group.txt"
@@ -75,10 +77,11 @@ def run(
     """Run every check; return the number of checks that failed."""
     memory = MemorySink()
     sink = _TeeSink(memory, JsonlFileSink(settings.event_log))
+    run_id = str(uuid.uuid4())
     failures = 0
 
-    def llm_for(settings: LLMSettings, schema_field: str = "schema") -> Any:
-        return build(settings, sink=sink, schema_field=schema_field)
+    def llm_for(settings: LLMSettings, schema_field: str = RESPONSE_SCHEMA_FIELD) -> Any:
+        return build(settings, sink=sink, schema_field=schema_field, run_id=run_id)
 
     def last_event() -> dict[str, Any]:
         return memory.events[-1]
@@ -96,8 +99,10 @@ def run(
         f"Models: chat {settings.chat_model}, embed {settings.embed_model}, "
         f"rerank {settings.rerank_model}"
     )
+    out(f"Run ID: {run_id}")
 
     def colour() -> None:
+        enforced_fields = []
         for field in ("schema", "json_schema"):
             result = llm_for(settings, field).chat_json(
                 system="Answer the question.",
@@ -111,9 +116,11 @@ def run(
                 f"schema {'ENFORCED' if enforced else 'NOT enforced'}"
             )
             if enforced:
-                return
-        nonlocal failures
-        failures += 1
+                enforced_fields.append(field)
+        out(f"Adapter uses {RESPONSE_SCHEMA_FIELD!r}; enforced: {enforced_fields}")
+        if RESPONSE_SCHEMA_FIELD not in enforced_fields:
+            nonlocal failures
+            failures += 1
 
     def draft(thinking: str) -> Callable[[], None]:
         def body() -> None:
@@ -173,7 +180,13 @@ def run(
     for event in memory.events:
         units = ", ".join(
             f"{name} {event[name]}"
-            for name in ("input_tokens", "output_tokens", "search_units")
+            for name in (
+                "input_tokens",
+                "output_tokens",
+                "raw_input_tokens",
+                "raw_output_tokens",
+                "search_units",
+            )
             if name in event
         )
         out(
@@ -181,6 +194,12 @@ def run(
             f"{event['latency_ms']:>6} ms  {units}"
             + (f"  {event['error_type']}" if "error_type" in event else "")
         )
+        out(
+            f"       schema_version {event['schema_version']}, run_id {event['run_id']}, "
+            f"request_id {event.get('request_id', '(none)')}"
+        )
+    run_ids = {event["run_id"] for event in memory.events}
+    out(f"Run IDs in events: {sorted(run_ids)}")
     costs = [Decimal(event["cost_usd"]) for event in memory.events if "cost_usd" in event]
     if costs:
         out(f"Estimated cost: {sum(costs)} USD")

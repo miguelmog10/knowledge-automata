@@ -1,4 +1,6 @@
+import dataclasses
 import json
+import uuid
 from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -43,12 +45,16 @@ def ticking_timer(step=0.25):
     return timer
 
 
-def observed(fake, prices=None, sink=None):
+RUN_ID = "0b6c4c1e-8f2d-4d8a-9a1e-3c5f7e9b2d41"
+
+
+def observed(fake, prices=None, sink=None, run_id=RUN_ID):
     sink = sink if sink is not None else MemorySink()
     llm = ObservedLLM(
         fake,
         provider="fake",
         sink=sink,
+        run_id=run_id,
         prices=prices,
         clock=lambda: FIXED_TS,
         timer=ticking_timer(),
@@ -67,8 +73,10 @@ def test_chat_emits_one_complete_event():
     assert result.data == {"title": "ok"}
     (event,) = sink.events
     assert set(event) == {
+        "schema_version",
         "ts",
         "event_id",
+        "run_id",
         "provider",
         "model",
         "operation",
@@ -81,6 +89,8 @@ def test_chat_emits_one_complete_event():
         "input_tokens",
         "output_tokens",
     }
+    assert event["schema_version"] == "1.0"
+    assert event["run_id"] == RUN_ID
     assert event["ts"] == "2026-10-25T09:30:00.123Z"
     assert event["provider"] == "fake"
     assert event["model"] == "fake-chat"
@@ -121,6 +131,56 @@ def test_embed_and_rerank_events_count_items_and_units():
     assert embed_event["event_id"] != rerank_event["event_id"]
 
 
+class ReportingLLM(FakeLLM):
+    """A fake that also reports raw tokens and a request ID, as Cohere does."""
+
+    def chat_json(self, **kwargs):
+        result = super().chat_json(**kwargs)
+        usage = dataclasses.replace(result.usage, raw_input_tokens=300, raw_output_tokens=9)
+        return dataclasses.replace(result, usage=usage, request_id="req-chat-1")
+
+
+def test_raw_tokens_and_request_id_reach_the_event_when_reported():
+    llm, sink = observed(ReportingLLM([{"a": 1}]))
+    chat(llm)
+    (event,) = sink.events
+    assert (event["raw_input_tokens"], event["raw_output_tokens"]) == (300, 9)
+    assert event["request_id"] == "req-chat-1"
+    assert validate_llm_event(event).ok
+
+
+def test_raw_tokens_and_request_id_are_omitted_when_not_reported():
+    llm, sink = observed(FakeLLM([{"a": 1}]))
+    chat(llm)
+    llm.embed(["a"], input_type="query", context=CONTEXT)
+    llm.rerank("q", ["a"], top_n=1, context=CONTEXT)
+    for event in sink.events:
+        assert not {"raw_input_tokens", "raw_output_tokens", "request_id"} & set(event)
+
+
+def test_every_event_of_one_observer_shares_its_run_id():
+    llm, sink = observed(FakeLLM([{"a": 1}, LLMResponseError("bad")]))
+    chat(llm)
+    with pytest.raises(LLMResponseError):
+        chat(llm)
+    llm.embed(["a"], input_type="query", context=CONTEXT)
+    llm.rerank("q", ["a"], top_n=1, context=CONTEXT)
+    assert len(sink.events) == 4
+    assert {event["run_id"] for event in sink.events} == {RUN_ID}
+    assert {event["schema_version"] for event in sink.events} == {"1.0"}
+    assert len({event["event_id"] for event in sink.events}) == 4
+    assert all(validate_llm_event(event).ok for event in sink.events)
+
+
+def test_run_id_defaults_to_a_new_uuid_and_is_validated():
+    first, second = observed(FakeLLM(), run_id=None)[0], observed(FakeLLM(), run_id=None)[0]
+    assert uuid.UUID(first.run_id).version == 4
+    assert first.run_id != second.run_id
+    assert observed(FakeLLM(), run_id=RUN_ID.upper())[0].run_id == RUN_ID
+    with pytest.raises(ValueError, match="run_id must be a UUID"):
+        observed(FakeLLM(), run_id="run-1")
+
+
 def test_errors_are_logged_and_reraised_unchanged():
     error = LLMRateLimitError("monthly cap", monthly_cap=True)
     llm, sink = observed(FakeLLM([error]))
@@ -142,8 +202,24 @@ def test_error_events_keep_billed_usage_and_cost():
         chat(llm)
     (event,) = sink.events
     assert (event["input_tokens"], event["output_tokens"]) == (400_000, 100_000)
+    assert "request_id" not in event
     assert Decimal(event["cost_usd"]) == 2
     assert event["price_table"] == "2026-10-25"
+    assert validate_llm_event(event).ok
+
+
+def test_error_events_keep_the_request_id_and_raw_tokens():
+    error = LLMResponseError(
+        "truncated",
+        usage=Usage(input_tokens=12, output_tokens=5, raw_input_tokens=300, raw_output_tokens=9),
+        request_id="req-err-1",
+    )
+    llm, sink = observed(FakeLLM([error]))
+    with pytest.raises(LLMResponseError):
+        chat(llm)
+    (event,) = sink.events
+    assert event["request_id"] == "req-err-1"
+    assert (event["raw_input_tokens"], event["raw_output_tokens"]) == (300, 9)
     assert validate_llm_event(event).ok
 
 
@@ -215,13 +291,36 @@ def test_jsonl_sink_creates_the_folder_and_appends_lines(tmp_path):
     assert [json.loads(line) for line in lines] == [{"n": 1, "text": "café"}, {"n": 2}]
 
 
+def test_jsonl_sink_keeps_existing_lines_byte_for_byte(tmp_path):
+    path = tmp_path / "llm-events.jsonl"
+    earlier = b'{"from": "an earlier run",  "spacing": "kept"}\n'
+    path.write_bytes(earlier)
+    JsonlFileSink(path).emit({"n": 1})
+    content = path.read_bytes()
+    assert content.startswith(earlier)
+    assert content[len(earlier) :] == b'{"n": 1}\n'
+
+
+def test_jsonl_sink_starts_a_new_file_if_the_log_is_deleted(tmp_path):
+    path = tmp_path / "llm-events.jsonl"
+    sink = JsonlFileSink(path)
+    sink.emit({"n": 1})
+    path.unlink()
+    sink.emit({"n": 2})
+    assert [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()] == [
+        {"n": 2}
+    ]
+
+
 # The event schema itself
 
 
 def valid_event(**changes):
     event = {
+        "schema_version": "1.0",
         "ts": "2026-10-25T09:30:00Z",
         "event_id": "6f1c8a8e-3b0a-4c39-9a52-6a0f1f3d2b11",
+        "run_id": RUN_ID,
         "provider": "cohere",
         "model": "command-a-plus-05-2026",
         "operation": "chat",
@@ -246,6 +345,12 @@ def valid_event(**changes):
         ({"event_id": "not-a-uuid"}, "is not a 'uuid'"),
         ({"artifact_id": "ART-1"}, "does not match"),
         ({"latency_ms": -1}, "less than the minimum"),
+        ({"run_id": None}, "'run_id' is a required property"),
+        ({"run_id": "run-1"}, "is not a 'uuid'"),
+        ({"schema_version": None}, "'schema_version' is a required property"),
+        ({"schema_version": "v1"}, "does not match"),
+        ({"request_id": ""}, "should be non-empty"),
+        ({"raw_output_tokens": -1}, "less than the minimum"),
     ],
 )
 def test_invalid_events_are_rejected(changes, message):

@@ -1,4 +1,6 @@
 import importlib.util
+import json
+import uuid
 from pathlib import Path
 
 import cohere
@@ -68,6 +70,15 @@ def test_build_llm_logs_to_the_configured_file_by_default(tmp_path):
     assert llm.sink.path == settings.event_log
 
 
+def test_each_build_llm_gets_a_new_run_id_unless_one_is_given():
+    settings = LLMSettings(api_key=KEY)
+    first, second = build_llm(settings, client=object()), build_llm(settings, client=object())
+    assert uuid.UUID(first.run_id).version == 4
+    assert first.run_id != second.run_id
+    shared = str(uuid.uuid4())
+    assert build_llm(settings, client=object(), run_id=shared).run_id == shared
+
+
 def test_build_llm_needs_the_key():
     with pytest.raises(LLMConfigError, match=r"\.env\.example"):
         build_llm(LLMSettings.from_env({}))
@@ -77,38 +88,52 @@ def test_build_llm_needs_the_key():
 
 
 def fake_builder(fake, fields):
-    def build(settings, *, sink, schema_field):
+    def build(settings, *, sink, schema_field, run_id):
         fields.append((schema_field, settings.chat_thinking))
-        return ObservedLLM(fake, provider="fake", sink=sink)
+        return ObservedLLM(fake, provider="fake", sink=sink, run_id=run_id)
 
     return build
 
 
 def test_smoke_script_runs_every_check(tmp_path, decision_draft):
     smoke = load_smoke_script()
-    fake = FakeLLM([{"color": "vermilion"}, decision_draft, decision_draft])
+    vermilion = {"color": "vermilion"}
+    fake = FakeLLM([vermilion, vermilion, decision_draft, decision_draft])
     fields, lines = [], []
     settings = LLMSettings(api_key=KEY, event_log=tmp_path / "events.jsonl")
     failures = smoke.run(settings, build=fake_builder(fake, fields), out=lines.append)
     output = "\n".join(lines)
     assert failures == 0, output
     assert "'schema': answer {'color': 'vermilion'}, schema ENFORCED" in output
+    assert "'json_schema': answer {'color': 'vermilion'}, schema ENFORCED" in output
     assert output.count("validate_draft: PASSED") == 2
-    assert [thinking for _, thinking in fields[1:3]] == ["enabled", "disabled"]
-    assert [call.operation for call in fake.calls] == ["chat"] * 3 + ["embed"] * 2 + ["rerank"]
-    assert "6 calls, 0 failed checks" in output
-    assert len((tmp_path / "events.jsonl").read_text(encoding="utf-8").splitlines()) == 6
+    assert [field for field, _ in fields[:2]] == ["schema", "json_schema"]
+    assert [thinking for _, thinking in fields[2:4]] == ["enabled", "disabled"]
+    assert [call.operation for call in fake.calls] == ["chat"] * 4 + ["embed"] * 2 + ["rerank"]
+    assert "7 calls, 0 failed checks" in output
+    events = [
+        json.loads(line)
+        for line in (tmp_path / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(events) == 7
+    (run_id,) = {event["run_id"] for event in events}
+    assert f"Run ID: {run_id}" in output
+    assert all(event["schema_version"] == "1.0" for event in events)
     assert KEY not in output
 
 
-def test_smoke_script_tries_json_schema_when_schema_is_ignored(tmp_path, decision_draft):
+def test_smoke_script_fails_when_the_adapter_field_is_ignored(tmp_path, decision_draft):
     smoke = load_smoke_script()
-    fake = FakeLLM([{"color": "blue"}, {"color": "vermilion"}, decision_draft, decision_draft])
-    fields, lines = [], []
+    used = smoke.RESPONSE_SCHEMA_FIELD
+    other = "json_schema" if used == "schema" else "schema"
+    answers = {used: {"color": "blue"}, other: {"color": "vermilion"}}
+    fake = FakeLLM([answers["schema"], answers["json_schema"], decision_draft, decision_draft])
+    lines = []
     settings = LLMSettings(api_key=KEY, event_log=tmp_path / "events.jsonl")
-    assert smoke.run(settings, build=fake_builder(fake, fields), out=lines.append) == 0
-    assert [field for field, _ in fields[:2]] == ["schema", "json_schema"]
-    assert "'json_schema': answer {'color': 'vermilion'}, schema ENFORCED" in "\n".join(lines)
+    assert smoke.run(settings, build=fake_builder(fake, []), out=lines.append) == 1
+    output = "\n".join(lines)
+    assert f"{used!r}: answer {{'color': 'blue'}}, schema NOT enforced" in output
+    assert f"Adapter uses {used!r}; enforced: [{other!r}]" in output
 
 
 def test_smoke_script_reports_failed_checks_and_carries_on(tmp_path):

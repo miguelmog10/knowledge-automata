@@ -45,11 +45,16 @@ class CallContext:
 
 @dataclass(frozen=True)
 class Usage:
-    """Billed units; ``None`` when the provider does not report them."""
+    """Billed units, and raw (processed) token counts when reported separately.
+
+    ``None`` when the provider does not report a unit.
+    """
 
     input_tokens: int | None = None
     output_tokens: int | None = None
     search_units: int | None = None
+    raw_input_tokens: int | None = None
+    raw_output_tokens: int | None = None
 
 
 @dataclass(frozen=True)
@@ -58,6 +63,7 @@ class ChatResult:
     model: str
     usage: Usage
     finish_reason: str | None = None
+    request_id: str | None = None  # the provider's response ID, for support requests
 
 
 @dataclass(frozen=True)
@@ -65,6 +71,7 @@ class EmbedResult:
     vectors: list[list[float]]  # one per input text, same order
     model: str
     usage: Usage
+    request_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -78,6 +85,7 @@ class RerankResult:
     results: list[RankedDocument]  # best first, at most top_n
     model: str
     usage: Usage
+    request_id: str | None = None
 
 
 @dataclass(frozen=True)

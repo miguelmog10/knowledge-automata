@@ -5,6 +5,7 @@ never hold prompts, artifact text, model output or keys, so the log is safe to k
 cannot become an unvalidated second copy of the institutional memory.
 """
 
+import functools
 import json
 import re
 import time
@@ -14,6 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol, TypeVar, runtime_checkable
 
+from knowledge_automata.core.schemas import LLM_EVENT_SCHEMA, load_schema
 from knowledge_automata.core.validation import validate_llm_event
 from knowledge_automata.llm.interfaces import (
     CallContext,
@@ -29,6 +31,13 @@ from knowledge_automata.llm.pricing import PriceTable, estimate_cost, format_cos
 
 _PROVIDER = re.compile(r"[a-z][a-z0-9-]*")
 _Result = TypeVar("_Result", ChatResult, EmbedResult, RerankResult)
+_UNITS = ("input_tokens", "output_tokens", "raw_input_tokens", "raw_output_tokens", "search_units")
+
+
+@functools.cache
+def event_schema_version() -> str:
+    """The ``MAJOR.MINOR`` version of the event schema, written into every event."""
+    return load_schema(LLM_EVENT_SCHEMA)["x-version"]
 
 
 @runtime_checkable
@@ -37,7 +46,12 @@ class EventSink(Protocol):
 
 
 class JsonlFileSink:
-    """Appends one JSON line per event, creating the folder on first use."""
+    """An append-only JSON Lines log that survives across runs.
+
+    For each event it opens the file in append mode, writes one UTF-8 line and closes it,
+    creating the folder and the file if they are missing. It never truncates, rewrites or
+    rotates the file. One writing process at a time is assumed in v0.1.
+    """
 
     def __init__(self, path: Path | str) -> None:
         self.path = Path(path)
@@ -67,7 +81,8 @@ class ObservedLLM:
 
     ``inner`` must implement the three interfaces and expose ``models`` (ModelIds), so a
     failed call is still logged with the model it was meant for. Exceptions from ``inner``
-    are logged with ``status: "error"`` and re-raised unchanged.
+    are logged with ``status: "error"`` and re-raised unchanged. Every event carries
+    ``run_id`` (a UUID grouping the calls of one run; a new one when None).
     """
 
     def __init__(
@@ -76,6 +91,7 @@ class ObservedLLM:
         *,
         provider: str,
         sink: EventSink,
+        run_id: str | None = None,
         prices: PriceTable | None = None,
         clock: Callable[[], datetime] = utc_now,
         timer: Callable[[], float] = time.perf_counter,
@@ -84,6 +100,10 @@ class ObservedLLM:
             raise ValueError(f"provider must be lowercase words joined by hyphens: {provider!r}")
         if not isinstance(inner.models, ModelIds):
             raise TypeError("The wrapped adapter must expose models as ModelIds")
+        try:
+            self.run_id = str(uuid.UUID(run_id)) if run_id is not None else str(uuid.uuid4())
+        except (TypeError, ValueError, AttributeError):
+            raise ValueError(f"run_id must be a UUID, got {run_id!r}") from None
         self.inner = inner
         self.provider = provider
         self.models: ModelIds = inner.models
@@ -136,6 +156,7 @@ class ObservedLLM:
             result = call()
         except Exception as exc:
             usage = getattr(exc, "usage", None)
+            request_id = getattr(exc, "request_id", None)
             self._emit(
                 operation,
                 context,
@@ -143,6 +164,7 @@ class ObservedLLM:
                 latency_seconds=self._timer() - start,
                 model=self.models.for_operation(operation),
                 usage=usage if isinstance(usage, Usage) else Usage(),
+                request_id=request_id if isinstance(request_id, str) else None,
                 error_type=type(exc).__name__,
             )
             raise
@@ -153,6 +175,7 @@ class ObservedLLM:
             latency_seconds=self._timer() - start,
             model=result.model,
             usage=result.usage,
+            request_id=result.request_id,
         )
         return result
 
@@ -165,11 +188,18 @@ class ObservedLLM:
         latency_seconds: float,
         model: str,
         usage: Usage,
+        request_id: str | None = None,
         error_type: str | None = None,
     ) -> None:
         event: dict[str, Any] = {
+            "schema_version": event_schema_version(),
             "ts": _timestamp(self._clock()),
             "event_id": str(uuid.uuid4()),
+            "run_id": self.run_id,
+        }
+        if request_id:
+            event["request_id"] = request_id
+        event |= {
             "provider": self.provider,
             "model": model,
             "operation": operation,
@@ -184,7 +214,7 @@ class ObservedLLM:
             event["error_type"] = error_type
         event["latency_ms"] = max(0, round(latency_seconds * 1000))
         event["items"] = items
-        for name in ("input_tokens", "output_tokens", "search_units"):
+        for name in _UNITS:
             value = getattr(usage, name)
             if value is not None:
                 event[name] = value

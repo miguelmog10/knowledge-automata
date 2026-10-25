@@ -81,11 +81,15 @@ def embed_body(request):
     texts = json.loads(request.content)["texts"]
     # Each vector encodes its text, so the test can check the output order.
     return 200, {
-        "id": "embed-1",
+        "id": f"embed-{texts[0]}",
         "response_type": "embeddings_by_type",
         "embeddings": {"float": [[float(text.split("-")[1]), 0.5] for text in texts]},
         "texts": texts,
-        "meta": {"api_version": {"version": "2"}, "billed_units": {"input_tokens": len(texts)}},
+        "meta": {
+            "api_version": {"version": "2"},
+            "billed_units": {"input_tokens": len(texts)},
+            "tokens": {"input_tokens": 2 * len(texts)},
+        },
     }
 
 
@@ -145,13 +149,25 @@ def test_chat_returns_the_parsed_object_with_billed_usage():
     result = call_chat(adapter_for(api))
     assert result.data == {"color": "vermilion"}
     assert result.model == "command-a-plus-05-2026"
-    assert result.usage == Usage(input_tokens=12, output_tokens=5)
+    assert result.usage == Usage(
+        input_tokens=12, output_tokens=5, raw_input_tokens=300, raw_output_tokens=9
+    )
+    assert result.request_id == "chat-1"
     assert result.finish_reason == "COMPLETE"
+
+
+def test_chat_without_raw_tokens_or_id_leaves_them_unset():
+    body = chat_body('{"color": "vermilion"}')
+    del body["id"], body["usage"]["tokens"]
+    result = call_chat(adapter_for(FakeCohereAPI((200, body))))
+    assert result.usage == Usage(input_tokens=12, output_tokens=5)
+    assert result.request_id is None
 
 
 def test_billed_units_are_rounded_up_to_whole_units():
     api = FakeCohereAPI((200, chat_body('{"color": "vermilion"}', billed=(12.2, 5.0))))
-    assert call_chat(adapter_for(api)).usage == Usage(input_tokens=13, output_tokens=5)
+    usage = call_chat(adapter_for(api)).usage
+    assert (usage.input_tokens, usage.output_tokens) == (13, 5)
 
 
 @pytest.mark.parametrize(
@@ -168,7 +184,10 @@ def test_unusable_chat_responses_raise_with_billed_usage(body, message):
     api = FakeCohereAPI((200, body))
     with pytest.raises(LLMResponseError, match=message) as excinfo:
         call_chat(adapter_for(api))
-    assert excinfo.value.usage == Usage(input_tokens=12, output_tokens=5)
+    assert excinfo.value.usage == Usage(
+        input_tokens=12, output_tokens=5, raw_input_tokens=300, raw_output_tokens=9
+    )
+    assert excinfo.value.request_id == "chat-1"
     assert PROMPT_SENTINEL not in str(excinfo.value)
 
 
@@ -185,7 +204,9 @@ def test_embed_splits_into_batches_and_keeps_order():
     assert all(body["embedding_types"] == ["float"] for body in bodies)
     assert all(body["model"] == "embed-v5.0-fast" for body in bodies)
     assert [vector[0] for vector in result.vectors] == [float(i) for i in range(200)]
-    assert result.usage == Usage(input_tokens=200)
+    assert result.usage == Usage(input_tokens=200, raw_input_tokens=400)
+    # One request per batch, so the IDs of all batches are kept, in order.
+    assert result.request_id == "embed-text-0,embed-text-96,embed-text-192"
 
 
 @pytest.mark.parametrize(
@@ -225,7 +246,7 @@ def rerank_body(results, search_units=1):
     return {
         "id": "rerank-1",
         "results": results,
-        "meta": {"billed_units": {"search_units": search_units}},
+        "meta": {"billed_units": {"search_units": search_units}, "tokens": {"input_tokens": 7}},
     }
 
 
@@ -235,7 +256,8 @@ def test_rerank_returns_best_first_with_indices():
     result = adapter_for(api).rerank("q", ["a", "b", "c"], top_n=2, context=CONTEXT)
     assert [(r.index, r.score) for r in result.results] == [(2, 0.9), (0, 0.2)]
     assert result.model == "rerank-v5.0-pro"
-    assert result.usage == Usage(search_units=1)
+    assert result.usage == Usage(search_units=1, raw_input_tokens=7)
+    assert result.request_id == "rerank-1"
     body = api.bodies()[0]
     assert api.requests[0].url.path == "/v2/rerank"
     assert (body["query"], body["documents"], body["top_n"]) == ("q", ["a", "b", "c"], 2)

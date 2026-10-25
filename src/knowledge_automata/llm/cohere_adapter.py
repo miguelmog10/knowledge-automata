@@ -6,6 +6,7 @@ connection errors are the SDK's own, bounded by ``KA_LLM_MAX_RETRIES``; there is
 second retry loop here.
 """
 
+import dataclasses
 import json
 import math
 from collections.abc import Mapping, Sequence
@@ -87,37 +88,43 @@ class CohereAdapter:
             request["thinking"] = {"type": self.settings.chat_thinking}
         response = self._call(self._client.chat, **request)
 
-        billed = getattr(getattr(response, "usage", None), "billed_units", None)
-        usage = Usage(
-            input_tokens=_units(getattr(billed, "input_tokens", None)),
-            output_tokens=_units(getattr(billed, "output_tokens", None)),
-        )
+        usage = _read_usage(getattr(response, "usage", None))
+        request_id = _request_id(response)
         finish_reason = getattr(response, "finish_reason", None)
         if finish_reason == "MAX_TOKENS":
             raise LLMResponseError(
                 "The chat response was truncated at the token limit (finish_reason MAX_TOKENS)",
                 usage=usage,
+                request_id=request_id,
             )
         if finish_reason not in (None, "COMPLETE"):
             raise LLMResponseError(
                 f"The chat response did not complete (finish_reason {finish_reason})",
                 usage=usage,
+                request_id=request_id,
             )
         return ChatResult(
-            data=_parse_json_object(response, usage),
+            data=_parse_json_object(response, usage, request_id),
             model=self.models.chat,
             usage=usage,
             finish_reason=finish_reason,
+            request_id=request_id,
         )
 
     def embed(
         self, texts: Sequence[str], *, input_type: InputType, context: CallContext
     ) -> EmbedResult:
+        """Embed ``texts`` in batches of at most 96.
+
+        Usage is summed over the batches; ``request_id`` lists the batch response IDs,
+        separated by commas, when there is more than one batch.
+        """
         if input_type not in COHERE_INPUT_TYPES:
             raise ValueError(f"input_type must be 'document' or 'query', got {input_type!r}")
         texts = list(texts)
         vectors: list[list[float]] = []
-        billed_tokens: list[int | None] = []
+        usages: list[Usage] = []
+        request_ids: list[str] = []
         for start in range(0, len(texts), EMBED_BATCH_SIZE):
             batch = texts[start : start + EMBED_BATCH_SIZE]
             response = self._call(
@@ -127,18 +134,23 @@ class CohereAdapter:
                 texts=batch,
                 embedding_types=["float"],
             )
-            billed = getattr(getattr(response, "meta", None), "billed_units", None)
-            billed_tokens.append(_units(getattr(billed, "input_tokens", None)))
+            usages.append(_read_usage(getattr(response, "meta", None)))
+            if (request_id := _request_id(response)) is not None:
+                request_ids.append(request_id)
             batch_vectors = getattr(getattr(response, "embeddings", None), "float_", None)
             if batch_vectors is None or len(batch_vectors) != len(batch):
                 raise LLMResponseError(
                     f"Cohere returned {0 if batch_vectors is None else len(batch_vectors)} "
                     f"embeddings for {len(batch)} texts",
-                    usage=Usage(input_tokens=_sum(billed_tokens)),
+                    usage=_sum_usage(usages),
+                    request_id=",".join(request_ids) or None,
                 )
             vectors.extend([float(x) for x in vector] for vector in batch_vectors)
         return EmbedResult(
-            vectors=vectors, model=self.models.embed, usage=Usage(input_tokens=_sum(billed_tokens))
+            vectors=vectors,
+            model=self.models.embed,
+            usage=_sum_usage(usages),
+            request_id=",".join(request_ids) or None,
         )
 
     def rerank(
@@ -156,21 +168,22 @@ class CohereAdapter:
             documents=documents,
             top_n=min(top_n, len(documents)),
         )
-        billed = getattr(getattr(response, "meta", None), "billed_units", None)
-        usage = Usage(
-            input_tokens=_units(getattr(billed, "input_tokens", None)),
-            search_units=_units(getattr(billed, "search_units", None)),
-        )
+        usage = _read_usage(getattr(response, "meta", None))
+        request_id = _request_id(response)
         results = []
         for item in getattr(response, "results", None) or []:
             index, score = getattr(item, "index", None), getattr(item, "relevance_score", None)
             if not isinstance(index, int) or not 0 <= index < len(documents) or score is None:
                 raise LLMResponseError(
-                    "Cohere returned a rerank result without a valid index or score", usage=usage
+                    "Cohere returned a rerank result without a valid index or score",
+                    usage=usage,
+                    request_id=request_id,
                 )
             results.append(RankedDocument(index=index, score=float(score)))
         results.sort(key=lambda result: (-result.score, result.index))
-        return RerankResult(results=results[:top_n], model=self.models.rerank, usage=usage)
+        return RerankResult(
+            results=results[:top_n], model=self.models.rerank, usage=usage, request_id=request_id
+        )
 
     def _call(self, method: Any, **kwargs: Any) -> Any:
         try:
@@ -225,12 +238,14 @@ class CohereAdapter:
         return message[:_MAX_PROVIDER_MESSAGE]
 
 
-def _parse_json_object(response: Any, usage: Usage) -> dict[str, Any]:
+def _parse_json_object(response: Any, usage: Usage, request_id: str | None) -> dict[str, Any]:
     # Reasoning models such as Command A+ may put a thinking block before the text block.
     content = getattr(getattr(response, "message", None), "content", None) or []
     text = next((item.text for item in content if getattr(item, "type", None) == "text"), None)
     if text is None:
-        raise LLMResponseError("The chat response has no text content", usage=usage)
+        raise LLMResponseError(
+            "The chat response has no text content", usage=usage, request_id=request_id
+        )
     try:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
@@ -238,11 +253,13 @@ def _parse_json_object(response: Any, usage: Usage) -> dict[str, Any]:
         raise LLMResponseError(
             f"The chat response is not valid JSON (line {exc.lineno}, column {exc.colno})",
             usage=usage,
+            request_id=request_id,
         ) from None
     if not isinstance(data, dict):
         raise LLMResponseError(
             f"The chat response is a JSON {_JSON_TYPES.get(type(data), 'value')}, not an object",
             usage=usage,
+            request_id=request_id,
         )
     return data
 
@@ -257,13 +274,36 @@ _JSON_TYPES: dict[type, str] = {
 }
 
 
+def _read_usage(container: Any) -> Usage:
+    """Read ``billed_units`` and raw ``tokens`` from chat ``usage`` or embed/rerank ``meta``."""
+    billed = getattr(container, "billed_units", None)
+    raw = getattr(container, "tokens", None)
+    return Usage(
+        input_tokens=_units(getattr(billed, "input_tokens", None)),
+        output_tokens=_units(getattr(billed, "output_tokens", None)),
+        search_units=_units(getattr(billed, "search_units", None)),
+        raw_input_tokens=_units(getattr(raw, "input_tokens", None)),
+        raw_output_tokens=_units(getattr(raw, "output_tokens", None)),
+    )
+
+
+def _request_id(response: Any) -> str | None:
+    value = getattr(response, "id", None)
+    return value if isinstance(value, str) and value else None
+
+
 def _units(value: Any) -> int | None:
-    """Billed units arrive as numbers that may be floats; round up to whole units."""
+    """Units arrive as numbers that may be floats; round up to whole units."""
     if value is None:
         return None
     return math.ceil(float(value))
 
 
-def _sum(values: list[int | None]) -> int | None:
-    known = [value for value in values if value is not None]
-    return sum(known) if known else None
+def _sum_usage(usages: list[Usage]) -> Usage:
+    """Add up per-batch usage; a unit no batch reported stays None."""
+
+    def total(name: str) -> int | None:
+        known = [value for usage in usages if (value := getattr(usage, name)) is not None]
+        return sum(known) if known else None
+
+    return Usage(**{field.name: total(field.name) for field in dataclasses.fields(Usage)})
