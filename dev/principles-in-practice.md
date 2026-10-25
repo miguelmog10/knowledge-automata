@@ -126,3 +126,23 @@ Evidence: `dev/backlog.md`, `dev/STATUS.md`.
 
 Moving the local clone out of OneDrive (which had locked `.venv` during `uv sync`) hid several traps for a newcomer: the editable install still pointed at the old folder, so tests would have silently run the old copy; uv had been installed inside the old `.venv`; and PowerShell blocked the activation script. Claude caught the silent one by inspecting the virtual environment before any test run, turning what could have been hours of confusion into a few guided steps. Caveat as before: the owner verified each step (P5).
 Evidence: README "Getting started", `dev/tool-feedback.md`.
+
+### 2026-10-25: P10 Distrust the happy path (product)
+
+An autouse test fixture blocks every socket connection, so a test that accidentally reaches Cohere fails loudly instead of quietly spending trial calls (capped at 1,000 a month). The adapter is still tested against the real SDK, through an in-memory HTTP transport.
+Evidence: `tests/conftest.py`, `tests/llm/test_cohere_adapter.py`.
+
+### 2026-10-25: P4 Maintain traceability (product)
+
+Every LLM call writes an event that names the agent and the artifact but never holds prompts, artifact text or output. Cost and failures stay traceable to artifacts and records, while the log stays safe to share and cannot become a second, unvalidated copy of the institutional memory.
+Evidence: ADR-0012, `schemas/core/llm-event.v1.json`, `src/knowledge_automata/llm/observed.py`.
+
+### 2026-10-25: P11 Build evidence, not just confidence (product)
+
+The Cohere docs disagree on the `response_format` field name and are silent on some keywords. Instead of guessing, the field name is one constant, unsupported schema keywords raise an error, and a small manual smoke check with a schema the model would only follow if enforced ("vermilion" sky) settles the question with evidence.
+Evidence: `scripts/cohere_smoke.py`, `src/knowledge_automata/llm/provider_schema.py`.
+
+### 2026-10-25: P12 Optimise for outcomes, not code (product)
+
+The price table ships empty for Cohere models because the pricing page publishes no per-token prices for them. Leaving the cost out, rather than copying a number from a third-party site, keeps the cost figures trustworthy when they do appear.
+Evidence: `src/knowledge_automata/llm/prices.toml`, `dev/tool-feedback.md`.

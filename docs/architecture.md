@@ -55,6 +55,10 @@ Every change increments `revision` and appends a history entry. Only `active` re
 
 The core (Sensor, Governor, Comparator, Observer, Oracle, Operator and the Artifact Ledger) is domain-neutral. A domain is a set of Registrars and their schemas. v0.1 ships the project-management domain, with registers aligned to PMI's PMBOK Guide (ADR-0007, ADR-0009). Possible future domains include an association (charter, motions, member decisions) or a research group (hypotheses, experiments, findings).
 
+## LLM service layer
+
+All model calls go through `knowledge_automata.llm` (ADR-0003, [ADR-0012](decisions/0012-llm-service-layer-observation-and-cost.md)). It offers three provider-neutral interfaces: structured chat (`chat_json`, which returns a parsed JSON object), embeddings and reranking. Each provider has one adapter, and only the Cohere adapter imports the Cohere SDK. Callers get a ready, observed implementation from `build_llm` and never assemble the pieces themselves; tests use a deterministic fake adapter and never touch the network. Following the design principle, the service layer only parses the model's JSON: callers validate it against their record schemas and decide what to do when it fails.
+
 ## Patterns and terminology
 
 | Concept in this project | Established term |
@@ -70,6 +74,8 @@ The core (Sensor, Governor, Comparator, Observer, Oracle, Operator and the Artif
 | Operator | Human-in-the-loop |
 | Shared registers | Blackboard architecture |
 | The full closed loop | MAPE-K loop (Monitor, Analyse, Plan, Execute over shared Knowledge), from IBM's autonomic computing work |
+| Observation wrapper (`ObservedLLM`) | Decorator pattern |
+| Fake adapter (`FakeLLM`) | Test double (fake) |
 
 ## Security: defence in depth
 
@@ -79,7 +85,9 @@ Supply-chain security (dependency auditing, pinned CI actions and an SBOM per re
 
 ## Observability
 
-Every LLM call is logged by the service layer as one structured JSON event: agent, model, operation, input and output tokens, latency and artifact ID. A small, dated price table in configuration converts tokens to cost. Because the Ledger links artifacts to records, cost per artifact and per record can be derived. The event format should stay compatible with a later move to a standard such as OpenTelemetry.
+Every LLM call through the service layer writes one event to a JSON Lines log (by default `runtime/logs/llm-events.jsonl`, git-ignored). Events hold metadata only: time, provider, model, operation, the calling agent, the artifact ID and prompt version, status and error type, latency, and the billed units the provider reports (input and output tokens, search units). They never hold prompts, artifact text, model output or keys, so the log is safe to keep and share and cannot become an unvalidated second copy of the institutional memory. Each event is validated against `schemas/core/llm-event.v1.json` before it is written; failed calls are logged too, with the units they were billed for.
+
+Cost is estimated from billed units and a dated price table (`prices.toml`, inside the package) copied from the provider's official pricing page. A model without a published price is left out of the table, and its events carry no cost rather than a guess. Because every event carries the artifact ID, and the Ledger links artifacts to records, cost per artifact and per record can be derived. The event format should stay compatible with a later move to a standard such as OpenTelemetry. See [ADR-0012](decisions/0012-llm-service-layer-observation-and-cost.md).
 
 ## Vision: an architecture, not just an implementation
 

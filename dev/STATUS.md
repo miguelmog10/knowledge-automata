@@ -6,7 +6,7 @@
 
 ## Current phase
 
-Handoffs 001 and 002 merged (PR #1 to PR #3). Handoff 003 (LLM service layer and Cohere adapter) is ready for Copilot on `feat/llm-service-layer`.
+Handoffs 001 and 002 merged (PR #1 to PR #3). Handoff 003 (LLM service layer and Cohere adapter) is implemented on `feat/llm-service-layer`; the smoke check against the real API is pending Miguel's go-ahead.
 
 ## Done
 
@@ -21,7 +21,13 @@ Handoffs 001 and 002 merged (PR #1 to PR #3). Handoff 003 (LLM service layer and
 
 ## In progress
 
-- Handoff 003: LLM service layer, Cohere adapter, fake adapter, event log and price table (`dev/handoffs/003-llm-service-layer.md`).
+- Handoff 003 on `feat/llm-service-layer` (`dev/handoffs/003-llm-service-layer.md`), implemented with tests:
+  - `knowledge_automata.llm`: interfaces, errors, settings (`KA_*` variables, plus `KA_CHAT_THINKING`), the Cohere schema reduction, the Cohere adapter (`cohere` 7.3 SDK), `FakeLLM`, `ObservedLLM` with JSONL and in-memory sinks, the price table and `build_llm`.
+  - Event log at `runtime/logs/llm-events.jsonl` (under the existing `/runtime/` ignore rule), validated against `schemas/core/llm-event.v1.json`.
+  - `prices.toml` has no Cohere models yet: the pricing page lists no per-token prices for them, so events carry no `cost_usd`.
+  - Tests never touch the network (autouse socket block); the adapter is tested against the real SDK through `httpx.MockTransport`.
+  - ADR-0012, architecture, README, backlog and logs updated; `dev/handoffs` excluded from `ruff format`, which formats Python blocks inside Markdown.
+  - Remaining: the smoke check (`uv run --env-file .env python scripts/cohere_smoke.py`), run only with Miguel's approval, with thinking enabled and disabled so handoff 004 can choose the default.
 
 ## Next
 
@@ -34,6 +40,7 @@ None.
 
 ## Notes for the next session
 
-- Before Copilot runs the smoke check in handoff 003, Miguel creates a Cohere trial API key and puts it in `.env` as `CO_API_KEY` (never committed). Trial keys are rate limited and reportedly capped at about 1,000 calls a month, so real calls are budgeted.
+- Python 3.15: the Cohere SDK pulls in PyYAML, which has no 3.15 wheel yet and builds from source. If a dependency fails to install on 3.15 in CI, stop and report it; do not drop 3.15 without Miguel's approval.
+- Trial keys are rate limited and capped at 1,000 calls a month, so real calls (smoke checks, evaluation runs) are budgeted. The key lives only in `.env` as `CO_API_KEY` (never committed).
 - Record each pull request's Copilot credits in `dev/costs.md` as the last commit on its branch, before merging.
 - Local setup: `uv sync --all-extras`, then `uv run pytest`. Keep the clone outside cloud-synced folders (see README).

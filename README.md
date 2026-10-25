@@ -46,6 +46,8 @@ pytest
 
 On macOS or Linux, activate with `source .venv/bin/activate` and copy with `cp .env.example .env`. Without uv, `pip install -e ".[dev]"` in a virtual environment still works, but does not use the lock file.
 
+Tests never call the API. Commands that need your Cohere key load `.env` through uv, for example the manual smoke check, which makes a handful of real calls: `uv run --env-file .env python scripts/cohere_smoke.py`.
+
 After changing dependencies in `pyproject.toml`, run `uv lock` and commit the updated `uv.lock`.
 
 Keep the clone outside cloud-synced folders such as OneDrive or Dropbox: sync tools lock files inside `.git` and `.venv` while Git and uv are writing them. If you move the folder, delete `.venv` and run `uv sync --all-extras` again, because the editable install records the old path.

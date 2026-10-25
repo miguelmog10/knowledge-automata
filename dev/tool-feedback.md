@@ -87,3 +87,33 @@ Suggested improvement: pass multi-line messages through a file by default on Win
 
 Note: after the project folder was moved, the editable install in `.venv` (`_editable_impl_knowledge_automata.pth`) still pointed at the old `src` folder. Nothing failed: while the old copy existed, imports and tests would have silently used it. We deleted and rebuilt `.venv` rather than testing whether `uv sync` repairs it.
 Suggested improvement: warn in `uv sync` or `uv run` when an editable install points outside the current project.
+
+### 2026-10-25: Cohere pricing page (missing)
+
+Note: cohere.com/pricing lists only Model Vault per-instance prices. It gives no per-token prices for `command-a-plus-05-2026` or `embed-v5.0-fast`, and no per-search-unit or per-token price for `rerank-v5.0-pro`. The docs page "How does Cohere pricing work" explains billed units but gives no numbers. The price table therefore ships with no Cohere models, and the event log carries no cost.
+Suggested improvement: publish per-unit list prices for each API model, with the unit (tokens or search units) stated per model.
+
+### 2026-10-25: Cohere Python SDK 7.3.0 (confusing)
+
+Note: following up the `schema` versus `json_schema` entry above: the SDK's `JsonObjectResponseFormatV2` also names the field `json_schema`, like the API reference, while the structured outputs guide uses `schema`. The SDK model allows extra fields, so `schema` passes through unchecked, and only a real call shows which name the API enforces. The smoke check settles it.
+Suggested improvement: one name across the guide, the API reference and the SDK.
+
+### 2026-10-25: Cohere Python SDK 7.3.0 (confusing)
+
+Note: the SDK pulls in 28 packages, including `tokenizers`, `huggingface-hub`, `hf-xet`, `fastavro`, `requests` and two HTTP stacks (`httpx` and `httpx2`). `cohere/client.py` imports `tokenizers` at the top, so the chain cannot be avoided even when local tokenization is never used. Through `huggingface-hub` it also needs PyYAML, which has no Python 3.15 wheel yet: on Windows with 3.15 the install fails without a C compiler.
+Suggested improvement: make local tokenization an optional extra (for example `cohere[tokenizers]`) and import it lazily.
+
+### 2026-10-25: Cohere Python SDK 7.3.0 (confusing)
+
+Note: the SDK wraps HTTP error responses in `ApiError` subclasses (there is no `cohere.ApiError`; it lives in `cohere.core.api_error`), but lets `httpx` timeouts and connection errors through unwrapped, so an adapter has to import `httpx` as well. A 402 (billing limit) arrives as a plain `ApiError` with no subclass. The SDK also emits a Pydantic `__fields__` deprecation warning when parsing chat responses.
+Suggested improvement: wrap transport errors in an SDK exception, add a subclass for 402, and move to Pydantic 2 `model_fields`.
+
+### 2026-10-25: Cohere Python SDK 7.3.0 (delight)
+
+Note: the SDK's built-in retries are well designed: exponential backoff with jitter, honouring `Retry-After`, for 408, 409, 429 and 5xx responses and connection errors, bounded by `max_retries` on the client. The service layer did not need its own retry loop. Passing an `httpx.Client` with `httpx.MockTransport` made it possible to test the adapter offline against the real SDK serialization and error classes.
+Suggested improvement: document the retry policy (which statuses, the backoff and the timeout default of 300 seconds) in the SDK README.
+
+### 2026-10-25: ruff 0.17.2 (confusing)
+
+Note: following up the earlier ruff entry: `ruff format --check` also formats Python code blocks inside Markdown, and failed on the committed handoff, whose Python examples are not meant to be reformatted. We excluded `dev/handoffs` from formatting in `pyproject.toml`.
+Suggested improvement: say in the summary that Markdown code blocks are checked, and make it easy to opt out per file type.
