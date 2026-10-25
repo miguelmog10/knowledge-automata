@@ -1,7 +1,7 @@
 """The LLM service layer (ADR-0003, ADR-0012).
 
-The only place that talks to an LLM provider. Callers use the interfaces and results
-exported here; only ``cohere_adapter`` imports the Cohere SDK.
+The only place that talks to an LLM provider. Callers use ``build_llm`` and the interfaces
+and results exported here; only ``cohere_adapter`` imports the Cohere SDK.
 """
 
 from knowledge_automata.llm.errors import (
@@ -13,6 +13,7 @@ from knowledge_automata.llm.errors import (
     LLMResponseError,
     LLMUnavailableError,
 )
+from knowledge_automata.llm.factory import build_llm
 from knowledge_automata.llm.interfaces import (
     CallContext,
     ChatModel,
@@ -53,6 +54,7 @@ __all__ = [
     "RerankModel",
     "RerankResult",
     "Usage",
+    "build_llm",
     "estimate_cost",
     "load_price_table",
 ]

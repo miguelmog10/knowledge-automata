@@ -88,3 +88,27 @@ def test_repr_and_errors_never_show_the_key():
     with pytest.raises(LLMConfigError) as excinfo:
         LLMSettings.from_env({"CO_API_KEY": SECRET, "KA_LLM_MAX_RETRIES": "x"})
     assert SECRET not in str(excinfo.value)
+
+
+ENV_EXAMPLE = Path(__file__).resolve().parents[2] / ".env.example"
+
+
+def test_env_example_documents_every_setting_with_its_default():
+    assignments = {}
+    for line in ENV_EXAMPLE.read_text(encoding="utf-8").splitlines():
+        line = line.removeprefix("# ").strip()
+        name, sep, value = line.partition("=")
+        if sep and name.isupper() and " " not in name:
+            assignments[name] = value
+    assert assignments["CO_API_KEY"] == ""
+    assert {name for name in assignments if name.startswith("KA_")} == {
+        "KA_CHAT_MODEL",
+        "KA_EMBED_MODEL",
+        "KA_RERANK_MODEL",
+        "KA_LLM_TEMPERATURE",
+        "KA_LLM_TIMEOUT_SECONDS",
+        "KA_LLM_MAX_RETRIES",
+        "KA_CHAT_THINKING",
+        "KA_EVENT_LOG",
+    }
+    assert LLMSettings.from_env(assignments) == LLMSettings()
