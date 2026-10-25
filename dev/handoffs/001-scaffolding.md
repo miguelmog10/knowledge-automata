@@ -21,6 +21,22 @@ Key facts:
   - **Claude (claude.ai project):** discovery, architecture, schemas, review and second opinion.
   - **Opus (you, in VS Code):** planning and implementation.
 
+**The framework.** Full text: <PRINCIPLES.md>. Link to it from `README.md` (section 6) and from `AGENTS.md`. The principles, as referenced by
+number (P1 to P16) in this repo:
+
+| # | Principle | # | Principle |
+|---|---|---|---|
+| P1 | Design before prompting | P9 | Testing is mandatory |
+| P2 | Architecture is a first-class deliverable | P10 | Distrust the happy path |
+| P3 | Plan continuously, adapt relentlessly | P11 | Build evidence, not just confidence |
+| P4 | Maintain traceability | P12 | Optimise for outcomes, not code |
+| P5 | AI generates. Humans own | P13 | Documentation is part of development |
+| P6 | Small increments beat big bang development | P14 | Version everything that matters |
+| P7 | Treat AI artifacts as engineering artifacts | P15 | Reduce technical debt as you go |
+| P8 | Externalize memory | P16 | Reuse what compounds, delete what doesn't |
+
+Include this table in `AGENTS.md` and at the top of `dev/principles-in-practice.md`.
+
 **Hard rule: clean-room rebuild.** Miguel previously built a course project called Chronicle. Do **not** open, read, copy or adapt any file from the Chronicle repository. Every file in this repo is written from scratch. Learnings are carried forward only as written decisions (see ADR-0002).
 
 ## 2. How to work on this task
@@ -287,7 +303,7 @@ Intro: notes on tools, SDKs and documentation used while building, so useful fee
 
 ### 4.13 `dev/handoffs/001-scaffolding.md`
 
-Commit this document unchanged.
+Already committed by Miguel on this branch. Do not modify or recommit it.
 
 ## 5. Suggested commit sequence
 
