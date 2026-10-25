@@ -26,7 +26,7 @@ Gaps fixed by design:
 - Free-form Markdown was the source of truth (fixed by validated records, ADR-0005).
 - The LLM generated IDs (code assigns them, ADR-0005).
 - The provider was coupled to the code (fixed by the service layer, ADR-0003).
-- Schemas overlapped.
+- Schemas overlapped (fixed: each register maps to one distinct PMBOK artifact with its own Registrar, ADR-0007).
 
 ## Consequences
 
