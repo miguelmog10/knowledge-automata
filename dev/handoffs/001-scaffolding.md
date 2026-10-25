@@ -327,7 +327,7 @@ Each ends with a `Co-authored-by:` trailer for the AI assistant. Run `ruff` and 
 
 # Handoff 001 Addendum A: Positioning as general-purpose institutional memory
 
-Paste this section at the end of `dev/handoffs/001-scaffolding.md`. Where it conflicts with earlier sections, this addendum wins.
+Note: this addendum wins where it conflicts with earlier sections.
 
 ## A.1 Positioning change
 
@@ -371,7 +371,7 @@ No new commits needed: include ADR-0009 in commit 4 and apply the other changes 
 
 # Handoff 001 Addendum B: GitHub workflow and repo settings
 
-Paste this section after Addendum A. Miguel configures the GitHub settings in B.1 by hand; Opus implements B.2 to B.4.
+Miguel configures the GitHub settings in B.1 by hand; Opus implements B.2 to B.4.
 
 ## B.1 Repository settings (Miguel, in GitHub)
 
@@ -402,7 +402,7 @@ Paste this section after Addendum A. Miguel configures the GitHub settings in B.
 
 # Handoff 001 Addendum C: Supply-chain security baseline
 
-Paste this after Addendum B. It applies to the same scaffolding PR. Context: the EU Cyber Resilience Act (CRA) expects a software bill of materials (SBOM), no known exploitable vulnerabilities, timely security updates and coordinated vulnerability disclosure. The CRA targets commercial products on the EU market and largely exempts non-commercial open source, so this is readiness and good practice, not a compliance claim.
+It applies to the same scaffolding PR. Context: the EU Cyber Resilience Act (CRA) expects a software bill of materials (SBOM), no known exploitable vulnerabilities, timely security updates and coordinated vulnerability disclosure. The CRA targets commercial products on the EU market and largely exempts non-commercial open source, so this is readiness and good practice, not a compliance claim.
 
 ## C.1 Repository settings (Miguel, by hand)
 
