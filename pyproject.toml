@@ -12,6 +12,7 @@ license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Miguel Morales" }]
 dependencies = [
+    "cohere>=7.3",
     "jsonschema>=4.23",
 ]
 
