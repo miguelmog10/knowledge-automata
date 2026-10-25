@@ -40,6 +40,8 @@ packages = ["src/knowledge_automata"]
 line-length = 100
 target-version = "py311"
 src = ["src", "tests"]
+# Handoffs are committed records of what was agreed; ruff must not reformat their code blocks.
+extend-exclude = ["dev/handoffs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
