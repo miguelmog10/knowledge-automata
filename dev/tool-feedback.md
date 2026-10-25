@@ -122,3 +122,23 @@ Suggested improvement: say in the summary that Markdown code blocks are checked,
 
 Note: several files Claude wrote into the repository and into Miguel's journal arrived as an earlier version, although every write reported success. The pattern was a second write of the same file: the revised handoff 003 and event schema were lost this way, so Copilot implemented the first version, and journal entries disappeared several times (first blamed, wrongly, on an editor). Found when Claude re-read the files from the computer and compared them.
 Suggested improvement (Claude): verify the delivered content against what was sent, or fail the write; meanwhile Claude writes each version under a new name and reads it back from the computer to confirm it arrived.
+
+### 2026-10-25: Cohere structured outputs (confusing)
+
+Note: following up the two `schema` versus `json_schema` entries above: the smoke check found both names enforced on `command-a-plus-05-2026` (the model returned "vermilion" for the sky under each). SDK 7.3.0 logs "The `response_format.schema` parameter is an experimental feature and may change in future releases" on every call that uses `schema`, and nothing for `json_schema`. The adapter now sends `json_schema`; the smoke check keeps testing both names.
+Suggested improvement: use `json_schema` in the structured outputs guide, or say there that `schema` is an experimental alias.
+
+### 2026-10-25: Cohere Command A+ reasoning (missing)
+
+Note: Command A+ thinks by default, and thinking tokens are billed as output tokens. For the same decision draft, thinking enabled used about 6x the billed output tokens of thinking disabled (1,320 versus 223, then 1,256 versus 223), with the same validation result. Latency was 6.3x in one run and 1.6x in the other. One artifact only, so not yet a conclusion about quality. Chat responses also report raw token counts (`usage.tokens`) that differ from billed ones (raw input 728 versus 256 billed), without saying what the difference is.
+Suggested improvement: state in the reasoning guide that thinking is on by default and billed as output, with a typical cost ratio, and explain raw versus billed tokens.
+
+### 2026-10-25: Cohere Rerank v5.0 Pro (confusing)
+
+Note: `rerank-v5.0-pro` bills input tokens (`meta.billed_units.input_tokens`, 39 for one query and three short documents) and reports no search units, while the API reference and older pricing describe rerank in search units. Embed and rerank responses also report no raw `meta.tokens`, unlike chat.
+Suggested improvement: state the billing unit per rerank model in the API reference and on the pricing page.
+
+### 2026-10-25: Cohere Python SDK 7.3.0 (bug)
+
+Note: parsing responses raises `PydanticDeprecatedSince20: The __fields__ attribute is deprecated, use the model_fields class property instead`, from `cohere/core/unchecked_base_model.py` line 328. pytest shows it on every adapter test; it will become an error when Pydantic 3 removes `__fields__`.
+Suggested improvement: use `model_fields` in `unchecked_base_model.py` (a candidate upstream issue or pull request).

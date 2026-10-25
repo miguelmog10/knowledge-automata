@@ -6,7 +6,7 @@
 
 ## Current phase
 
-Handoffs 001 and 002 merged (PR #1 to PR #3). Handoff 003 (LLM service layer and Cohere adapter) is implemented on `feat/llm-service-layer`; the smoke check against the real API is pending Miguel's go-ahead.
+Handoffs 001 and 002 merged (PR #1 to PR #3). Handoff 003 (LLM service layer and Cohere adapter) and its Addendum A (event log additions) are implemented on `feat/llm-service-layer`, and the smoke check against the real API passed on 2026-10-25. The pull request is next (Miguel).
 
 ## Done
 
@@ -27,7 +27,13 @@ Handoffs 001 and 002 merged (PR #1 to PR #3). Handoff 003 (LLM service layer and
   - `prices.toml` has no Cohere models yet: the pricing page lists no per-token prices for them, so events carry no `cost_usd`.
   - Tests never touch the network (autouse socket block); the adapter is tested against the real SDK through `httpx.MockTransport`.
   - ADR-0012, architecture, README, backlog and logs updated; `dev/handoffs` excluded from `ruff format`, which formats Python blocks inside Markdown.
-  - Remaining: the smoke check (`uv run --env-file .env python scripts/cohere_smoke.py`), run only with Miguel's approval, with thinking enabled and disabled so handoff 004 can choose the default.
+  - Addendum A: every event carries `schema_version` and a `run_id` grouping the calls of one run, plus the provider's `request_id` and raw token counts when reported. The event log is append-only.
+  - Smoke check (`uv run --env-file .env python scripts/cohere_smoke.py`), run twice with Miguel's approval on 2026-10-25, 0 failed checks both times. The second run (7 calls, after Addendum A) wrote 7 valid events sharing one `run_id`, each with `schema_version` 1.0 and a `request_id`; raw token counts appeared on the chat events only.
+    - Structured output: the vermilion test was enforced under both `response_format` field names, `schema` and `json_schema`. SDK 7.3 logs an "experimental feature" warning for `schema` only, so the adapter now sends `json_schema`, the name in the API reference and the SDK.
+    - Thinking on versus off for the same decision draft: about 6x billed output tokens (1,320 versus 223, then 1,256 versus 223) and the same `validate_draft` result (passed). Latency was 6.3x in the first run (10.1 s versus 1.6 s) but only 1.6x in the second (3.9 s versus 2.4 s), so latency varies. One artifact only: handoff 004 chooses the default and checks quality on the sample project.
+    - Chat raw token counts differ from billed ones: raw input 117 versus 12 billed for the colour test and 728 versus 256 for the draft; raw output is billed output plus 3 to 4.
+    - Embed (`embed-v5.0-fast`): 2,048 dimensions, 23 and 5 billed input tokens. Rerank (`rerank-v5.0-pro`): correct order (0.6867 for the matching document), billed as 39 input tokens, not search units.
+    - The SDK raises a Pydantic `__fields__` deprecation warning (`PydanticDeprecatedSince20`, in `cohere/core/unchecked_base_model.py`) while parsing responses; harmless now, but it will break with Pydantic 3.
 
 ## Next
 
@@ -40,6 +46,7 @@ None.
 
 ## Notes for the next session
 
+- Handoff 004: choose `KA_CHAT_THINKING` for the Decision Registrar from the smoke check results above (thinking costs about 6x output tokens for the same validation result on one artifact) and check quality on the sample project before settling it.
 - Python 3.15: the Cohere SDK pulls in PyYAML, which has no 3.15 wheel yet and builds from source. If a dependency fails to install on 3.15 in CI, stop and report it; do not drop 3.15 without Miguel's approval.
 - Trial keys are rate limited and capped at 1,000 calls a month, so real calls (smoke checks, evaluation runs) are budgeted. The key lives only in `.env` as `CO_API_KEY` (never committed).
 - If a default model stops working (not available to trial keys, no structured-output support, or errors), log why in `dev/tool-feedback.md`, fall back to the previous version (`command-a-03-2025`, `embed-v4.0`, `rerank-v4.0-pro` or `rerank-v3.5`) and record it here. Only if no Cohere model works for a role, ask Miguel (handoff 003 Addendum A).

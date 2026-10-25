@@ -151,3 +151,8 @@ Evidence: `src/knowledge_automata/llm/prices.toml`, `dev/tool-feedback.md`.
 
 A "success" message from a tool was not evidence. Several of Claude's file writes reported success but delivered an older version, and the revised handoff 003 never reached Copilot. Re-reading the files from the computer exposed it; the missing work was recovered as Addendum A instead of being silently lost. Claude now verifies every file it delivers by reading it back.
 Evidence: handoff 003 Addendum A, `dev/tool-feedback.md`.
+
+### 2026-10-25: P11 Build evidence, not just confidence (product)
+
+Command A+ thinks by default, and it would have been easy to keep that default or to switch it off on instinct. The smoke check ran the same decision draft with thinking enabled and disabled before any default was chosen: about 6x the billed output tokens for the same validation result. Handoff 004 now chooses the default from measured cost, and checks quality on the sample project first.
+Evidence: `scripts/cohere_smoke.py`, `dev/STATUS.md`, `dev/tool-feedback.md`.
