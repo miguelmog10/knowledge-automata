@@ -37,9 +37,11 @@ from knowledge_automata.llm.provider_schema import to_cohere_schema
 from knowledge_automata.llm.settings import LLMSettings
 
 PROVIDER = "cohere"
-# Cohere's structured outputs guide names the field "schema"; the SDK and the API
-# reference name it "json_schema". The smoke check settles which one is enforced.
-RESPONSE_SCHEMA_FIELD = "schema"
+# The structured outputs guide names the field "schema", the SDK and the API reference
+# "json_schema". The smoke check of 2026-10-25 found both enforced, but SDK 7.3 logs an
+# "experimental feature" warning for "schema" only, so the documented field is used.
+# Re-run the smoke check after each SDK upgrade: it tests both names.
+RESPONSE_SCHEMA_FIELD = "json_schema"
 # Cohere's documented maximum number of texts per embed call.
 EMBED_BATCH_SIZE = 96
 COHERE_INPUT_TYPES: dict[str, str] = {"document": "search_document", "query": "search_query"}

@@ -114,7 +114,10 @@ def test_chat_request_has_separate_messages_model_temperature_and_schema():
         {"role": "user", "content": f"Notes: {PROMPT_SENTINEL}"},
     ]
     assert body["temperature"] == 0
-    assert body["response_format"] == {"type": "json_object", "schema": to_cohere_schema(SCHEMA)}
+    assert body["response_format"] == {
+        "type": "json_object",
+        "json_schema": to_cohere_schema(SCHEMA),
+    }
     assert "thinking" not in body
 
 
@@ -126,21 +129,18 @@ def test_chat_uses_the_configured_schema_field_and_thinking():
         max_retries=0,
         httpx_client=httpx.Client(transport=httpx.MockTransport(api.handler)),
     )
-    CohereAdapter(settings, client=client, schema_field="json_schema").chat_json(
+    CohereAdapter(settings, client=client, schema_field="schema").chat_json(
         system="s", user="u", schema=SCHEMA, context=CONTEXT
     )
     body = api.bodies()[0]
-    assert body["response_format"] == {
-        "type": "json_object",
-        "json_schema": to_cohere_schema(SCHEMA),
-    }
+    assert body["response_format"] == {"type": "json_object", "schema": to_cohere_schema(SCHEMA)}
     assert body["thinking"] == {"type": "disabled"}
 
 
 def test_chat_accepts_the_real_decision_draft_schema():
     api = FakeCohereAPI((200, chat_body('{"content": {}}')))
     call_chat(adapter_for(api), schema=draft_schema(DECISION_LOG))
-    sent = api.bodies()[0]["response_format"]["schema"]
+    sent = api.bodies()[0]["response_format"]["json_schema"]
     assert sent == to_cohere_schema(draft_schema(DECISION_LOG))
 
 
