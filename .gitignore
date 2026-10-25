@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Knowledge Automata: local pipeline data (registers, ledger, logs from real inputs)
+/runtime/
+
+# Editors
+.vscode/
+.idea/
