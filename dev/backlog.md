@@ -11,7 +11,6 @@
 - Decision Registrar and Risk Registrar (specialist record keepers).
 - Fictional sample project in `examples/`, doubling as a small evaluation set with expected records.
 - CLI entry point to run the pipeline over a folder.
-- Lock file, added with the first runtime dependency (the Cohere SDK).
 - Release workflow that generates a CycloneDX SBOM and attaches it to the v0.1.0 tag.
 
 ## Stretch (v0.1)

@@ -33,17 +33,18 @@ Early development (v0.1 in progress). See [dev/STATUS.md](dev/STATUS.md).
 
 ## Getting started
 
-Requires Python 3.11 or later. On Windows (PowerShell):
+Requires Python 3.11 or later and [uv](https://docs.astral.sh/uv/), which installs the exact dependency versions pinned in `uv.lock`. On Windows (PowerShell):
 
 ```powershell
-python -m venv .venv
+uv sync --all-extras          # creates .venv and installs the locked dependencies
 .\.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
 Copy-Item .env.example .env   # then add your Cohere API key
 pytest
 ```
 
-On macOS or Linux, activate with `source .venv/bin/activate` and copy with `cp .env.example .env`.
+On macOS or Linux, activate with `source .venv/bin/activate` and copy with `cp .env.example .env`. Without uv, `pip install -e ".[dev]"` in a virtual environment still works, but does not use the lock file.
+
+After changing dependencies in `pyproject.toml`, run `uv lock` and commit the updated `uv.lock`.
 
 ## How this project is built
 
