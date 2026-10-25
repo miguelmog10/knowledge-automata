@@ -42,3 +42,13 @@ Suggested improvement: explain why the command was redirected, or run it when a 
 
 Note: `ruff format --check` reported more files than the three Python and TOML files in the repo. Verbose output showed it includes Markdown files (README, ADRs, the handoff) by default. Everything passed, but the count was surprising.
 Suggested improvement: make the included file types visible in the default summary.
+
+### 2026-10-25: Cohere structured outputs docs (confusing)
+
+Note: while designing the record schemas, the "parameter types in JSON" page showed supported keywords only through examples, every one of which marks all properties as required, so it did not say whether optional properties are allowed. The unsupported keywords (`minLength`/`maxLength`, `minimum`/`maximum`, `minItems`/`maxItems`, `allOf`/`oneOf`/`not`, `uniqueItems`) are listed on a different page.
+Suggested improvement: one table of supported and unsupported JSON Schema keywords on the parameter types page, including whether optional properties are allowed.
+
+### 2026-10-25: jsonschema (confusing)
+
+Note: while checking the draft record schemas, a record with `"created_at": "yesterday"` passed validation even with `FORMAT_CHECKER` enabled. `date` is checked out of the box, but `date-time` is only checked when the optional `rfc3339-validator` package is installed; otherwise it is silently skipped.
+Suggested improvement: warn, or fail, when a schema uses a format the installed checker cannot assert.
