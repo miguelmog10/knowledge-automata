@@ -13,6 +13,8 @@ Knowledge Automata is a general-purpose institutional memory for any group that 
 
 Knowledge is created constantly and lost just as fast. Decisions sit in meeting notes, chats and documents, so groups rediscover context and re-argue settled decisions over and over.
 
+Even a perfect memory would still need a record. A record is shared truth that everyone can see and agree on. It makes ownership of decisions clear, keeps the history of how and why they changed, outlives any single tool, chat or model, and is what governance and audits rely on. Knowledge Automata keeps that record, so people and AI tools can answer from it.
+
 Project management is the first application. Formal registers such as a decision log and a risk register solve this, but they are expensive to maintain by hand, which is why Agile teams often skip them. Knowledge Automata maintains them automatically as a side effect of normal work, so teams get PMI-quality records without the overhead.
 
 ## How it works
@@ -45,6 +47,8 @@ pytest
 On macOS or Linux, activate with `source .venv/bin/activate` and copy with `cp .env.example .env`. Without uv, `pip install -e ".[dev]"` in a virtual environment still works, but does not use the lock file.
 
 After changing dependencies in `pyproject.toml`, run `uv lock` and commit the updated `uv.lock`.
+
+Keep the clone outside cloud-synced folders such as OneDrive or Dropbox: sync tools lock files inside `.git` and `.venv` while Git and uv are writing them. If you move the folder, delete `.venv` and run `uv sync --all-extras` again, because the editable install records the old path.
 
 ## How this project is built
 

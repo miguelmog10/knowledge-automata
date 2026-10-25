@@ -6,6 +6,12 @@
 
 Knowledge Automata is designed as a closed-loop control system for the knowledge of any decision-making group: it senses inputs, decides what to do, compares against current state, acts, and monitors the result, with a human operator overseeing it.
 
+## Design principle
+
+**Use the LLM only where judgement is needed; use deterministic code for everything that can be checked.**
+
+Understanding an artifact, drafting a record and judging how it relates to existing records need a model. Hashing, validation, ID assignment, the evidence quote check, write rules, Markdown views and cost tracking do not: code does them, which is cheaper, faster, repeatable and testable. Every LLM output is treated as a proposal that code checks before it is used.
+
 ## Roles
 
 | Name | Plain role | Responsibility | v0.1 |

@@ -111,3 +111,18 @@ Evidence: ADR-0011, `src/knowledge_automata/core/evidence.py`.
 
 Copilot's plan review of handoff 002 caught three problems before any code was written: `enum` fields without `"type": "string"` (every Cohere structured-output example pairs them), a `date-time` check based on `datetime.fromisoformat` alone, which would have accepted loose forms such as `2026-10-25 11:43`, and a conflict between the handoff ("no README change") and the definition of done in `AGENTS.md` once the lock file changed the setup steps. Miguel decided each one and committed the schema fix before implementation started.
 Evidence: handoff 002 "Revised" line, commit `62d0dc6`, `src/knowledge_automata/core/validation.py`.
+
+### 2026-10-25: P12 Optimise for outcomes, not code (product)
+
+Adopted the design principle "use the LLM only where judgement is needed; use deterministic code for everything that can be checked". Validation, IDs, evidence checks, views and cost tracking stay in code: cheaper, faster and repeatable, and focused on the outcome rather than on using AI everywhere because it is fashionable.
+Evidence: `docs/architecture.md` (Design principle).
+
+### 2026-10-25: P3 Plan continuously, adapt relentlessly (product)
+
+Moved a thin vertical slice (one artifact through the Decision Registrar to one validated record on a real Command call) ahead of the Sensor, so the riskiest integration is proven early and the repository shows the Cohere path working end to end.
+Evidence: `dev/backlog.md`, `dev/STATUS.md`.
+
+### 2026-10-25: Core thesis: AI lowers the cost of engineering discipline (teamwork)
+
+Moving the local clone out of OneDrive (which had locked `.venv` during `uv sync`) hid several traps for a newcomer: the editable install still pointed at the old folder, so tests would have silently run the old copy; uv had been installed inside the old `.venv`; and PowerShell blocked the activation script. Claude caught the silent one by inspecting the virtual environment before any test run, turning what could have been hours of confusion into a few guided steps. Caveat as before: the owner verified each step (P5).
+Evidence: README "Getting started", `dev/tool-feedback.md`.

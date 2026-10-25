@@ -82,3 +82,8 @@ Suggested improvement (uv): retry briefly on Windows sharing violations, or name
 
 Note: a multi-line commit message passed with `git commit -m` from PowerShell was split at the embedded double quotes, and git treated the rest as file paths. Writing the message to a file and using `git commit -F` worked. uv also writes progress to stderr, which PowerShell reports as an error with exit code 1 even when the command succeeded.
 Suggested improvement: pass multi-line messages through a file by default on Windows, and judge success by the process exit code rather than stderr.
+
+### 2026-10-25: uv editable installs after moving a project (confusing)
+
+Note: after the project folder was moved, the editable install in `.venv` (`_editable_impl_knowledge_automata.pth`) still pointed at the old `src` folder. Nothing failed: while the old copy existed, imports and tests would have silently used it. We deleted and rebuilt `.venv` rather than testing whether `uv sync` repairs it.
+Suggested improvement: warn in `uv sync` or `uv run` when an editable install points outside the current project.

@@ -22,7 +22,7 @@ Humans own requirements, architecture, quality and outcomes. AI generates and pr
 - `dev/STATUS.md`: where we are now. **Read this first at the start of every session; update it at the end.**
 - `dev/backlog.md`: what's next, what's later, open questions, technical debt.
 - `dev/principles-in-practice.md` and `dev/tool-feedback.md`: running logs (see below).
-- `dev/costs.md`: Copilot credits used per pull request.
+- `dev/costs.md`: Copilot credits used per pull request, added by Miguel as the last commit on the branch before merging.
 - `dev/handoffs/`: prompts handed between team members, committed for traceability.
 
 Nothing important should exist only in a chat session.
@@ -84,6 +84,10 @@ Tests pass, ruff passes, docs updated in the same change, README.md updated if t
 
 - `dev/principles-in-practice.md`: when a principle visibly shaped a decision, improved the product, helped the team collaborate, or had to bend, add a short entry.
 - `dev/tool-feedback.md`: when a tool, SDK or doc (Cohere, Copilot, Python libraries, anything) is confusing, missing something or surprisingly good, add a short entry. These may later become upstream issues or pull requests.
+
+## Implementation reports
+
+Every implementation report (the summary Copilot gives at the end of a handoff) ends with a short **Cohere notes** section: Cohere API, SDK or documentation details used or checked, anything surprising, and the pages relied on. Write "none" if the work did not touch Cohere.
 
 ## Writing style for repo documents
 
