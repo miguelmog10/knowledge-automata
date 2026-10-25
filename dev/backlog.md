@@ -2,8 +2,8 @@
 
 ## Now (v0.1, first working slice)
 
-- Thin vertical slice (handoff 004): one sample artifact through the Decision Registrar (specialist record keeper) to one validated, stored decision record on a real Command call. Moved ahead of the Sensor (intake and input guardrail) on 2026-10-25 so the Cohere path is proven end to end early.
-- Markdown view generator. JSON records stay the source of truth; code generates the views and nobody edits them by hand.
+- Thin vertical slice (handoff 004): one sample artifact through the Decision Registrar (specialist record keeper) to one validated, stored decision record on a real Command call, with the decision log's Markdown view, so the result can be browsed on GitHub. Moved ahead of the Sensor (intake and input guardrail) on 2026-10-25 so the Cohere path is proven end to end early.
+- Markdown view generator (decision log view in handoff 004; risk register view with the Risk Registrar). JSON records stay the source of truth; code generates the views and nobody edits them by hand.
   - Risk register: one table sorted by the computed score (probability times impact).
   - Decision log: an index table, with optional one page per decision.
   - Each page starts with a short front matter block (ID, status, dates).
@@ -53,6 +53,8 @@
 - Opt-in debug capture of prompts and responses to a git-ignored folder, for prompt tuning (never in the event log).
 - Plain-text `chat` in the service layer, when an agent needs it (for example the Oracle).
 - Budget guard: stop a run before it exceeds a call or cost limit (trial keys are capped).
+- Event log rotation or archiving, if the file grows large.
+- A small report that sums calls, units and cost per run, per agent and per artifact from the event log.
 
 ### When collaborators join
 

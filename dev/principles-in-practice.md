@@ -146,3 +146,8 @@ Evidence: `scripts/cohere_smoke.py`, `src/knowledge_automata/llm/provider_schema
 
 The price table ships empty for Cohere models because the pricing page publishes no per-token prices for them. Leaving the cost out, rather than copying a number from a third-party site, keeps the cost figures trustworthy when they do appear.
 Evidence: `src/knowledge_automata/llm/prices.toml`, `dev/tool-feedback.md`.
+
+### 2026-10-25: P11 Build evidence, not just confidence (teamwork)
+
+A "success" message from a tool was not evidence. Several of Claude's file writes reported success but delivered an older version, and the revised handoff 003 never reached Copilot. Re-reading the files from the computer exposed it; the missing work was recovered as Addendum A instead of being silently lost. Claude now verifies every file it delivers by reading it back.
+Evidence: handoff 003 Addendum A, `dev/tool-feedback.md`.

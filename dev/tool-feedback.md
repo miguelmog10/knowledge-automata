@@ -117,3 +117,8 @@ Suggested improvement: document the retry policy (which statuses, the backoff an
 
 Note: following up the earlier ruff entry: `ruff format --check` also formats Python code blocks inside Markdown, and failed on the committed handoff, whose Python examples are not meant to be reformatted. We excluded `dev/handoffs` from formatting in `pyproject.toml`.
 Suggested improvement: say in the summary that Markdown code blocks are checked, and make it easy to opt out per file type.
+
+### 2026-10-25: Claude file bridge to the local computer (bug)
+
+Note: several files Claude wrote into the repository and into Miguel's journal arrived as an earlier version, although every write reported success. The pattern was a second write of the same file: the revised handoff 003 and event schema were lost this way, so Copilot implemented the first version, and journal entries disappeared several times (first blamed, wrongly, on an editor). Found when Claude re-read the files from the computer and compared them.
+Suggested improvement (Claude): verify the delivered content against what was sent, or fail the write; meanwhile Claude writes each version under a new name and reads it back from the computer to confirm it arrived.
