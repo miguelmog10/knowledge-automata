@@ -25,6 +25,8 @@ from knowledge_automata.llm.interfaces import (
     RerankResult,
     Usage,
 )
+from knowledge_automata.llm.observed import EventSink, JsonlFileSink, MemorySink, ObservedLLM
+from knowledge_automata.llm.pricing import PriceTable, estimate_cost, load_price_table
 from knowledge_automata.llm.settings import LLMSettings
 
 __all__ = [
@@ -33,6 +35,8 @@ __all__ = [
     "ChatResult",
     "EmbedResult",
     "EmbeddingModel",
+    "EventSink",
+    "JsonlFileSink",
     "LLMAuthError",
     "LLMConfigError",
     "LLMError",
@@ -41,9 +45,14 @@ __all__ = [
     "LLMResponseError",
     "LLMSettings",
     "LLMUnavailableError",
+    "MemorySink",
     "ModelIds",
+    "ObservedLLM",
+    "PriceTable",
     "RankedDocument",
     "RerankModel",
     "RerankResult",
     "Usage",
+    "estimate_cost",
+    "load_price_table",
 ]

@@ -8,7 +8,14 @@ import httpx
 import pytest
 
 import knowledge_automata
-from knowledge_automata.llm import ChatModel, EmbeddingModel, LLMSettings, RerankModel
+from knowledge_automata.llm import (
+    ChatModel,
+    EmbeddingModel,
+    LLMSettings,
+    MemorySink,
+    ObservedLLM,
+    RerankModel,
+)
 from knowledge_automata.llm.cohere_adapter import CohereAdapter
 from knowledge_automata.llm.fake import FakeLLM
 
@@ -45,7 +52,12 @@ def adapters():
     client = cohere.ClientV2(
         api_key="test", httpx_client=httpx.Client(transport=httpx.MockTransport(lambda r: None))
     )
-    return [FakeLLM(), CohereAdapter(LLMSettings(api_key="test"), client=client)]
+    cohere_adapter = CohereAdapter(LLMSettings(api_key="test"), client=client)
+    return [
+        FakeLLM(),
+        cohere_adapter,
+        ObservedLLM(cohere_adapter, provider="cohere", sink=MemorySink()),
+    ]
 
 
 @pytest.mark.parametrize("protocol", [ChatModel, EmbeddingModel, RerankModel])

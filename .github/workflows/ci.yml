@@ -46,7 +46,8 @@ jobs:
       - run: uv export --frozen --all-extras --no-emit-project --format requirements-txt -o requirements-audit.txt
       - run: uv run --no-sync pip-audit -r requirements-audit.txt --require-hashes --disable-pip
 
-  # Schemas must load from a normal (non-editable) install, not only from the source checkout.
+  # Schemas and the price table must load from a normal (non-editable) install, not only
+  # from the source checkout.
   package:
     runs-on: ubuntu-latest
     steps:
@@ -66,7 +67,7 @@ jobs:
           uv venv "$RUNNER_TEMP/wheel-check"
           uv pip install --python "$RUNNER_TEMP/wheel-check" --require-hashes -r runtime-requirements.txt
           uv pip install --python "$RUNNER_TEMP/wheel-check" --no-deps dist/*.whl
-      - name: Load every schema from the installed wheel
+      - name: Load every schema and the price table from the installed wheel
         working-directory: ${{ runner.temp }}
         run: |
           "$RUNNER_TEMP/wheel-check/bin/python" - <<'PY'
@@ -84,6 +85,11 @@ jobs:
           for name in expected:
               schemas.load_schema(name)
           print(f"Loaded {len(expected)} schemas from {root}")
+
+          from knowledge_automata.llm.pricing import load_price_table
+
+          prices = load_price_table()
+          print(f"Loaded the price table checked on {prices.checked_on} ({len(prices.models)} models)")
           PY
 
   # The only required status check, so matrix changes never break branch protection.

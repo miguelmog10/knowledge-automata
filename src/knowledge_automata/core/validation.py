@@ -17,6 +17,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from knowledge_automata.core.evidence import QuoteCheck, check_evidence
 from knowledge_automata.core.registers import RegisterSpec
 from knowledge_automata.core.schemas import (
+    LLM_EVENT_SCHEMA,
     RECONCILIATION_SCHEMA,
     RECORD_SCHEMA,
     draft_schema,
@@ -225,3 +226,8 @@ def validate_reconciliation(
                 f"only active records can be the target of {classification!r}"
             )
     return ValidationResult(tuple(errors))
+
+
+def validate_llm_event(event: Any) -> ValidationResult:
+    """Validate one LLM event log line against ``core/llm-event.v1.json`` (ADR-0012)."""
+    return ValidationResult(tuple(_schema_errors(_schema_validator(LLM_EVENT_SCHEMA), event)))
