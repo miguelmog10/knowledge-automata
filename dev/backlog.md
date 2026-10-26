@@ -55,6 +55,9 @@
 - Event log rotation or archiving, if the file grows large.
 - A small report that sums calls, units and cost per run, per agent and per artifact from the event log.
 - Thinking on versus off for the Registrars, measured on the evaluation set.
+- Prompt v2 candidates for the Decision Registrar, judged on the evaluation set, not on one artifact:
+  - `decided_by` listed everyone present instead of the group named in the decision ("the board").
+  - `impacts` was a generic summary not supported by the artifact, although the prompt says to omit unsupported fields.
 
 ### When collaborators join
 
@@ -72,6 +75,7 @@
 - How a Registrar reports that an artifact has nothing to record. The draft schema always requires content; this is probably the Governor's job (it only sends work orders for items it found).
 - Persisting rejected drafts and their errors: with the Artifact Ledger's `failed` status (ADR-0006).
 - Sensor content hashes must ignore line endings (CRLF versus LF), so the same artifact hashes the same on Windows and in CI.
+- Record finish_reason and the adapter's error message (both metadata, no content) in LLM events, as an optional field in a minor event schema version, so failed attempts can be diagnosed.
 - Cohere's trial monthly cap: the docs give no exact wording for the 429 it returns, so the adapter marks a 429 as the monthly cap only when the message mentions "month" (`llm/cohere_adapter.py`). Confirm the wording the first time it happens.
 - Chat thinking default for the Registrars: decided for the Decision Registrar, thinking disabled unless `KA_CHAT_THINKING` is set ([ADR-0014](../docs/decisions/0014-registrar-drafting-loop.md)); revisited with the evaluation set (see *Later*).
 - Prices: Cohere's pricing page lists no per-token or per-search-unit prices for the configured models, so `prices.toml` has no model entries and events carry no `cost_usd`. Fill the table when prices are published, or record an official source.
@@ -79,4 +83,4 @@
 
 ## Technical debt
 
-- (empty)
+- If writing the views fails after a record is saved, a rerun of `record-decision` is refused as "already recorded"; the error should suggest running `knowledge-automata views`.

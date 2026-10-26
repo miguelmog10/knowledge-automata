@@ -2,11 +2,11 @@
 
 ## Last updated
 
-2026-10-25
+2026-10-26
 
 ## Current phase
 
-Handoffs 001 to 003 merged (PR #1 to PR #4). Handoff 004, the thin vertical slice, is drafted and waiting for Miguel's review.
+Handoffs 001 to 003 merged (PR #1 to PR #4). Handoff 004, the thin vertical slice, is implemented on `feat/decision-slice` and waiting for Miguel's pull request and review.
 
 ## Done
 
@@ -34,12 +34,24 @@ Handoffs 001 to 003 merged (PR #1 to PR #4). Handoff 004, the thin vertical slic
 
 ## In progress
 
-- Handoff 004 drafted (`dev/handoffs/004-decision-slice.md`), with the Decision Registrar prompt, the retry prompt and the first sample artifact. Miguel's decisions: sample data committed in `examples/sample-project/`, artifact ID and date passed by the caller until the Ledger exists, thinking disabled by default for the Decision Registrar, a first CLI command, one JSON file per record (ADR-0013 in the handoff). Next: Miguel reviews and commits it on `feat/decision-slice`, then Copilot plans.
+- Handoff 004 (`dev/handoffs/004-decision-slice.md`), on `feat/decision-slice`, with tests (415 passing, every LLM call mocked):
+  - Prompt files packaged in the wheel and loaded by `core/prompts.py`; CI's `package` job loads every prompt from the installed wheel.
+  - `core/records.py` (envelope builder) and `storage/record_store.py`: one JSON file per record in a memory folder, validated before it is written, written atomically, never overwritten, deterministic formatting (ADR-0013).
+  - `agents/registrar.py`: one drafting loop for every Registrar (specialist record keeper), with one retry from the versioned retry prompt; the record history cites `decision-registrar.v1+registrar-retry.v1` when the retry was used (ADR-0014).
+  - `views/markdown.py` and the decision log view: an index and one page per decision, checked against hand-written fixtures; CI runs `knowledge-automata views --memory examples/sample-project --check`.
+  - `pipeline.py` (a temporary stand-in for the Artifact Ledger) and `cli.py`: `knowledge-automata record-decision` and `knowledge-automata views [--check]`, with exit codes 0, 1 (rejected or stale views), 2 (usage, configuration or file problem) and 3 (provider error). Thinking is disabled for the Decision Registrar unless `KA_CHAT_THINKING` is set.
+  - ADR-0013 and ADR-0014, architecture "Storage and views", README "Try it", sample project README, backlog.
+- The real run, with Miguel's approval on 2026-10-26 (run `98ebfd14-8f1a-4937-961f-242554938b23`, `command-a-plus-05-2026`, thinking disabled): `DEC-0001` recorded from `ART-0001` in 2 attempts and committed unedited with its views.
+  - Attempt 1 (`decision-registrar.v1`): `LLMResponseError` (unusable response) after 10.3 s, billed 697 input and 2,390 output tokens. That is more output than thinking enabled used in the smoke check (about 1,300). The cause is unknown, because events record only the error type.
+  - Attempt 2 (`decision-registrar.v1+registrar-retry.v1`): accepted after 2.1 s, billed 756 input and 322 output tokens.
+  - Total: 1,453 input and 2,712 output billed tokens; about 15 s for the whole command.
+  - Against handoff section 5: statement, rationale, alternatives, date and context match; the QR codes, the offline-sync risk and the actions were left out; the decision quote comes first, and quotes wrapped across lines passed the evidence check. Miguel accepted the record as is. Quality notes for a future `decision-registrar.v2`, to be judged on the evaluation set: `decided_by` listed everyone present instead of the group named in the decision ("the board"), and `impacts` is a generic summary not supported by the artifact, although the prompt says to omit unsupported fields. No evidence quote contains the artifact's typographic apostrophe, so that case was not exercised.
+- Next: Miguel opens the pull request (suggested title `feat: add the decision slice from artifact to decision log (handoff 004)`), adds the Copilot credits to `dev/costs.md` and merges.
 
 ## Next
 
-- Handoff 004, the thin vertical slice: one sample artifact through the Decision Registrar (specialist record keeper) to one validated, stored decision record on a real Command call. It comes before the Sensor (intake and input guardrail) so the Cohere path is proven end to end early.
-- Then the Sensor and Artifact Ledger, the Comparator, the Governor (orchestrator), the Risk Registrar, the sample project and CLI, and the v0.1.0 release (see `dev/backlog.md`).
+- The Sensor (intake and input guardrail) and the Artifact Ledger, replacing the stand-ins in `pipeline.py` (artifact ID and date by hand, artifacts found by name).
+- Then the Comparator, the Governor (orchestrator), the Risk Registrar, the sample project as an evaluation set, and the v0.1.0 release (see `dev/backlog.md`).
 
 ## Blockers
 
@@ -47,7 +59,9 @@ None.
 
 ## Notes for the next session
 
-- Handoff 004: choose `KA_CHAT_THINKING` for the Decision Registrar from the smoke check results above (thinking costs about 6x output tokens for the same validation result on one artifact) and check quality on the sample project before settling it.
+- The sample record is evidence: never rerun the real call to get a nicer `DEC-0001`. Prompt changes are new version files (`decision-registrar.v2`) judged on the evaluation set.
+- Line endings: `core.autocrlf` is on for this clone, so committed text may be CRLF in the working tree. The record store and views always write LF, `views --check` ignores CRLF versus LF, and `read_artifact` normalizes line endings before the evidence check. The Sensor's content hashes must do the same (backlog, *Open questions*).
+- Local checks: `uv sync --all-extras` (a plain `uv sync` removes ruff and pytest), then `uv run ruff check`, `uv run ruff format --check`, `uv run pytest`, and `uv run knowledge-automata views --memory examples/sample-project --check`.
 - Python 3.15: the Cohere SDK pulls in PyYAML, which has no 3.15 wheel yet and builds from source. If a dependency fails to install on 3.15 in CI, stop and report it; do not drop 3.15 without Miguel's approval.
 - Trial keys are rate limited and capped at 1,000 calls a month, so real calls (smoke checks, evaluation runs) are budgeted. The key lives only in `.env` as `CO_API_KEY` (never committed).
 - If a default model stops working (not available to trial keys, no structured-output support, or errors), log why in `dev/tool-feedback.md`, fall back to the previous version (`command-a-03-2025`, `embed-v4.0`, `rerank-v4.0-pro` or `rerank-v3.5`) and record it here. Only if no Cohere model works for a role, ask Miguel (handoff 003 Addendum A).
