@@ -6,7 +6,7 @@
 
 ## Current phase
 
-Handoffs 001 to 003 merged (PR #1 to PR #4). Handoff 004, the thin vertical slice, is implemented on `feat/decision-slice` and waiting for Miguel's pull request and review.
+Handoffs 001 to 004 merged (PR #1 to PR #5). The first slice works end to end: one artifact goes to one validated decision record on a real Command call. Next is the Sensor (intake and input guardrail) and the Artifact Ledger.
 
 ## Done
 
@@ -31,10 +31,7 @@ Handoffs 001 to 003 merged (PR #1 to PR #4). Handoff 004, the thin vertical slic
     - Chat raw token counts differ from billed ones: raw input 117 versus 12 billed for the colour test and 728 versus 256 for the draft; raw output is billed output plus 3 to 4.
     - Embed (`embed-v5.0-fast`): 2,048 dimensions, 23 and 5 billed input tokens. Rerank (`rerank-v5.0-pro`): correct order (0.6867 for the matching document), billed as 39 input tokens, not search units.
     - The SDK raises a Pydantic `__fields__` deprecation warning (`PydanticDeprecatedSince20`, in `cohere/core/unchecked_base_model.py`) while parsing responses; harmless now, but it will break with Pydantic 3.
-
-## In progress
-
-- Handoff 004 (`dev/handoffs/004-decision-slice.md`), on `feat/decision-slice`, with tests (415 passing, every LLM call mocked):
+- Handoff 004 merged as PR #5 (`dev/handoffs/004-decision-slice.md`, ADR-0013, ADR-0014), with tests (415 passing, every LLM call mocked):
   - Prompt files packaged in the wheel and loaded by `core/prompts.py`; CI's `package` job loads every prompt from the installed wheel.
   - `core/records.py` (envelope builder) and `storage/record_store.py`: one JSON file per record in a memory folder, validated before it is written, written atomically, never overwritten, deterministic formatting (ADR-0013).
   - `agents/registrar.py`: one drafting loop for every Registrar (specialist record keeper), with one retry from the versioned retry prompt; the record history cites `decision-registrar.v1+registrar-retry.v1` when the retry was used (ADR-0014).
@@ -46,7 +43,10 @@ Handoffs 001 to 003 merged (PR #1 to PR #4). Handoff 004, the thin vertical slic
   - Attempt 2 (`decision-registrar.v1+registrar-retry.v1`): accepted after 2.1 s, billed 756 input and 322 output tokens.
   - Total: 1,453 input and 2,712 output billed tokens; about 15 s for the whole command.
   - Against handoff section 5: statement, rationale, alternatives, date and context match; the QR codes, the offline-sync risk and the actions were left out; the decision quote comes first, and quotes wrapped across lines passed the evidence check. Miguel accepted the record as is. Quality notes for a future `decision-registrar.v2`, to be judged on the evaluation set: `decided_by` listed everyone present instead of the group named in the decision ("the board"), and `impacts` is a generic summary not supported by the artifact, although the prompt says to omit unsupported fields. No evidence quote contains the artifact's typographic apostrophe, so that case was not exercised.
-- Next: Miguel opens the pull request (suggested title `feat: add the decision slice from artifact to decision log (handoff 004)`), adds the Copilot credits to `dev/costs.md` and merges.
+
+## In progress
+
+None.
 
 ## Next
 
@@ -65,6 +65,6 @@ None.
 - Python 3.15: the Cohere SDK pulls in PyYAML, which has no 3.15 wheel yet and builds from source. If a dependency fails to install on 3.15 in CI, stop and report it; do not drop 3.15 without Miguel's approval.
 - Trial keys are rate limited and capped at 1,000 calls a month, so real calls (smoke checks, evaluation runs) are budgeted. The key lives only in `.env` as `CO_API_KEY` (never committed).
 - If a default model stops working (not available to trial keys, no structured-output support, or errors), log why in `dev/tool-feedback.md`, fall back to the previous version (`command-a-03-2025`, `embed-v4.0`, `rerank-v4.0-pro` or `rerank-v3.5`) and record it here. Only if no Cohere model works for a role, ask Miguel (handoff 003 Addendum A).
-- Record each pull request's Copilot credits in `dev/costs.md` as the last commit on its branch, before merging. PR #4's row was added after the merge, on the next branch.
-- When squash merging, keep the `Co-authored-by:` trailers at the start of their lines: in PR #4 they were indented, so GitHub may not credit the co-authors on that commit.
+- Record each pull request's Copilot credits in `dev/costs.md` as the last commit on its branch, before merging. The rows for PR #4 and PR #5 were added after their merges.
+- When squash merging, copy the `Co-authored-by:` trailers from the code block in `AGENTS.md` (Commit conventions). In PR #4 they were indented, and in PR #5 the Claude address became a Markdown link and the Copilot line was missing, so GitHub may not credit the co-authors on those two commits.
 - Local setup: `uv sync --all-extras`, then `uv run pytest`. Keep the clone outside cloud-synced folders (see README).
