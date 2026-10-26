@@ -29,8 +29,10 @@ Understanding an artifact, drafting a record and judging how it relates to exist
 1. **Sensor (intake):** the artifact arrives. The Sensor checks it, hashes it and records it in the Artifact Ledger as accepted, quarantined or rejected. If accepted, it normalizes the text and adds metadata.
 2. **Governor (orchestrator):** reads the artifact, identifies its content (for example two decisions and one risk) and sends work orders to the Decision and Risk Registrars.
 3. **Comparator (reconciliation):** for each work order, retrieves related existing records and proposes a classification (new, update, reaffirmation or supersession) and a target record. Code checks the proposal before anything is written.
-4. **Registrars (specialist record keepers):** draft records as structured data, with evidence quotes from the artifact. Code checks the evidence quotes, validates the draft against the schema, assigns the ID and stores the record. A rejected draft affects only that record. Independent Registrars can run in parallel.
+4. **Registrars (specialist record keepers):** draft records as structured data, with evidence quotes from the artifact. Code checks the evidence quotes, validates the draft against the schema, assigns the ID and stores the record. A rejected draft affects only that record. Independent Registrars can run in parallel. All Registrars share one drafting loop: an invalid draft gets one retry with its validation errors, and if the retry fails too, the record is rejected and nothing is written ([ADR-0014](decisions/0014-registrar-drafting-loop.md)).
 5. **Governor:** marks the artifact as processed in the Ledger, listing the records it produced.
+
+The first thin slice (handoff 004) runs step 4 for the decision log on its own, without steps 1 to 3: the artifact ID and date are passed by hand, and every record is `new` until the Comparator exists.
 
 Around this loop: the Observer (quality control) checks register health, the Oracle (query interface) answers questions from stored records, and the Operator (human in the loop) approves sensitive changes.
 
@@ -50,6 +52,21 @@ Raw artifacts are read-only. Every record links back to its source artifacts, an
 | supersession | Creates a new record with `relations.supersedes`; the old record becomes `superseded` with `relations.superseded_by` and a `superseded` history entry. A reversal is a new decision that supersedes the old one. | Not allowed in v0.1 (the Comparator should return update). |
 
 Every change increments `revision` and appends a history entry. Only `active` records can be the target of update, reaffirmation or supersession.
+
+## Storage and views
+
+Records live in a **memory folder**: the stored institutional memory of one group ([ADR-0013](decisions/0013-record-storage-json-files.md)). The folder is a parameter of the CLI: the default, `runtime/memory`, is git-ignored, and the sample project in `examples/sample-project` is a committed one.
+
+```
+<memory>/
+  artifacts/                         raw artifacts (read-only; only the sample project keeps them here)
+  registers/decision-log/DEC-0001.json
+  views/decision-log.md              index (generated)
+  views/decision-log/DEC-0001.md     one page per decision (generated)
+```
+
+- **JSON records are the source of truth.** Each record is one file, validated (envelope and content) before it is written, written to a temporary file and moved into place, and never overwritten by a new record. Files are deterministic (UTF-8, LF line endings, two-space indentation, fixed key order), so diffs show only real changes.
+- **Views are generated.** Code renders the Markdown views from the records with standard relative links (index to pages, pages to their source artifacts, supersession both ways), so the registers browse like a wiki on GitHub. Nobody edits them by hand: `knowledge-automata views` regenerates them, and CI runs `knowledge-automata views --check` on the sample project, which fails when the committed views differ from the generator's output.
 
 ## Domains and applications
 
