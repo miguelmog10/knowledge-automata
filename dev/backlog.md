@@ -2,13 +2,12 @@
 
 ## Now (v0.1, first working slice)
 
-- Thin vertical slice (handoff 004): one sample artifact through the Decision Registrar (specialist record keeper) to one validated, stored decision record on a real Command call, with the decision log's Markdown view, so the result can be browsed on GitHub. Moved ahead of the Sensor (intake and input guardrail) on 2026-10-25 so the Cohere path is proven end to end early.
-- Markdown view generator (decision log view in handoff 004; risk register view with the Risk Registrar). JSON records stay the source of truth; code generates the views and nobody edits them by hand.
+- Markdown view generator: the decision log view is done (handoff 004); the risk register view comes with the Risk Registrar. JSON records stay the source of truth; code generates the views and nobody edits them by hand.
   - Risk register: one table sorted by the computed score (probability times impact).
-  - Decision log: an index table, with optional one page per decision.
+  - Decision log (done): an index table and one page per decision.
   - Each page starts with a short front matter block (ID, status, dates).
   - Standard relative Markdown links only, no double-bracket wiki links: supersession linked both ways, each record linked to its source artifacts, and the index linked to each record, so the registers browse like a wiki.
-  - A test renders fixture records against expected output, and a CI check fails if committed views differ from the generator's output.
+  - A test renders fixture records against expected output, and a CI check fails if committed views differ from the generator's output (done for the decision log).
 - Sensor (intake and input guardrail) with deterministic checks (empty, unsupported format, oversized, encoding, duplicate hash), Artifact Ledger and quarantine path.
 - Governor (orchestrator and router): classification and work orders.
 - Comparator (reconciliation) using Embed and Rerank.
@@ -55,6 +54,10 @@
 - Budget guard: stop a run before it exceeds a call or cost limit (trial keys are capped).
 - Event log rotation or archiving, if the file grows large.
 - A small report that sums calls, units and cost per run, per agent and per artifact from the event log.
+- Thinking on versus off for the Registrars, measured on the evaluation set.
+- Prompt v2 candidates for the Decision Registrar, judged on the evaluation set, not on one artifact:
+  - `decided_by` listed everyone present instead of the group named in the decision ("the board").
+  - `impacts` was a generic summary not supported by the artifact, although the prompt says to omit unsupported fields.
 
 ### When collaborators join
 
@@ -67,13 +70,17 @@
 
 ## Open questions
 
-- Storage details for records and the ledger (JSON files per record, one file per register, or SQLite). Leaning: one JSON file per record for both registers, to be confirmed in the storage handoff.
+- Storage for records: decided, one JSON file per record ([ADR-0013](../docs/decisions/0013-record-storage-json-files.md)). The Artifact Ledger's storage is decided with the Sensor.
 - Artifact Ledger status when some of an artifact's records are rejected (for example a `processed` status with a list of rejections).
+- How a Registrar reports that an artifact has nothing to record. The draft schema always requires content; this is probably the Governor's job (it only sends work orders for items it found).
+- Persisting rejected drafts and their errors: with the Artifact Ledger's `failed` status (ADR-0006).
+- Sensor content hashes must ignore line endings (CRLF versus LF), so the same artifact hashes the same on Windows and in CI.
+- Record finish_reason and the adapter's error message (both metadata, no content) in LLM events, as an optional field in a minor event schema version, so failed attempts can be diagnosed.
 - Cohere's trial monthly cap: the docs give no exact wording for the 429 it returns, so the adapter marks a 429 as the monthly cap only when the message mentions "month" (`llm/cohere_adapter.py`). Confirm the wording the first time it happens.
-- Chat thinking default for the Registrars: Command A+ reasons by default. Handoff 004 chooses `KA_CHAT_THINKING` from the smoke check's billed tokens, latency and validation results.
+- Chat thinking default for the Registrars: decided for the Decision Registrar, thinking disabled unless `KA_CHAT_THINKING` is set ([ADR-0014](../docs/decisions/0014-registrar-drafting-loop.md)); revisited with the evaluation set (see *Later*).
 - Prices: Cohere's pricing page lists no per-token or per-search-unit prices for the configured models, so `prices.toml` has no model entries and events carry no `cost_usd`. Fill the table when prices are published, or record an official source.
 - Python 3.15: PyYAML (pulled in by the Cohere SDK through `tokenizers` and `huggingface-hub`) has no 3.15 wheel yet and builds from source. CI shows whether that works on Ubuntu; on Windows it needs a C compiler.
 
 ## Technical debt
 
-- (empty)
+- If writing the views fails after a record is saved, a rerun of `record-decision` is refused as "already recorded"; the error should suggest running `knowledge-automata views`.

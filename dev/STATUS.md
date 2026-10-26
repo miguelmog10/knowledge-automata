@@ -2,11 +2,11 @@
 
 ## Last updated
 
-2026-10-25
+2026-10-26
 
 ## Current phase
 
-Handoffs 001 and 002 merged (PR #1 to PR #3). Handoff 003 (LLM service layer and Cohere adapter) and its Addendum A (event log additions) are implemented on `feat/llm-service-layer`, and the smoke check against the real API passed on 2026-10-25. The pull request is next (Miguel).
+Handoffs 001 to 003 merged (PR #1 to PR #4). Handoff 004, the thin vertical slice, is implemented on `feat/decision-slice` and waiting for Miguel's pull request and review.
 
 ## Done
 
@@ -18,10 +18,7 @@ Handoffs 001 and 002 merged (PR #1 to PR #3). Handoff 003 (LLM service layer and
   - `jsonschema` as the first runtime dependency, `uv.lock`, CI and Dependabot on uv, and a CI `package` job that loads every schema from the built wheel. Python 3.15 passed with the first compiled dependency.
   - ADR-0011 (record model and write rules); ADR-0007 amended to cite the PMBOK Guide, Eighth Edition.
 - Planning updates after PR #3 (Miguel and Claude): the design principle "use the LLM only where judgement is needed" in `docs/architecture.md`, the thin vertical slice moved ahead of the Sensor, the Markdown view specification in the backlog, credits recorded as the last commit before merging, and "Cohere notes" at the end of every implementation report.
-
-## In progress
-
-- Handoff 003 on `feat/llm-service-layer` (`dev/handoffs/003-llm-service-layer.md`), implemented with tests:
+- Handoff 003 merged as PR #4 (`dev/handoffs/003-llm-service-layer.md`, ADR-0012), with tests:
   - `knowledge_automata.llm`: interfaces, errors, settings (`KA_*` variables, plus `KA_CHAT_THINKING`), the Cohere schema reduction, the Cohere adapter (`cohere` 7.3 SDK), `FakeLLM`, `ObservedLLM` with JSONL and in-memory sinks, the price table and `build_llm`.
   - Event log at `runtime/logs/llm-events.jsonl` (under the existing `/runtime/` ignore rule), validated against `schemas/core/llm-event.v1.json`.
   - `prices.toml` has no Cohere models yet: the pricing page lists no per-token prices for them, so events carry no `cost_usd`.
@@ -35,10 +32,26 @@ Handoffs 001 and 002 merged (PR #1 to PR #3). Handoff 003 (LLM service layer and
     - Embed (`embed-v5.0-fast`): 2,048 dimensions, 23 and 5 billed input tokens. Rerank (`rerank-v5.0-pro`): correct order (0.6867 for the matching document), billed as 39 input tokens, not search units.
     - The SDK raises a Pydantic `__fields__` deprecation warning (`PydanticDeprecatedSince20`, in `cohere/core/unchecked_base_model.py`) while parsing responses; harmless now, but it will break with Pydantic 3.
 
+## In progress
+
+- Handoff 004 (`dev/handoffs/004-decision-slice.md`), on `feat/decision-slice`, with tests (415 passing, every LLM call mocked):
+  - Prompt files packaged in the wheel and loaded by `core/prompts.py`; CI's `package` job loads every prompt from the installed wheel.
+  - `core/records.py` (envelope builder) and `storage/record_store.py`: one JSON file per record in a memory folder, validated before it is written, written atomically, never overwritten, deterministic formatting (ADR-0013).
+  - `agents/registrar.py`: one drafting loop for every Registrar (specialist record keeper), with one retry from the versioned retry prompt; the record history cites `decision-registrar.v1+registrar-retry.v1` when the retry was used (ADR-0014).
+  - `views/markdown.py` and the decision log view: an index and one page per decision, checked against hand-written fixtures; CI runs `knowledge-automata views --memory examples/sample-project --check`.
+  - `pipeline.py` (a temporary stand-in for the Artifact Ledger) and `cli.py`: `knowledge-automata record-decision` and `knowledge-automata views [--check]`, with exit codes 0, 1 (rejected or stale views), 2 (usage, configuration or file problem) and 3 (provider error). Thinking is disabled for the Decision Registrar unless `KA_CHAT_THINKING` is set.
+  - ADR-0013 and ADR-0014, architecture "Storage and views", README "Try it", sample project README, backlog.
+- The real run, with Miguel's approval on 2026-10-26 (run `98ebfd14-8f1a-4937-961f-242554938b23`, `command-a-plus-05-2026`, thinking disabled): `DEC-0001` recorded from `ART-0001` in 2 attempts and committed unedited with its views.
+  - Attempt 1 (`decision-registrar.v1`): `LLMResponseError` (unusable response) after 10.3 s, billed 697 input and 2,390 output tokens. That is more output than thinking enabled used in the smoke check (about 1,300). The cause is unknown, because events record only the error type.
+  - Attempt 2 (`decision-registrar.v1+registrar-retry.v1`): accepted after 2.1 s, billed 756 input and 322 output tokens.
+  - Total: 1,453 input and 2,712 output billed tokens; about 15 s for the whole command.
+  - Against handoff section 5: statement, rationale, alternatives, date and context match; the QR codes, the offline-sync risk and the actions were left out; the decision quote comes first, and quotes wrapped across lines passed the evidence check. Miguel accepted the record as is. Quality notes for a future `decision-registrar.v2`, to be judged on the evaluation set: `decided_by` listed everyone present instead of the group named in the decision ("the board"), and `impacts` is a generic summary not supported by the artifact, although the prompt says to omit unsupported fields. No evidence quote contains the artifact's typographic apostrophe, so that case was not exercised.
+- Next: Miguel opens the pull request (suggested title `feat: add the decision slice from artifact to decision log (handoff 004)`), adds the Copilot credits to `dev/costs.md` and merges.
+
 ## Next
 
-- Handoff 004, the thin vertical slice: one sample artifact through the Decision Registrar (specialist record keeper) to one validated, stored decision record on a real Command call. It comes before the Sensor (intake and input guardrail) so the Cohere path is proven end to end early.
-- Then the Sensor and Artifact Ledger, the Comparator, the Governor (orchestrator), the Risk Registrar, the sample project and CLI, and the v0.1.0 release (see `dev/backlog.md`).
+- The Sensor (intake and input guardrail) and the Artifact Ledger, replacing the stand-ins in `pipeline.py` (artifact ID and date by hand, artifacts found by name).
+- Then the Comparator, the Governor (orchestrator), the Risk Registrar, the sample project as an evaluation set, and the v0.1.0 release (see `dev/backlog.md`).
 
 ## Blockers
 
@@ -46,9 +59,12 @@ None.
 
 ## Notes for the next session
 
-- Handoff 004: choose `KA_CHAT_THINKING` for the Decision Registrar from the smoke check results above (thinking costs about 6x output tokens for the same validation result on one artifact) and check quality on the sample project before settling it.
+- The sample record is evidence: never rerun the real call to get a nicer `DEC-0001`. Prompt changes are new version files (`decision-registrar.v2`) judged on the evaluation set.
+- Line endings: `core.autocrlf` is on for this clone, so committed text may be CRLF in the working tree. The record store and views always write LF, `views --check` ignores CRLF versus LF, and `read_artifact` normalizes line endings before the evidence check. The Sensor's content hashes must do the same (backlog, *Open questions*).
+- Local checks: `uv sync --all-extras` (a plain `uv sync` removes ruff and pytest), then `uv run ruff check`, `uv run ruff format --check`, `uv run pytest`, and `uv run knowledge-automata views --memory examples/sample-project --check`.
 - Python 3.15: the Cohere SDK pulls in PyYAML, which has no 3.15 wheel yet and builds from source. If a dependency fails to install on 3.15 in CI, stop and report it; do not drop 3.15 without Miguel's approval.
 - Trial keys are rate limited and capped at 1,000 calls a month, so real calls (smoke checks, evaluation runs) are budgeted. The key lives only in `.env` as `CO_API_KEY` (never committed).
 - If a default model stops working (not available to trial keys, no structured-output support, or errors), log why in `dev/tool-feedback.md`, fall back to the previous version (`command-a-03-2025`, `embed-v4.0`, `rerank-v4.0-pro` or `rerank-v3.5`) and record it here. Only if no Cohere model works for a role, ask Miguel (handoff 003 Addendum A).
-- Record each pull request's Copilot credits in `dev/costs.md` as the last commit on its branch, before merging.
+- Record each pull request's Copilot credits in `dev/costs.md` as the last commit on its branch, before merging. PR #4's row was added after the merge, on the next branch.
+- When squash merging, keep the `Co-authored-by:` trailers at the start of their lines: in PR #4 they were indented, so GitHub may not credit the co-authors on that commit.
 - Local setup: `uv sync --all-extras`, then `uv run pytest`. Keep the clone outside cloud-synced folders (see README).

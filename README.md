@@ -31,7 +31,7 @@ See [docs/architecture.md](docs/architecture.md) for roles, data flow and design
 
 ## Status
 
-Early development (v0.1 in progress). See [dev/STATUS.md](dev/STATUS.md).
+Early development (v0.1 in progress). The first slice works: one artifact goes to one validated decision record on a real Command call, with generated Markdown views. See [dev/STATUS.md](dev/STATUS.md).
 
 ## Getting started
 
@@ -51,6 +51,22 @@ Tests never call the API. Commands that need your Cohere key load `.env` through
 After changing dependencies in `pyproject.toml`, run `uv lock` and commit the updated `uv.lock`.
 
 Keep the clone outside cloud-synced folders such as OneDrive or Dropbox: sync tools lock files inside `.git` and `.venv` while Git and uv are writing them. If you move the folder, delete `.venv` and run `uv sync --all-extras` again, because the editable install records the old path.
+
+## Try it
+
+See [a decision recorded from fictional meeting notes](examples/sample-project/views/decision-log.md) in the sample project.
+
+To record the most significant decision in your own artifact (one real Command call, two if the first draft fails validation):
+
+```powershell
+uv run --env-file .env knowledge-automata record-decision notes.md --artifact-id ART-0001 --artifact-date 2026-02-03
+```
+
+The record is validated before it is stored as JSON in the memory folder (by default `runtime/memory`, git-ignored; choose another with `--memory`), and the Markdown views are regenerated next to it. Artifacts kept in `<memory>/artifacts/`, with names starting with their ID, are linked from the views. Until the Sensor (intake) and its Artifact Ledger exist, you give each artifact its ID and date, and a second run on the same artifact ID is refused without a call. To regenerate the views, or check that they match the records, without any call:
+
+```powershell
+uv run knowledge-automata views --memory examples/sample-project --check
+```
 
 ## How this project is built
 

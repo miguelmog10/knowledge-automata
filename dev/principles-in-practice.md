@@ -156,3 +156,18 @@ Evidence: handoff 003 Addendum A, `dev/tool-feedback.md`.
 
 Command A+ thinks by default, and it would have been easy to keep that default or to switch it off on instinct. The smoke check ran the same decision draft with thinking enabled and disabled before any default was chosen: about 6x the billed output tokens for the same validation result. Handoff 004 now chooses the default from measured cost, and checks quality on the sample project first.
 Evidence: `scripts/cohere_smoke.py`, `dev/STATUS.md`, `dev/tool-feedback.md`.
+
+### 2026-10-26: P11 Build evidence, not just confidence (product)
+
+The first real record took two attempts and has two weak fields (`decided_by` lists everyone present, `impacts` is a generic summary). It was committed exactly as the run wrote it, rather than rerun until it looked better, and the weaknesses went to the backlog as prompt v2 candidates to judge on the evaluation set. The sample record shows what the system really produces.
+Evidence: `examples/sample-project/registers/decision-log/DEC-0001.json`, `dev/backlog.md`.
+
+### 2026-10-26: P10 Distrust the happy path (product)
+
+The single retry in the Registrar loop was designed for invalid drafts, and the very first real call needed it: the first response was unusable and the retry was accepted. Without the loop the slice would have failed on its first run. The failure also showed a gap: events record only the error type, so the cause cannot be diagnosed yet.
+Evidence: `src/knowledge_automata/agents/registrar.py`, ADR-0014, `dev/STATUS.md`.
+
+### 2026-10-26: P6 Small increments beat big bang development (product)
+
+Building one artifact to one record ahead of the Sensor (intake), Governor (orchestrator) and Comparator (reconciliation) proved the real Cohere path end to end with two calls, and surfaced the unusable first response, line-ending differences between Windows and CI, and missing event metadata while they are cheap to fix. Each surfaced item is now a backlog entry instead of a surprise inside a larger pipeline.
+Evidence: handoff 004, `dev/backlog.md`.

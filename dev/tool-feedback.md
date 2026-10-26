@@ -142,3 +142,8 @@ Suggested improvement: state the billing unit per rerank model in the API refere
 
 Note: parsing responses raises `PydanticDeprecatedSince20: The __fields__ attribute is deprecated, use the model_fields class property instead`, from `cohere/core/unchecked_base_model.py` line 328. pytest shows it on every adapter test; it will become an error when Pydantic 3 removes `__fields__`.
 Suggested improvement: use `model_fields` in `unchecked_base_model.py` (a candidate upstream issue or pull request).
+
+### 2026-10-26: Cohere Command A+ structured output (open observation)
+
+Note: in the first real `record-decision` run, the first response, with thinking disabled, was unusable (`LLMResponseError`) after 10.3 s and 2,390 billed output tokens: more output than thinking enabled used for a similar draft in the smoke check (about 1,300). The retry was accepted with 322 output tokens. The cause is unknown, because events record only the error type, so this is not yet a finding about Cohere: it could be the prompt, the schema, the response or our parsing. One run only.
+Suggested improvement: for us first, record `finish_reason` and the adapter's error message (metadata, no content) in events so the next failure can be diagnosed (backlog, *Open questions*).

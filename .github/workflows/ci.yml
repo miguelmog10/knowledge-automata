@@ -29,6 +29,8 @@ jobs:
       - run: uv run --no-sync ruff check
       - run: uv run --no-sync ruff format --check
       - run: uv run --no-sync pytest
+      # The committed sample views must match the generator's output for the committed records.
+      - run: uv run --no-sync knowledge-automata views --memory examples/sample-project --check
 
   audit:
     runs-on: ubuntu-latest
@@ -46,8 +48,8 @@ jobs:
       - run: uv export --frozen --all-extras --no-emit-project --format requirements-txt -o requirements-audit.txt
       - run: uv run --no-sync pip-audit -r requirements-audit.txt --require-hashes --disable-pip
 
-  # Schemas and the price table must load from a normal (non-editable) install, not only
-  # from the source checkout.
+  # Schemas, prompts and the price table must load from a normal (non-editable) install, not
+  # only from the source checkout.
   package:
     runs-on: ubuntu-latest
     steps:
@@ -59,7 +61,8 @@ jobs:
         with:
           version: "0.13.5"
           python-version: "3.15"
-      # Builds the sdist, then the wheel from the sdist, so both must contain the schemas.
+      # Builds the sdist, then the wheel from the sdist, so both must contain the schemas
+      # and the prompts.
       - run: uv build --out-dir dist
       - run: uv export --frozen --no-emit-project --format requirements-txt -o runtime-requirements.txt
       - name: Install the wheel into a clean environment
@@ -67,7 +70,7 @@ jobs:
           uv venv "$RUNNER_TEMP/wheel-check"
           uv pip install --python "$RUNNER_TEMP/wheel-check" --require-hashes -r runtime-requirements.txt
           uv pip install --python "$RUNNER_TEMP/wheel-check" --no-deps dist/*.whl
-      - name: Load every schema and the price table from the installed wheel
+      - name: Load every schema, every prompt and the price table from the installed wheel
         working-directory: ${{ runner.temp }}
         run: |
           "$RUNNER_TEMP/wheel-check/bin/python" - <<'PY'
@@ -85,6 +88,19 @@ jobs:
           for name in expected:
               schemas.load_schema(name)
           print(f"Loaded {len(expected)} schemas from {root}")
+
+          from knowledge_automata.core import prompts
+
+          root = prompts.prompts_root()
+          assert root == Path(knowledge_automata.__file__).parent / "prompts", root
+          repo_prompts = Path(os.environ["GITHUB_WORKSPACE"], "prompts")
+          expected = sorted(
+              p.relative_to(repo_prompts).with_suffix("").as_posix() for p in repo_prompts.rglob("*.md")
+          )
+          assert expected and prompts.list_prompts() == expected, prompts.list_prompts()
+          for name in expected:
+              prompts.load_prompt(name)
+          print(f"Loaded {len(expected)} prompts from {root}")
 
           from knowledge_automata.llm.pricing import load_price_table
 
