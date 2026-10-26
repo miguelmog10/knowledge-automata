@@ -70,7 +70,12 @@ Tests pass, ruff passes, docs updated in the same change, README.md updated if t
 - Conventional Commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `ci:`.
 - Messages explain *why*, not only *what*.
 - Reference ADRs or backlog items when relevant, for example `implements ADR-0006`.
-- AI-assisted commits end with a `Co-authored-by:` trailer naming the AI assistant and model, so the human and AI collaboration is visible in the history.
+- AI-assisted commits end with a `Co-authored-by:` trailer naming the AI assistant and model, so the human and AI collaboration is visible in the history. Copy the trailers from this block, so the address keeps its angle brackets, and keep each one at the start of its line:
+
+  ```
+  Co-authored-by: Claude - (Claude Opus 5.5) <noreply@anthropic.com>
+  Co-authored-by: GitHub Copilot - (Claude Opus 5.5) <noreply@anthropic.com>
+  ```
 - Milestones are tagged (for example `v0.1.0` for the first working slice).
 
 ## Branches and pull requests
