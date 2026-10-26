@@ -1,0 +1,21 @@
+# Cohere list prices in USD, copied from the official pricing page.
+# Never estimate a price; leave a model out if no price is published.
+#
+# On 2026-10-25 the pricing page listed only Model Vault per-instance prices, and no
+# per-token or per-search-unit prices for command-a-plus-05-2026, embed-v5.0-fast or
+# rerank-v5.0-pro. They are left out, so events for these models carry no cost_usd.
+# See dev/tool-feedback.md.
+checked_on = "2026-10-25"
+source = "https://cohere.com/pricing"
+currency = "USD"
+
+# Shape of a model entry (prices are strings, computed with Decimal):
+#
+# [models."<model id>"]
+# input_per_million_tokens = "..."
+# output_per_million_tokens = "..."
+# # Rerank, whichever unit the pricing page uses for this model:
+# # per_thousand_search_units = "..."
+# # per_million_tokens = "..."
+
+[models]

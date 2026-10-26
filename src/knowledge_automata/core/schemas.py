@@ -15,6 +15,7 @@ from typing import Any
 from knowledge_automata.core.registers import RegisterSpec
 
 DRAFT_SCHEMA = "core/draft.v1.json"
+LLM_EVENT_SCHEMA = "core/llm-event.v1.json"
 RECONCILIATION_SCHEMA = "core/reconciliation.v1.json"
 RECORD_SCHEMA = "core/record.v1.json"
 

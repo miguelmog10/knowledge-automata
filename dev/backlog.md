@@ -2,12 +2,17 @@
 
 ## Now (v0.1, first working slice)
 
-- LLM service layer with a Cohere adapter and a fake adapter for tests.
-- Structured event logging for every LLM call, plus a dated price table and token-to-cost function.
+- Thin vertical slice (handoff 004): one sample artifact through the Decision Registrar (specialist record keeper) to one validated, stored decision record on a real Command call, with the decision log's Markdown view, so the result can be browsed on GitHub. Moved ahead of the Sensor (intake and input guardrail) on 2026-10-25 so the Cohere path is proven end to end early.
+- Markdown view generator (decision log view in handoff 004; risk register view with the Risk Registrar). JSON records stay the source of truth; code generates the views and nobody edits them by hand.
+  - Risk register: one table sorted by the computed score (probability times impact).
+  - Decision log: an index table, with optional one page per decision.
+  - Each page starts with a short front matter block (ID, status, dates).
+  - Standard relative Markdown links only, no double-bracket wiki links: supersession linked both ways, each record linked to its source artifacts, and the index linked to each record, so the registers browse like a wiki.
+  - A test renders fixture records against expected output, and a CI check fails if committed views differ from the generator's output.
 - Sensor (intake and input guardrail) with deterministic checks (empty, unsupported format, oversized, encoding, duplicate hash), Artifact Ledger and quarantine path.
 - Governor (orchestrator and router): classification and work orders.
 - Comparator (reconciliation) using Embed and Rerank.
-- Decision Registrar and Risk Registrar (specialist record keepers).
+- Risk Registrar, and the Decision Registrar's remaining write rules (update, reaffirmation, supersession).
 - Fictional sample project in `examples/`, doubling as a small evaluation set with expected records.
 - CLI entry point to run the pipeline over a folder.
 - Release workflow that generates a CycloneDX SBOM and attaches it to the v0.1.0 tag.
@@ -43,6 +48,13 @@
 - Remaining PMBOK risk fields: urgency, proximity, contingency and fallback plans, residual and secondary risks, reserves.
 - Typed Python models for records, only with a test that keeps them in sync with the schema files.
 - Store the envelope version in each record before the first envelope change.
+- Probability-impact heat map in the risk register view.
+- Links across registers, for example a risk mitigated by a decision (a minor schema change).
+- Opt-in debug capture of prompts and responses to a git-ignored folder, for prompt tuning (never in the event log).
+- Plain-text `chat` in the service layer, when an agent needs it (for example the Oracle).
+- Budget guard: stop a run before it exceeds a call or cost limit (trial keys are capped).
+- Event log rotation or archiving, if the file grows large.
+- A small report that sums calls, units and cost per run, per agent and per artifact from the event log.
 
 ### When collaborators join
 
@@ -55,8 +67,12 @@
 
 ## Open questions
 
-- Storage details for records and the ledger (JSON files per record, one file per register, or SQLite).
+- Storage details for records and the ledger (JSON files per record, one file per register, or SQLite). Leaning: one JSON file per record for both registers, to be confirmed in the storage handoff.
 - Artifact Ledger status when some of an artifact's records are rejected (for example a `processed` status with a list of rejections).
+- Cohere's trial monthly cap: the docs give no exact wording for the 429 it returns, so the adapter marks a 429 as the monthly cap only when the message mentions "month" (`llm/cohere_adapter.py`). Confirm the wording the first time it happens.
+- Chat thinking default for the Registrars: Command A+ reasons by default. Handoff 004 chooses `KA_CHAT_THINKING` from the smoke check's billed tokens, latency and validation results.
+- Prices: Cohere's pricing page lists no per-token or per-search-unit prices for the configured models, so `prices.toml` has no model entries and events carry no `cost_usd`. Fill the table when prices are published, or record an official source.
+- Python 3.15: PyYAML (pulled in by the Cohere SDK through `tokenizers` and `huggingface-hub`) has no 3.15 wheel yet and builds from source. CI shows whether that works on Ubuntu; on Windows it needs a C compiler.
 
 ## Technical debt
 

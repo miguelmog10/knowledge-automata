@@ -82,3 +82,63 @@ Suggested improvement (uv): retry briefly on Windows sharing violations, or name
 
 Note: a multi-line commit message passed with `git commit -m` from PowerShell was split at the embedded double quotes, and git treated the rest as file paths. Writing the message to a file and using `git commit -F` worked. uv also writes progress to stderr, which PowerShell reports as an error with exit code 1 even when the command succeeded.
 Suggested improvement: pass multi-line messages through a file by default on Windows, and judge success by the process exit code rather than stderr.
+
+### 2026-10-25: uv editable installs after moving a project (confusing)
+
+Note: after the project folder was moved, the editable install in `.venv` (`_editable_impl_knowledge_automata.pth`) still pointed at the old `src` folder. Nothing failed: while the old copy existed, imports and tests would have silently used it. We deleted and rebuilt `.venv` rather than testing whether `uv sync` repairs it.
+Suggested improvement: warn in `uv sync` or `uv run` when an editable install points outside the current project.
+
+### 2026-10-25: Cohere pricing page (missing)
+
+Note: cohere.com/pricing lists only Model Vault per-instance prices. It gives no per-token prices for `command-a-plus-05-2026` or `embed-v5.0-fast`, and no per-search-unit or per-token price for `rerank-v5.0-pro`. The docs page "How does Cohere pricing work" explains billed units but gives no numbers. The price table therefore ships with no Cohere models, and the event log carries no cost.
+Suggested improvement: publish per-unit list prices for each API model, with the unit (tokens or search units) stated per model.
+
+### 2026-10-25: Cohere Python SDK 7.3.0 (confusing)
+
+Note: following up the `schema` versus `json_schema` entry above: the SDK's `JsonObjectResponseFormatV2` also names the field `json_schema`, like the API reference, while the structured outputs guide uses `schema`. The SDK model allows extra fields, so `schema` passes through unchecked, and only a real call shows which name the API enforces. The smoke check settles it.
+Suggested improvement: one name across the guide, the API reference and the SDK.
+
+### 2026-10-25: Cohere Python SDK 7.3.0 (confusing)
+
+Note: the SDK pulls in 28 packages, including `tokenizers`, `huggingface-hub`, `hf-xet`, `fastavro`, `requests` and two HTTP stacks (`httpx` and `httpx2`). `cohere/client.py` imports `tokenizers` at the top, so the chain cannot be avoided even when local tokenization is never used. Through `huggingface-hub` it also needs PyYAML, which has no Python 3.15 wheel yet: on Windows with 3.15 the install fails without a C compiler.
+Suggested improvement: make local tokenization an optional extra (for example `cohere[tokenizers]`) and import it lazily.
+
+### 2026-10-25: Cohere Python SDK 7.3.0 (confusing)
+
+Note: the SDK wraps HTTP error responses in `ApiError` subclasses (there is no `cohere.ApiError`; it lives in `cohere.core.api_error`), but lets `httpx` timeouts and connection errors through unwrapped, so an adapter has to import `httpx` as well. A 402 (billing limit) arrives as a plain `ApiError` with no subclass. The SDK also emits a Pydantic `__fields__` deprecation warning when parsing chat responses.
+Suggested improvement: wrap transport errors in an SDK exception, add a subclass for 402, and move to Pydantic 2 `model_fields`.
+
+### 2026-10-25: Cohere Python SDK 7.3.0 (delight)
+
+Note: the SDK's built-in retries are well designed: exponential backoff with jitter, honouring `Retry-After`, for 408, 409, 429 and 5xx responses and connection errors, bounded by `max_retries` on the client. The service layer did not need its own retry loop. Passing an `httpx.Client` with `httpx.MockTransport` made it possible to test the adapter offline against the real SDK serialization and error classes.
+Suggested improvement: document the retry policy (which statuses, the backoff and the timeout default of 300 seconds) in the SDK README.
+
+### 2026-10-25: ruff 0.17.2 (confusing)
+
+Note: following up the earlier ruff entry: `ruff format --check` also formats Python code blocks inside Markdown, and failed on the committed handoff, whose Python examples are not meant to be reformatted. We excluded `dev/handoffs` from formatting in `pyproject.toml`.
+Suggested improvement: say in the summary that Markdown code blocks are checked, and make it easy to opt out per file type.
+
+### 2026-10-25: Claude file bridge to the local computer (bug)
+
+Note: several files Claude wrote into the repository and into Miguel's journal arrived as an earlier version, although every write reported success. The pattern was a second write of the same file: the revised handoff 003 and event schema were lost this way, so Copilot implemented the first version, and journal entries disappeared several times (first blamed, wrongly, on an editor). Found when Claude re-read the files from the computer and compared them.
+Suggested improvement (Claude): verify the delivered content against what was sent, or fail the write; meanwhile Claude writes each version under a new name and reads it back from the computer to confirm it arrived.
+
+### 2026-10-25: Cohere structured outputs (confusing)
+
+Note: following up the two `schema` versus `json_schema` entries above: the smoke check found both names enforced on `command-a-plus-05-2026` (the model returned "vermilion" for the sky under each). SDK 7.3.0 logs "The `response_format.schema` parameter is an experimental feature and may change in future releases" on every call that uses `schema`, and nothing for `json_schema`. The adapter now sends `json_schema`; the smoke check keeps testing both names.
+Suggested improvement: use `json_schema` in the structured outputs guide, or say there that `schema` is an experimental alias.
+
+### 2026-10-25: Cohere Command A+ reasoning (missing)
+
+Note: Command A+ thinks by default, and thinking tokens are billed as output tokens. For the same decision draft, thinking enabled used about 6x the billed output tokens of thinking disabled (1,320 versus 223, then 1,256 versus 223), with the same validation result. Latency was 6.3x in one run and 1.6x in the other. One artifact only, so not yet a conclusion about quality. Chat responses also report raw token counts (`usage.tokens`) that differ from billed ones (raw input 728 versus 256 billed), without saying what the difference is.
+Suggested improvement: state in the reasoning guide that thinking is on by default and billed as output, with a typical cost ratio, and explain raw versus billed tokens.
+
+### 2026-10-25: Cohere Rerank v5.0 Pro (confusing)
+
+Note: `rerank-v5.0-pro` bills input tokens (`meta.billed_units.input_tokens`, 39 for one query and three short documents) and reports no search units, while the API reference and older pricing describe rerank in search units. Embed and rerank responses also report no raw `meta.tokens`, unlike chat.
+Suggested improvement: state the billing unit per rerank model in the API reference and on the pricing page.
+
+### 2026-10-25: Cohere Python SDK 7.3.0 (bug)
+
+Note: parsing responses raises `PydanticDeprecatedSince20: The __fields__ attribute is deprecated, use the model_fields class property instead`, from `cohere/core/unchecked_base_model.py` line 328. pytest shows it on every adapter test; it will become an error when Pydantic 3 removes `__fields__`.
+Suggested improvement: use `model_fields` in `unchecked_base_model.py` (a candidate upstream issue or pull request).

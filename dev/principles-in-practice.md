@@ -111,3 +111,48 @@ Evidence: ADR-0011, `src/knowledge_automata/core/evidence.py`.
 
 Copilot's plan review of handoff 002 caught three problems before any code was written: `enum` fields without `"type": "string"` (every Cohere structured-output example pairs them), a `date-time` check based on `datetime.fromisoformat` alone, which would have accepted loose forms such as `2026-10-25 11:43`, and a conflict between the handoff ("no README change") and the definition of done in `AGENTS.md` once the lock file changed the setup steps. Miguel decided each one and committed the schema fix before implementation started.
 Evidence: handoff 002 "Revised" line, commit `62d0dc6`, `src/knowledge_automata/core/validation.py`.
+
+### 2026-10-25: P12 Optimise for outcomes, not code (product)
+
+Adopted the design principle "use the LLM only where judgement is needed; use deterministic code for everything that can be checked". Validation, IDs, evidence checks, views and cost tracking stay in code: cheaper, faster and repeatable, and focused on the outcome rather than on using AI everywhere because it is fashionable.
+Evidence: `docs/architecture.md` (Design principle).
+
+### 2026-10-25: P3 Plan continuously, adapt relentlessly (product)
+
+Moved a thin vertical slice (one artifact through the Decision Registrar to one validated record on a real Command call) ahead of the Sensor, so the riskiest integration is proven early and the repository shows the Cohere path working end to end.
+Evidence: `dev/backlog.md`, `dev/STATUS.md`.
+
+### 2026-10-25: Core thesis: AI lowers the cost of engineering discipline (teamwork)
+
+Moving the local clone out of OneDrive (which had locked `.venv` during `uv sync`) hid several traps for a newcomer: the editable install still pointed at the old folder, so tests would have silently run the old copy; uv had been installed inside the old `.venv`; and PowerShell blocked the activation script. Claude caught the silent one by inspecting the virtual environment before any test run, turning what could have been hours of confusion into a few guided steps. Caveat as before: the owner verified each step (P5).
+Evidence: README "Getting started", `dev/tool-feedback.md`.
+
+### 2026-10-25: P10 Distrust the happy path (product)
+
+An autouse test fixture blocks every socket connection, so a test that accidentally reaches Cohere fails loudly instead of quietly spending trial calls (capped at 1,000 a month). The adapter is still tested against the real SDK, through an in-memory HTTP transport.
+Evidence: `tests/conftest.py`, `tests/llm/test_cohere_adapter.py`.
+
+### 2026-10-25: P4 Maintain traceability (product)
+
+Every LLM call writes an event that names the agent and the artifact but never holds prompts, artifact text or output. Cost and failures stay traceable to artifacts and records, while the log stays safe to share and cannot become a second, unvalidated copy of the institutional memory.
+Evidence: ADR-0012, `schemas/core/llm-event.v1.json`, `src/knowledge_automata/llm/observed.py`.
+
+### 2026-10-25: P11 Build evidence, not just confidence (product)
+
+The Cohere docs disagree on the `response_format` field name and are silent on some keywords. Instead of guessing, the field name is one constant, unsupported schema keywords raise an error, and a small manual smoke check with a schema the model would only follow if enforced ("vermilion" sky) settles the question with evidence.
+Evidence: `scripts/cohere_smoke.py`, `src/knowledge_automata/llm/provider_schema.py`.
+
+### 2026-10-25: P12 Optimise for outcomes, not code (product)
+
+The price table ships empty for Cohere models because the pricing page publishes no per-token prices for them. Leaving the cost out, rather than copying a number from a third-party site, keeps the cost figures trustworthy when they do appear.
+Evidence: `src/knowledge_automata/llm/prices.toml`, `dev/tool-feedback.md`.
+
+### 2026-10-25: P11 Build evidence, not just confidence (teamwork)
+
+A "success" message from a tool was not evidence. Several of Claude's file writes reported success but delivered an older version, and the revised handoff 003 never reached Copilot. Re-reading the files from the computer exposed it; the missing work was recovered as Addendum A instead of being silently lost. Claude now verifies every file it delivers by reading it back.
+Evidence: handoff 003 Addendum A, `dev/tool-feedback.md`.
+
+### 2026-10-25: P11 Build evidence, not just confidence (product)
+
+Command A+ thinks by default, and it would have been easy to keep that default or to switch it off on instinct. The smoke check ran the same decision draft with thinking enabled and disabled before any default was chosen: about 6x the billed output tokens for the same validation result. Handoff 004 now chooses the default from measured cost, and checks quality on the sample project first.
+Evidence: `scripts/cohere_smoke.py`, `dev/STATUS.md`, `dev/tool-feedback.md`.

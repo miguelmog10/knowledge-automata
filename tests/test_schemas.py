@@ -12,23 +12,13 @@ from knowledge_automata.domains.project_management.registers import (
     REGISTERS,
     RISK_REGISTER,
 )
+from knowledge_automata.llm.provider_schema import KEPT_KEYWORDS, SUPPORTED_FORMATS
 
 CORE_DIR = Path(__file__).resolve().parents[1] / "src" / "knowledge_automata" / "core"
 
-# Keywords the provider adapter will send to the LLM provider (checked against Cohere's
-# structured outputs documentation), and keywords it will remove before sending.
-SENT_KEYWORDS = {
-    "type",
-    "properties",
-    "required",
-    "items",
-    "enum",
-    "const",
-    "description",
-    "title",
-    "format",
-    "additionalProperties",
-}
+# Keywords the provider adapter sends to the LLM provider (llm/provider_schema.py), and
+# keywords it removes before sending.
+SENT_KEYWORDS = KEPT_KEYWORDS
 REMOVED_KEYWORDS = {
     "$schema",
     "$id",
@@ -38,7 +28,7 @@ REMOVED_KEYWORDS = {
     "minItems",
     "maxItems",
 }
-SENT_FORMATS = {"date", "date-time", "time", "uuid"}
+SENT_FORMATS = SUPPORTED_FORMATS
 
 
 def provider_compatibility_errors(schema: dict, path: str = "$") -> list[str]:

@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:knowledge-automata:schema:core:llm-event:v1",
+  "x-version": "1.0",
+  "title": "LLM call event",
+  "description": "One line of the LLM event log: metadata about one call through the service layer. It never contains prompts, artifact text, model output or keys. Never sent to an LLM provider.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "description": "Version (MAJOR.MINOR) of this event schema, so the log stays readable after the format changes."
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the call finished (UTC)."
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "run_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Groups the calls of one run (one smoke check, one pipeline run). Generated once per run by build_llm unless the caller passes one."
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The provider's ID for the response, when it returns one; useful when contacting provider support."
+    },
+    "provider": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "For example cohere, or fake in tests."
+    },
+    "model": { "type": "string", "minLength": 1 },
+    "operation": { "enum": ["chat", "embed", "rerank"] },
+    "agent": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "The role that made the call, for example decision-registrar or smoke-check."
+    },
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^ART-[0-9]{4,}$"
+    },
+    "prompt_version": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["ok", "error"] },
+    "error_type": {
+      "type": "string",
+      "description": "Project exception class name, for example LLMRateLimitError. Present only when status is error."
+    },
+    "latency_ms": { "type": "integer", "minimum": 0 },
+    "items": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Texts embedded or documents reranked. 1 for chat."
+    },
+    "input_tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Billed input tokens, when the provider reports them."
+    },
+    "output_tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Billed output tokens, when the provider reports them."
+    },
+    "raw_input_tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Input tokens actually processed, when the provider reports them separately from billed tokens."
+    },
+    "raw_output_tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Output tokens actually generated, when the provider reports them separately from billed tokens."
+    },
+    "search_units": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Billed rerank search units, when the provider reports them."
+    },
+    "cost_usd": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Estimated cost as a decimal string. Omitted when the price table has no price for this model."
+    },
+    "price_table": {
+      "type": "string",
+      "format": "date",
+      "description": "The checked_on date of the price table used for cost_usd."
+    }
+  },
+  "required": ["schema_version", "ts", "event_id", "run_id", "provider", "model", "operation", "agent", "status", "latency_ms", "items"],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "error" } }, "required": ["status"] },
+      "then": { "required": ["error_type"] },
+      "else": { "not": { "required": ["error_type"] } }
+    },
+    {
+      "if": { "required": ["cost_usd"] },
+      "then": { "required": ["price_table"] }
+    }
+  ]
+}

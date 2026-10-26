@@ -15,3 +15,4 @@ Short records of significant decisions: why the system looks the way it does. Ne
 | [0009](0009-general-purpose-core-project-management-first-domain.md) | General-purpose core, project management as first domain | Accepted |
 | [0010](0010-supply-chain-security-baseline.md) | Supply-chain security baseline | Accepted |
 | [0011](0011-record-model-and-write-rules.md) | Record model and write rules | Accepted |
+| [0012](0012-llm-service-layer-observation-and-cost.md) | LLM service layer: structured chat, observation and cost | Accepted |
