@@ -29,6 +29,8 @@ jobs:
       - run: uv run --no-sync ruff check
       - run: uv run --no-sync ruff format --check
       - run: uv run --no-sync pytest
+      # The committed sample views must match the generator's output for the committed records.
+      - run: uv run --no-sync knowledge-automata views --memory examples/sample-project --check
 
   audit:
     runs-on: ubuntu-latest
