@@ -6,7 +6,7 @@
 
 ## Current phase
 
-Handoffs 001 and 002 merged (PR #1 to PR #3). Handoff 003 (LLM service layer and Cohere adapter) and its Addendum A (event log additions) are implemented on `feat/llm-service-layer`, and the smoke check against the real API passed on 2026-10-25. The pull request is next (Miguel).
+Handoffs 001 to 003 merged (PR #1 to PR #4). Handoff 004, the thin vertical slice, is drafted and waiting for Miguel's review.
 
 ## Done
 
@@ -18,10 +18,7 @@ Handoffs 001 and 002 merged (PR #1 to PR #3). Handoff 003 (LLM service layer and
   - `jsonschema` as the first runtime dependency, `uv.lock`, CI and Dependabot on uv, and a CI `package` job that loads every schema from the built wheel. Python 3.15 passed with the first compiled dependency.
   - ADR-0011 (record model and write rules); ADR-0007 amended to cite the PMBOK Guide, Eighth Edition.
 - Planning updates after PR #3 (Miguel and Claude): the design principle "use the LLM only where judgement is needed" in `docs/architecture.md`, the thin vertical slice moved ahead of the Sensor, the Markdown view specification in the backlog, credits recorded as the last commit before merging, and "Cohere notes" at the end of every implementation report.
-
-## In progress
-
-- Handoff 003 on `feat/llm-service-layer` (`dev/handoffs/003-llm-service-layer.md`), implemented with tests:
+- Handoff 003 merged as PR #4 (`dev/handoffs/003-llm-service-layer.md`, ADR-0012), with tests:
   - `knowledge_automata.llm`: interfaces, errors, settings (`KA_*` variables, plus `KA_CHAT_THINKING`), the Cohere schema reduction, the Cohere adapter (`cohere` 7.3 SDK), `FakeLLM`, `ObservedLLM` with JSONL and in-memory sinks, the price table and `build_llm`.
   - Event log at `runtime/logs/llm-events.jsonl` (under the existing `/runtime/` ignore rule), validated against `schemas/core/llm-event.v1.json`.
   - `prices.toml` has no Cohere models yet: the pricing page lists no per-token prices for them, so events carry no `cost_usd`.
@@ -34,6 +31,10 @@ Handoffs 001 and 002 merged (PR #1 to PR #3). Handoff 003 (LLM service layer and
     - Chat raw token counts differ from billed ones: raw input 117 versus 12 billed for the colour test and 728 versus 256 for the draft; raw output is billed output plus 3 to 4.
     - Embed (`embed-v5.0-fast`): 2,048 dimensions, 23 and 5 billed input tokens. Rerank (`rerank-v5.0-pro`): correct order (0.6867 for the matching document), billed as 39 input tokens, not search units.
     - The SDK raises a Pydantic `__fields__` deprecation warning (`PydanticDeprecatedSince20`, in `cohere/core/unchecked_base_model.py`) while parsing responses; harmless now, but it will break with Pydantic 3.
+
+## In progress
+
+- Handoff 004 drafted (`dev/handoffs/004-decision-slice.md`), with the Decision Registrar prompt, the retry prompt and the first sample artifact. Miguel's decisions: sample data committed in `examples/sample-project/`, artifact ID and date passed by the caller until the Ledger exists, thinking disabled by default for the Decision Registrar, a first CLI command, one JSON file per record (ADR-0013 in the handoff). Next: Miguel reviews and commits it on `feat/decision-slice`, then Copilot plans.
 
 ## Next
 
@@ -50,5 +51,6 @@ None.
 - Python 3.15: the Cohere SDK pulls in PyYAML, which has no 3.15 wheel yet and builds from source. If a dependency fails to install on 3.15 in CI, stop and report it; do not drop 3.15 without Miguel's approval.
 - Trial keys are rate limited and capped at 1,000 calls a month, so real calls (smoke checks, evaluation runs) are budgeted. The key lives only in `.env` as `CO_API_KEY` (never committed).
 - If a default model stops working (not available to trial keys, no structured-output support, or errors), log why in `dev/tool-feedback.md`, fall back to the previous version (`command-a-03-2025`, `embed-v4.0`, `rerank-v4.0-pro` or `rerank-v3.5`) and record it here. Only if no Cohere model works for a role, ask Miguel (handoff 003 Addendum A).
-- Record each pull request's Copilot credits in `dev/costs.md` as the last commit on its branch, before merging.
+- Record each pull request's Copilot credits in `dev/costs.md` as the last commit on its branch, before merging. PR #4's row was added after the merge, on the next branch.
+- When squash merging, keep the `Co-authored-by:` trailers at the start of their lines: in PR #4 they were indented, so GitHub may not credit the co-authors on that commit.
 - Local setup: `uv sync --all-extras`, then `uv run pytest`. Keep the clone outside cloud-synced folders (see README).

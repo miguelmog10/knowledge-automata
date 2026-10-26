@@ -7,3 +7,4 @@ Copilot credits used per pull request, so the cost of AI-assisted work stays vis
 | #1 | chore: scaffold repository (handoff 001) | Claude Opus 5.5 | 333.7 | 333.7 | | |
 | #2 | ci: add aggregate required check and handoff 001 follow-ups | Claude Opus 5.5 | 327.1 | 660.8 | | |
 | #3 | feat: add register schemas and validation (handoff 002) | Claude Opus 5.5 | 501.3 | 1162.1 | | |
+| #4 | feat: add LLM service layer and Cohere adapter (handoff 003) | Claude Opus 5.5 | 1145.4 | 2307.5 | | Added after the merge, on the next branch (the rule is the last commit before merging). Includes Addendum A. |
