@@ -23,6 +23,9 @@ dev = [
     "ruff==0.17.2",
 ]
 
+[project.scripts]
+knowledge-automata = "knowledge_automata.cli:main"
+
 [project.urls]
 Repository = "https://github.com/miguelmog10/knowledge-automata"
 
