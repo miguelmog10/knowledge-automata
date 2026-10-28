@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge Automata guide</title>
+<meta name="description" content="A visual guide to Knowledge Automata: the closed loop, what is built, and how one artifact became one decision record.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<!--
+  Style: direction B ("The pass") from the 2026-10-28 design review, pending the mise-en-place
+  screen theme. When mise-en-place ships it, replace the values below with its tokens.
+  Diagrams: rendered in the browser from docs/diagrams/*.md (the one source of each diagram).
+-->
+<style>
+:root {
+  --bg: #F3F1EC; --surface: #FFFEFA; --ink: #1E1C19; --muted: #615C54;
+  --line: #D9D4CA; --strong: #8A8276; --accent: #B23A22; --accent-soft: rgba(178, 58, 34, 0.07);
+  --serif: "Newsreader", Georgia, serif;
+  --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #191816; --surface: #23211E; --ink: #F1ECE3; --muted: #A9A194;
+    --line: #3A362F; --strong: #7A7266; --accent: #F07A5C; --accent-soft: rgba(240, 122, 92, 0.10);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #191816; --surface: #23211E; --ink: #F1ECE3; --muted: #A9A194;
+  --line: #3A362F; --strong: #7A7266; --accent: #F07A5C; --accent-soft: rgba(240, 122, 92, 0.10);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 17px; line-height: 1.6; }
+a { color: var(--accent); }
+a:hover { color: var(--ink); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+.kicker { margin: 0 0 8px; font-family: var(--serif); font-style: italic; font-size: 20px; color: var(--accent); }
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+h1, h2, h3 { font-family: var(--serif); font-weight: 500; }
+h2 { margin: 0; font-size: clamp(30px, 4vw, 40px); line-height: 1.15; letter-spacing: -0.015em; }
+section { margin-top: 80px; padding-top: 56px; border-top: 1px solid var(--line); scroll-margin-top: 16px; }
+.lede { margin: 12px 0 0; color: var(--muted); max-width: 680px; }
+
+/* Masthead */
+.masthead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 16px; padding: 28px 0 20px; border-bottom: 2px solid var(--ink); }
+.brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: 16px; }
+.brand b { font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: -0.01em; }
+nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; font-size: 15px; }
+nav a { color: var(--ink); text-decoration: none; }
+nav a:hover { text-decoration: underline; }
+.btn-theme { min-height: 40px; padding: 0 14px; background: transparent; color: var(--ink); border: 1px solid var(--ink); cursor: pointer; font: 12px var(--mono); letter-spacing: 0.06em; }
+
+/* Hero */
+.hero { display: flex; flex-wrap: wrap; gap: 48px; align-items: center; padding: 72px 0 24px; }
+.hero-text { flex: 999 1 520px; min-width: 0; }
+.hero h1 { margin: 0; font-size: clamp(44px, 7vw, 72px); line-height: 1; letter-spacing: -0.025em; }
+.hero p.sub { margin: 28px 0 0; font-size: 19px; color: var(--muted); max-width: 600px; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+.btn { display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; font-weight: 500; font-size: 15px; text-decoration: none; }
+.btn-primary { background: var(--ink); color: var(--bg); }
+.btn-primary:hover { color: var(--bg); background: var(--accent); }
+.btn-secondary { border: 1px solid var(--ink); color: var(--ink); }
+.ticket { background: var(--surface); border: 1px solid var(--line); border-top: 2px dashed var(--strong); padding: 24px; font-family: var(--mono); font-size: 13px; line-height: 1.7; }
+.hero .ticket { flex: 1 1 280px; max-width: 340px; transform: rotate(-1.2deg); }
+.ticket .row { display: flex; justify-content: space-between; gap: 16px; }
+.ticket .rule { margin: 14px 0; border-top: 1px dashed var(--strong); }
+.ticket .sub2 { color: var(--muted); }
+.ticket .hot { color: var(--accent); font-weight: 500; }
+
+/* Stations */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 16px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.sw { width: 20px; height: 12px; display: inline-block; }
+.sw-built { border: 1.5px solid var(--ink); }
+.sw-planned { border: 1.5px dashed var(--strong); }
+.standin { font-family: var(--mono); text-decoration: underline dotted; text-underline-offset: 3px; }
+.line { margin-top: 32px; border-top: 3px solid var(--ink); display: flex; flex-wrap: wrap; gap: 8px; }
+.station { flex: 1 1 160px; margin-top: 18px; padding: 18px; display: flex; flex-direction: column; gap: 6px; }
+.station.built { background: var(--surface); border: 1.5px solid var(--ink); }
+.station.planned { border: 1.5px dashed var(--strong); color: var(--muted); }
+.station b { font-family: var(--serif); font-size: 24px; font-weight: 500; line-height: 1.2; }
+.station span:last-child { font-size: 14px; line-height: 1.5; color: var(--muted); }
+.conn { align-self: center; margin-top: 18px; display: inline-flex; align-items: center; width: 28px; font-size: 9px; line-height: 1; }
+.conn i { flex: 1; }
+.conn.solid { color: var(--ink); } .conn.solid i { border-top: 1.5px solid var(--ink); }
+.conn.dotted { color: var(--strong); } .conn.dotted i { border-top: 2px dotted var(--strong); }
+.note { margin: 24px 0 0; font-size: 15px; color: var(--muted); max-width: 820px; }
+.note em { font-family: var(--serif); color: var(--ink); }
+
+/* Diagrams */
+figure.diagram { margin: 32px 0 0; padding: 24px; background: var(--bg); border: 1px solid var(--line); overflow-x: auto; }
+figure.diagram .canvas { min-height: 120px; display: flex; justify-content: center; }
+figure.diagram .canvas svg { max-width: 100%; height: auto; }
+figure.diagram figcaption { margin-top: 16px; font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; }
+.diagram-msg { font-size: 14px; color: var(--muted); align-self: center; }
+
+/* Status */
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-top: 32px; border-top: 1px solid var(--ink); }
+.figures div { padding: 24px 24px 24px 0; }
+.figures b { display: block; font-family: var(--serif); font-weight: 400; font-size: 56px; line-height: 1; }
+.figures span { display: block; margin-top: 8px; font-size: 14px; color: var(--muted); }
+.columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px; margin-top: 16px; }
+.columns ul { margin: 10px 0 0; padding-left: 18px; }
+
+/* Walkthrough */
+.steps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; padding: 0; list-style: none; }
+.steps button { display: flex; gap: 10px; align-items: center; min-height: 44px; padding: 0 16px; background: transparent; color: var(--ink); border: 1px solid var(--line); cursor: pointer; font: 15px var(--sans); }
+.steps button .mono { font-size: 11px; letter-spacing: 0.06em; }
+.steps button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.step-card { margin-top: 20px; padding: 32px; }
+.step-card h3 { margin: 8px 0 0; font-size: 32px; line-height: 1.2; }
+.step-card blockquote { margin: 20px 0 0; font-family: var(--serif); font-size: 22px; line-height: 1.45; max-width: 820px; }
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 32px; margin-top: 28px; font-family: var(--sans); font-size: 16px; line-height: 1.6; }
+.split p { margin: 0; }
+.split .who { margin: 0 0 8px; font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--muted); }
+.split .who.code { color: var(--accent); }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 28px; padding-top: 16px; border-top: 1px dashed var(--strong); }
+.facts span { font-family: var(--mono); font-size: 13px; }
+.facts span i { font-style: normal; color: var(--muted); }
+.step-nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 24px; font-family: var(--sans); }
+.step-nav button { min-height: 44px; padding: 0 16px; background: transparent; color: var(--ink); border: 1px solid var(--ink); cursor: pointer; font: 14px var(--sans); }
+.step-nav button:disabled { opacity: 0.4; cursor: default; }
+
+/* Deeper */
+.deeper { margin-top: 24px; border-top: 1px solid var(--ink); }
+.deeper a { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 24px; padding: 20px 0; border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+.deeper a:hover b { color: var(--accent); }
+.deeper b { font-family: var(--serif); font-size: 24px; font-weight: 400; }
+.deeper span { font-size: 15px; color: var(--muted); }
+.refresh ol { margin: 16px 0 0; padding-left: 20px; max-width: 760px; }
+.refresh li { margin-bottom: 8px; }
+footer { margin-top: 80px; padding: 24px 0 56px; border-top: 2px solid var(--ink); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <div class="brand">
+    <b>Knowledge Automata</b>
+    <span class="eyebrow">Field guide · v0.1 in progress</span>
+  </div>
+  <nav aria-label="Sections">
+    <a href="#loop">The loop</a>
+    <a href="#status">Status</a>
+    <a href="#walkthrough">Walkthrough</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#deeper">Go deeper</a>
+    <button type="button" class="btn-theme" id="theme-toggle" aria-label="Switch color theme">Dark</button>
+  </nav>
+</header>
+
+<main>
+<div class="hero">
+  <div class="hero-text">
+    <p class="kicker">The living memory of a group:</p>
+    <h1>Knowledge on autopilot.</h1>
+    <p class="sub">Meeting notes, chats and documents go in. Validated records come out, each one traceable to its source, so people and AI tools can ask what was decided and why. Open source, built on Cohere: Command, Embed and Rerank.</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="#walkthrough">Follow one artifact →</a>
+      <a class="btn btn-secondary" href="https://github.com/miguelmog10/knowledge-automata">View on GitHub</a>
+    </div>
+  </div>
+  <div class="ticket" aria-label="Summary of the first real run">
+    <div class="row" style="font-weight: 500"><span>ARTIFACT ART-0001</span><span>#1</span></div>
+    <div class="sub2">Board meeting · 03 FEB 2026</div>
+    <div class="rule"></div>
+    <div>1 × decision</div>
+    <div class="sub2">thinking off · 1 retry</div>
+    <div class="rule"></div>
+    <div class="row"><span>RUN</span><span>2026-10-26</span></div>
+    <div class="row hot"><span>RECORDED</span><span>DEC-0001</span></div>
+  </div>
+</div>
+
+<section id="loop" aria-labelledby="loop-title">
+  <p class="kicker">On the line:</p>
+  <h2 id="loop-title">The closed loop for one artifact</h2>
+  <p class="lede">Each artifact passes through a chain of roles, and the loop closes back on the Artifact Ledger. The model drafts; code checks, assigns IDs and stores.</p>
+  <div class="legend">
+    <span><i class="sw sw-built"></i>Built on main</span>
+    <span><i class="sw sw-planned"></i>Planned</span>
+    <span><span class="standin">stand-in</span> simple code does it today</span>
+  </div>
+  <div class="line">
+    <div class="station built"><span class="eyebrow">Station 1 · built</span><b>Sensor</b><span>Intake and input guardrail. Checks, hashes and logs every artifact.</span></div>
+    <span class="conn dotted" aria-hidden="true"><i></i>▶</span>
+    <div class="station planned"><span class="eyebrow">Station 2 · planned</span><b>Governor</b><span>Orchestrator. Reads the artifact and sends work orders.</span></div>
+    <span class="conn dotted" aria-hidden="true"><i></i>▶</span>
+    <div class="station planned"><span class="eyebrow">Station 3 · planned</span><b>Comparator</b><span>Reconciliation. New, update, reaffirmation or supersession, with Embed and Rerank.</span></div>
+    <span class="conn dotted" aria-hidden="true"><i></i>▶</span>
+    <div class="station built"><span class="eyebrow">Station 4 · partly built</span><b>Registrars</b><span>Specialist record keepers. Decision Registrar built, Risk Registrar planned.</span></div>
+    <span class="conn solid" aria-hidden="true"><i></i>▶</span>
+    <div class="station built"><span class="eyebrow">Back to · <span class="standin">stand-in</span></span><b>Artifact Ledger</b><span>Marks the artifact processed and lists the records it produced.</span></div>
+  </div>
+  <p class="note"><em>Today:</em> <code>record-decision</code> sends an accepted artifact straight to the Decision Registrar, and a pipeline stand-in for the Governor updates the Ledger. Around the line, the Operator (human in the loop) releases quarantined files; the Observer (quality control) and the Oracle (query interface) are planned.</p>
+  <figure class="diagram" id="diagram-loop">
+    <div class="canvas" data-diagram="03-closed-loop"><span class="diagram-msg">Loading the diagram…</span></div>
+    <figcaption><span>The full loop, with the planned feedback loops drawn dotted.</span><a href="https://github.com/miguelmog10/knowledge-automata/blob/main/docs/diagrams/03-closed-loop.md">Source</a></figcaption>
+  </figure>
+</section>
+
+<section id="status" aria-labelledby="status-title">
+  <p class="kicker">Service report:</p>
+  <h2 id="status-title">Where v0.1 stands</h2>
+  <div class="figures">
+    <div><b>600+</b><span>tests, all offline</span></div>
+    <div><b>15</b><span>architecture decision records</span></div>
+    <div><b>8</b><span>pull requests merged</span></div>
+    <div><b>1</b><span>real record, committed unedited</span></div>
+  </div>
+  <div class="columns">
+    <div>
+      <span class="eyebrow">Built</span>
+      <ul>
+        <li>LLM service layer: Command, Embed and Rerank behind provider-neutral interfaces, with a metadata-only event log</li>
+        <li>Decision Registrar (specialist record keeper) with one retry, validated records and Markdown views</li>
+        <li>Sensor (intake and input guardrail) and the Artifact Ledger</li>
+      </ul>
+    </div>
+    <div>
+      <span class="eyebrow">Next</span>
+      <ul>
+        <li>Comparator (reconciliation)</li>
+        <li>Governor (orchestrator)</li>
+        <li>Risk Registrar</li>
+        <li>Sample project as an evaluation set, then v0.1.0</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="walkthrough" aria-labelledby="walk-title">
+  <p class="kicker">One artifact, start to finish:</p>
+  <h2 id="walk-title">How ART-0001 became DEC-0001</h2>
+  <p class="lede">The real run of 2026-10-26 on fictional meeting notes. Pick a step to see what the model proposed and what code checked.</p>
+  <ol class="steps" id="steps" aria-label="Steps"></ol>
+  <div class="ticket step-card" aria-live="polite">
+    <span class="eyebrow" id="step-count">Step 1 of 6</span>
+    <h3 id="step-title"></h3>
+    <blockquote id="step-quote"></blockquote>
+    <div class="split">
+      <div><p class="who">The model proposed:</p><p id="step-model"></p></div>
+      <div><p class="who code">Code checked:</p><p id="step-code"></p></div>
+    </div>
+    <div class="facts" id="step-facts"></div>
+    <div class="step-nav">
+      <button type="button" id="step-prev">← Previous</button>
+      <button type="button" id="step-next">Next →</button>
+    </div>
+  </div>
+  <figure class="diagram">
+    <div class="canvas" data-diagram="04-art-0001-to-dec-0001"><span class="diagram-msg">Loading the diagram…</span></div>
+    <figcaption><span>The same run as a sequence diagram.</span><a href="https://github.com/miguelmog10/knowledge-automata/blob/main/docs/diagrams/04-art-0001-to-dec-0001.md">Source</a></figcaption>
+  </figure>
+</section>
+
+<section id="architecture" aria-labelledby="arch-title">
+  <p class="kicker">The whole kitchen:</p>
+  <h2 id="arch-title">Architecture</h2>
+  <p class="lede">Two views in the C4 style: who the system works with, and what runs inside it.</p>
+  <figure class="diagram" id="context">
+    <div class="canvas" data-diagram="01-system-context"><span class="diagram-msg">Loading the diagram…</span></div>
+    <figcaption><span>System context: the group, its Operator, the artifacts coming in and Cohere.</span><a href="https://github.com/miguelmog10/knowledge-automata/blob/main/docs/diagrams/01-system-context.md">Source</a></figcaption>
+  </figure>
+  <figure class="diagram" id="containers">
+    <div class="canvas" data-diagram="02-containers"><span class="diagram-msg">Loading the diagram…</span></div>
+    <figcaption><span>Containers: one Python app, its roles and LLM service layer, the memory folder and the event log.</span><a href="https://github.com/miguelmog10/knowledge-automata/blob/main/docs/diagrams/02-containers.md">Source</a></figcaption>
+  </figure>
+</section>
+
+<section id="deeper" aria-labelledby="deeper-title">
+  <p class="kicker">From the pantry:</p>
+  <h2 id="deeper-title">Go deeper</h2>
+  <div class="deeper">
+    <a href="https://github.com/miguelmog10/knowledge-automata/blob/main/docs/architecture.md"><b>Architecture</b><span>Roles, data flow, write rules, storage →</span></a>
+    <a href="https://github.com/miguelmog10/knowledge-automata/tree/main/docs/decisions"><b>Decision records</b><span>Why it is built this way →</span></a>
+    <a href="https://github.com/miguelmog10/knowledge-automata/tree/main/schemas"><b>Schemas</b><span>Record, draft, Ledger entry, LLM event →</span></a>
+    <a href="https://github.com/miguelmog10/knowledge-automata/tree/main/examples/sample-project"><b>The sample project</b><span>Tallyleaf: artifact, Ledger entry, record, views →</span></a>
+    <a href="https://github.com/miguelmog10/knowledge-automata/blob/main/dev/STATUS.md"><b>Status</b><span>Where the work stands, in detail →</span></a>
+    <a href="https://github.com/miguelmog10/knowledge-automata/tree/main/docs/diagrams"><b>Diagrams</b><span>The Mermaid sources of every diagram here →</span></a>
+  </div>
+</section>
+
+<section id="refresh" class="refresh" aria-labelledby="refresh-title">
+  <p class="kicker">Keeping it fresh:</p>
+  <h2 id="refresh-title">How to refresh this guide</h2>
+  <p class="lede">This is a living guide. A refresh never needs a special handoff: reread the same sources and update.</p>
+  <ol>
+    <li>Reread <code>README.md</code>, <code>dev/STATUS.md</code>, the latest file in <code>dev/handoffs/</code> and any new ADRs in <code>docs/decisions/</code>.</li>
+    <li>Update the diagrams in <code>docs/diagrams/</code> first (solid when built on main, dashed or dotted when planned), then their copies in <code>README.md</code> and <code>docs/architecture.md</code>.</li>
+    <li>Update this page: the stations, the status figures and lists, and the walkthrough if a new real run replaces it. Every "built" label must match <code>main</code>.</li>
+    <li>Change the refresh date and commit in the footer.</li>
+  </ol>
+</section>
+</main>
+
+<footer>
+  <span>Refreshed from README, STATUS, handoff 005 and ADRs 0001 to 0015.</span>
+  <span class="mono">Last refresh 2026-10-28 · main at b38b5cb</span>
+</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.1/dist/mermaid.min.js" integrity="sha384-aBQXj4hK6Jm05i7aQAsUV3bLdSUrHX1BGYfMB0166TtWt/RRaw+h0Eelme9OCOvy" crossorigin="anonymous"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* Theme: follows the system unless the reader picks one. */
+  var root = document.documentElement;
+  var toggle = document.getElementById('theme-toggle');
+  function stored() { try { return localStorage.getItem('ka-guide-theme'); } catch (e) { return null; } }
+  function remember(v) { try { localStorage.setItem('ka-guide-theme', v); } catch (e) { /* private mode */ } }
+  function isDark() {
+    var t = root.getAttribute('data-theme');
+    if (t) return t === 'dark';
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function syncLabel() { toggle.textContent = isDark() ? 'Light' : 'Dark'; }
+  var saved = stored();
+  if (saved === 'light' || saved === 'dark') root.setAttribute('data-theme', saved);
+  syncLabel();
+  toggle.addEventListener('click', function () {
+    var next = isDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    remember(next);
+    syncLabel();
+    renderDiagrams();
+  });
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onChange = function () { if (!root.getAttribute('data-theme')) { syncLabel(); renderDiagrams(); } };
+    if (mq.addEventListener) mq.addEventListener('change', onChange); else if (mq.addListener) mq.addListener(onChange);
+  }
+
+  /* Walkthrough: facts from dev/STATUS.md and examples/sample-project. */
+  var steps = [
+    { title: 'The artifact arrives',
+      quote: 'Decision: the board chose to build one Flutter app for iOS and Android, because a single codebase lets two developers ship the walkthrough count to both platforms at the same time.',
+      model: 'Nothing yet. Intake uses no model.',
+      code: 'The Sensor (intake and input guardrail) checks format, encoding, size and the delimiter, hashes the text and records the artifact in the Artifact Ledger. For this first run, the Ledger entry was backfilled in handoff 005.',
+      facts: [['ID', 'ART-0001'], ['Size', '1,433 bytes'], ['Hash', 'sha256:ea5866af…']] },
+    { title: 'Draft, attempt 1',
+      model: 'The Decision Registrar (specialist record keeper) sent the artifact to Command with prompt decision-registrar.v1, thinking disabled. The response was unusable.',
+      code: 'The LLM service layer raised LLMResponseError and logged the call: billed tokens, latency and request ID, never the text.',
+      facts: [['Model', 'command-a-plus-05-2026'], ['Time', '10.3 s'], ['Billed', '697 in / 2,390 out']] },
+    { title: 'The one retry',
+      model: 'Same artifact, with the error added by registrar-retry.v1. Command returned a JSON draft.',
+      code: 'The drafting loop allows exactly one retry (ADR-0014). If the retry had failed too, the record would have been rejected and nothing written.',
+      facts: [['Time', '2.1 s'], ['Billed', '756 in / 322 out'], ['Prompt', 'decision-registrar.v1+registrar-retry.v1']] },
+    { title: 'Code checks the draft',
+      model: 'Nothing. The model proposes, code checks.',
+      code: 'validate_draft ran the JSON Schema, the semantic checks and the evidence check: all 3 quotes were found word for word in ART-0001.',
+      facts: [['Schema', 'decision.v1'], ['Quotes', '3 of 3 found'], ['Result', 'valid']] },
+    { title: 'The record is written',
+      model: 'The content: title, statement, context, rationale, alternatives, decided by, date and impacts.',
+      code: 'Code assigned DEC-0001, wrapped the content in the envelope (sources, history, revision 1), validated it and wrote it atomically. It was committed unedited.',
+      facts: [['ID', 'DEC-0001'], ['Status', 'active'], ['File', 'registers/decision-log/DEC-0001.json']] },
+    { title: 'The view is generated',
+      model: 'Nothing. Views are code only.',
+      code: 'Code rendered the decision log index and a page for DEC-0001 that links back to ART-0001. CI fails if the committed views drift from the records.',
+      facts: [['Page', 'views/decision-log/DEC-0001.md'], ['Check', 'views --check']],
+      link: ['Read DEC-0001', 'https://github.com/miguelmog10/knowledge-automata/blob/main/examples/sample-project/views/decision-log/DEC-0001.md'] }
+  ];
+  var current = 0;
+  var list = document.getElementById('steps');
+  var buttons = steps.map(function (s, i) {
+    var li = document.createElement('li');
+    var b = document.createElement('button');
+    b.type = 'button';
+    var n = document.createElement('span'); n.className = 'mono'; n.textContent = '0' + (i + 1);
+    var t = document.createElement('span'); t.textContent = s.title;
+    b.appendChild(n); b.appendChild(t);
+    b.addEventListener('click', function () { show(i); });
+    li.appendChild(b); list.appendChild(li);
+    return b;
+  });
+  function show(i) {
+    current = i;
+    var s = steps[i];
+    buttons.forEach(function (b, j) { b.setAttribute('aria-pressed', j === i ? 'true' : 'false'); });
+    document.getElementById('step-count').textContent = 'Step ' + (i + 1) + ' of ' + steps.length;
+    document.getElementById('step-title').textContent = s.title;
+    var q = document.getElementById('step-quote');
+    q.textContent = s.quote ? '“' + s.quote + '”' : '';
+    q.hidden = !s.quote;
+    document.getElementById('step-model').textContent = s.model;
+    document.getElementById('step-code').textContent = s.code;
+    var f = document.getElementById('step-facts');
+    f.textContent = '';
+    s.facts.forEach(function (kv) {
+      var span = document.createElement('span');
+      var k = document.createElement('i'); k.textContent = kv[0] + ' ';
+      span.appendChild(k); span.appendChild(document.createTextNode(kv[1]));
+      f.appendChild(span);
+    });
+    if (s.link) {
+      var a = document.createElement('a'); a.href = s.link[1]; a.textContent = s.link[0] + ' →';
+      a.style.fontFamily = 'var(--sans)'; a.style.fontSize = '14px';
+      f.appendChild(a);
+    }
+    document.getElementById('step-prev').disabled = i === 0;
+    document.getElementById('step-next').disabled = i === steps.length - 1;
+  }
+  document.getElementById('step-prev').addEventListener('click', function () { if (current > 0) show(current - 1); });
+  document.getElementById('step-next').addEventListener('click', function () { if (current < steps.length - 1) show(current + 1); });
+  show(0);
+
+  /* Diagrams: one source each, in docs/diagrams/*.md. The page keeps the diagram text and swaps
+     its skin (the GitHub paper frontmatter and classDef lines) for the page's theme. */
+  var SKINS = {
+    light: { bg: '#F3F1EC', sf: '#FFFEFA', ink: '#1E1C19', mu: '#615C54', hl: '#D9D4CA', st: '#8A8276', ac: '#B23A22' },
+    dark:  { bg: '#191816', sf: '#23211E', ink: '#F1ECE3', mu: '#A9A194', hl: '#3A362F', st: '#7A7266', ac: '#F07A5C' }
+  };
+  var sources = {};
+  var renderCount = 0;
+
+  function extract(md) {
+    var m = md.replace(/\r\n/g, '\n').match(/```mermaid\n([\s\S]*?)\n```/);
+    return m ? m[1] : null;
+  }
+  function hexToRgb(h) {
+    h = h.replace('#', '');
+    return 'rgb(' + parseInt(h.slice(0, 2), 16) + ', ' + parseInt(h.slice(2, 4), 16) + ', ' + parseInt(h.slice(4, 6), 16) + ')';
+  }
+  function skin(src, c) {
+    var body = src.replace(/^---\n[\s\S]*?\n---\n/, '');
+    body = body.replace(/^[ \t]*classDef (built|planned|focus) .*\n/gm, '');
+    var lines = body.split('\n');
+    if (/^flowchart/.test(lines[0])) {
+      lines.splice(1, 0,
+        '  classDef built fill:' + c.sf + ',stroke:' + c.ink + ',stroke-width:1.5px,color:' + c.ink,
+        '  classDef planned fill:' + c.bg + ',stroke:' + c.st + ',stroke-width:1.5px,stroke-dasharray:6 4,color:' + c.mu,
+        '  classDef focus fill:' + c.sf + ',stroke:' + c.ac + ',stroke-width:3px,color:' + c.ink);
+    }
+    body = lines.join('\n').replace(/rect rgb\([^)]*\)/g, 'rect ' + hexToRgb(c.sf));
+    return body;
+  }
+  function themeVariables(c) {
+    return {
+      background: c.bg, mainBkg: c.sf, primaryColor: c.sf, primaryTextColor: c.ink, primaryBorderColor: c.ink,
+      secondaryColor: c.sf, secondaryTextColor: c.ink, secondaryBorderColor: c.st,
+      tertiaryColor: c.sf, tertiaryTextColor: c.ink, tertiaryBorderColor: c.hl,
+      lineColor: c.mu, textColor: c.ink, titleColor: c.ink, nodeTextColor: c.ink,
+      clusterBkg: c.bg, clusterBorder: c.hl, edgeLabelBackground: c.bg,
+      actorBkg: c.sf, actorBorder: c.ink, actorTextColor: c.ink, actorLineColor: c.mu,
+      signalColor: c.mu, signalTextColor: c.ink, loopTextColor: c.ink,
+      labelBoxBkgColor: c.sf, labelBoxBorderColor: c.hl, labelTextColor: c.ink,
+      noteBkgColor: c.sf, noteTextColor: c.ink, noteBorderColor: c.hl
+    };
+  }
+  function message(el, html) { el.innerHTML = '<span class="diagram-msg">' + html + '</span>'; }
+
+  function renderDiagrams() {
+    if (!window.mermaid) {
+      document.querySelectorAll('[data-diagram]').forEach(function (el) {
+        message(el, 'The diagram library did not load. Open the source link below to see the diagram on GitHub.');
+      });
+      return;
+    }
+    var c = isDark() ? SKINS.dark : SKINS.light;
+    window.mermaid.initialize({
+      startOnLoad: false, securityLevel: 'strict', theme: 'base',
+      fontFamily: 'Instrument Sans, system-ui, sans-serif', themeVariables: themeVariables(c)
+    });
+    document.querySelectorAll('[data-diagram]').forEach(function (el) {
+      var name = el.getAttribute('data-diagram');
+      var load = sources[name] ? Promise.resolve(sources[name]) :
+        fetch('../diagrams/' + name + '.md').then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.text();
+        }).then(function (md) {
+          var src = extract(md);
+          if (!src) throw new Error('no Mermaid block');
+          sources[name] = src;
+          return src;
+        });
+      load.then(function (src) {
+        renderCount += 1;
+        return window.mermaid.render('ka-' + name + '-' + renderCount, skin(src, c));
+      }).then(function (out) {
+        el.innerHTML = out.svg;
+      }).catch(function () {
+        message(el, 'This diagram loads when the guide is served over HTTP. Use the source link below, or run <code>python -m http.server</code> in the <code>docs</code> folder and open <code>/guide/</code>.');
+      });
+    });
+  }
+  renderDiagrams();
+})();
+</script>
+</body>
+</html>

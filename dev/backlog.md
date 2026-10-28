@@ -49,6 +49,8 @@
 - Cost tracking automation: test whether the VS Code chat export includes per-request credits; if so, script it into `dev/costs.md`.
 - Cohere token costs in `dev/costs.md` once the pipeline makes real calls.
 - Write the Knowledge Automata case study in the principles repo at v0.1.0.
+- Diagram copy check: a small script that copies each Mermaid block in `docs/diagrams/` into `README.md` and `docs/architecture.md` between their `diagram` markers, with a `--check` mode that CI runs (like `views --check`). Until then the copies are kept by hand.
+- Guide on the mise-en-place screen theme: load its pinned `tokens.css` and Mermaid themes instead of the values in `docs/guide/index.html`, once mise-en-place v0.2 is tagged.
 - Issue log Registrar, including proposals and open questions found in artifacts (dropped in v0.1, ADR-0011) and risks that occurred.
 - Operator (human in the loop) review of evidence-check rejections.
 - Remaining PMBOK risk fields: urgency, proximity, contingency and fallback plans, residual and secondary risks, reserves.

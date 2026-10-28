@@ -162,3 +162,18 @@ Suggested improvement: for us, prefer the editor's file tools for source files a
 
 Note: the same problem as on 2026-10-25. A second write of the Cohere journal, sent from the same staging path as the first, delivered the earlier version although the write reported success. Reading the file back and comparing hashes caught it; writing the same content from a new staging path delivered it correctly.
 Suggested improvement (Claude): as before, verify delivered content or fail the write. Workaround that worked: stage every new version of a file from a new path, then read it back and compare hashes.
+
+### 2026-10-28: Mermaid 11 theme configuration (confusing)
+
+Note: `fontFamily` set under `themeVariables` in a diagram's frontmatter is ignored: the SVG uses Mermaid's default font (`"trebuchet ms", verdana, arial`). Set at the root of `config`, it applies. Found with Mermaid CLI 11.16.1 while drawing these diagrams with the mise-en-place starter.
+Suggested improvement: document which theme variables each diagram type reads, or warn on unused keys. For us: fixed in the mise-en-place brief.
+
+### 2026-10-28: Mermaid C4 diagrams (missing)
+
+Note: C4 support is still experimental. Mermaid's own docs list dashed lines, legends and tags as unsupported, styling is fixed, and layout follows statement order. In a test render, relationship labels overlapped and the title and labels were unreadable on a dark background, so built versus planned cannot be shown by line style.
+Suggested improvement: support `$lineStyle` and a legend as in C4-PlantUML. For us: flowcharts that follow C4 conventions.
+
+### 2026-10-28: GitHub Mermaid rendering (confusing)
+
+Note: GitHub draws every Mermaid node with a drop shadow, whatever the theme, and serves the diagram in a frame whose light or dark mode follows the account setting, not the page. Neither can be changed from the diagram source.
+Suggested improvement: honor the diagram's own theme without extra effects, or document them.

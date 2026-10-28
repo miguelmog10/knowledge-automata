@@ -6,7 +6,7 @@
 
 ## Current phase
 
-Handoffs 001 to 004 merged (PR #1 to PR #5), then the PR #5 credits and status (PR #6) and the README pass (PR #7). Handoff 005, the Sensor (intake and input guardrail) and the Artifact Ledger, is implemented on `feat/sensor-ledger` and waits for Miguel's review. Next is the Comparator (reconciliation).
+Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the PR #5 credits and status (PR #6) and the README pass (PR #7). Architecture diagrams and a visual guide are in progress on `docs/architecture-diagrams`. Next is the Comparator (reconciliation).
 
 ## Done
 
@@ -45,10 +45,7 @@ Handoffs 001 to 004 merged (PR #1 to PR #5), then the PR #5 credits and status (
   - Against handoff section 5: statement, rationale, alternatives, date and context match; the QR codes, the offline-sync risk and the actions were left out; the decision quote comes first, and quotes wrapped across lines passed the evidence check. Miguel accepted the record as is. Quality notes for a future `decision-registrar.v2`, to be judged on the evaluation set: `decided_by` listed everyone present instead of the group named in the decision ("the board"), and `impacts` is a generic summary not supported by the artifact, although the prompt says to omit unsupported fields. No evidence quote contains the artifact's typographic apostrophe, so that case was not exercised.
 - PR #5 Copilot credits and a status update merged as PR #6.
 - README pass before the Cohere application (Miguel and Claude, 2026-10-26), merged as PR #7: a "See it working" link to `DEC-0001`, Status moved up with what works and what is next, a "Design principles" section, built versus planned roles in "How it works", and American spelling.
-
-## In progress
-
-- Handoff 005 on `feat/sensor-ledger` (`dev/handoffs/005-sensor-and-ledger.md`, ADR-0015), eight commits, 603 tests passing, every LLM call mocked:
+- Handoff 005 merged as PR #8 (`dev/handoffs/005-sensor-and-ledger.md`, ADR-0015), with its Copilot credits in `dev/costs.md`; 603 tests passing, every LLM call mocked:
   - Event schema 1.1: `finish_reason` on chat events and `error_message` on failed calls; `LLMResponseError` carries `finish_reason`, and `scripts/cohere_smoke.py` prints both.
   - `storage/json_files.py`: the deterministic JSON writer shared by records and Ledger entries. Every committed record kept the same bytes (SHA-256 before and after compared).
   - `schemas/core/ledger-entry.v1.json`, `core/ledger.py` (transitions, history, `error_paths`), `validate_ledger_entry` and `storage/ledger_store.py` (`save_new`, `save_transition` with a lost-update check).
@@ -56,12 +53,21 @@ Handoffs 001 to 004 merged (PR #1 to PR #5), then the PR #5 credits and status (
   - `pipeline.py`: `ingest_file`, `release_artifact` and a Ledger-driven `record_decision` (record, views, then Ledger; a provider error marks the artifact `failed`; a stored copy that no longer matches its hash is refused). Views link artifacts through the Ledger.
   - CLI: `ingest`, `record-decision ARTIFACT_ID`, `release`, `ledger`; the `--artifact-id` and `--artifact-date` arguments of `record-decision` are gone.
   - `examples/sample-project/ledger/ART-0001.json`, backfilled once through the Ledger code from the committed blob; the sample record and views are unchanged.
-  - Deviations, approved or to review in the pull request: rejected drafts also carry `error_type` when the last response was unusable (approved); the backfill commit came before the Ledger-driven views (approved); copies go through `storage/artifact_files.py` (approved); the Sensor stays free of file access and the pipeline does the I/O, because agents never import storage (to review).
+  - Deviations, approved in the pull request: rejected drafts also carry `error_type` when the last response was unusable (approved); the backfill commit came before the Ledger-driven views (approved); copies go through `storage/artifact_files.py` (approved); the Sensor stays free of file access and the pipeline does the I/O, because agents never import storage.
   - No real Cohere call was made. The optional smoke rerun (7 calls) to see `finish_reason` on real events was not done.
+
+## In progress
+
+- Architecture diagrams and visual guide on `docs/architecture-diagrams` (Miguel and Claude, 2026-10-28), waiting for Miguel's commit:
+  - Four Mermaid diagrams in `docs/diagrams/`, one source each: system context, containers, the closed loop and the ART-0001 to DEC-0001 run. Flowcharts that follow C4 conventions, because Mermaid's native C4 has no dashed lines or legend. Built versus planned is shown by line style, with a legend.
+  - Copies between `diagram` markers in `README.md` (closed loop) and `docs/architecture.md` (context, containers, closed loop).
+  - `docs/guide/index.html`: the visual guide in direction B ("The pass"), with a click-through walkthrough. It renders the diagrams from `docs/diagrams/` in its own light and dark style. `docs/guide/README.md` holds the refresh steps.
+  - `.github/workflows/pages.yml` and ADR-0016 (proposed): publish the guide and the diagram sources with GitHub Pages. Pages must be enabled in the repository settings.
+  - A mise-en-place v0.2 brief (screen theme, Mermaid font fix, sequence diagram pattern) runs in its own chat; the guide moves to those tokens when it ships.
 
 ## Next
 
-- Miguel reviews and merges handoff 005, and adds its Copilot credits to `dev/costs.md`.
+- Miguel commits the diagrams and the guide, opens the pull request and enables GitHub Pages.
 - Then the Comparator, the Governor (orchestrator), the Risk Registrar, the sample project as an evaluation set, and the v0.1.0 release (see `dev/backlog.md`).
 
 ## Blockers
@@ -70,6 +76,7 @@ None.
 
 ## Notes for the next session
 
+- Refresh the guide and the diagrams when a handoff lands (steps in `docs/guide/README.md`): every "built" label must match `main`.
 - The sample record is evidence: never rerun the real call to get a nicer `DEC-0001`. Prompt changes are new version files (`decision-registrar.v2`) judged on the evaluation set.
 - Line endings: `core.autocrlf` is on for this clone, so committed text may be CRLF in the working tree. The record store and views always write LF, `views --check` ignores CRLF versus LF, `record-decision` normalizes the stored copy's line endings before the evidence check, and the Sensor's content hash ignores them too (ADR-0015). A Windows checkout may hold an artifact copy with CRLF, so its size differs from the Ledger's `size_bytes` (the original bytes); never compare the two. Keeping copies byte-identical (`.gitattributes`) is an open question in the backlog.
 - Local checks: `uv sync --all-extras` (a plain `uv sync` removes ruff and pytest), then `uv run ruff check`, `uv run ruff format --check`, `uv run pytest`, and `uv run knowledge-automata views --memory examples/sample-project --check`.
