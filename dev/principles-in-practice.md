@@ -181,3 +181,23 @@ Evidence: `docs/guide/index.html` (once added).
 
 Handoff 005 was designed by Miguel and Claude in a voice conversation before any code. Claude proposed flagging an artifact that reuses an earlier file name as a "possible revision"; Miguel pushed back, using Claude's own example that a name like `notes.md` can arrive many times in a project's life. The Ledger now records only the fact ("same file name as ART-0003") and makes no guess.
 Evidence: `dev/handoffs/005-sensor-and-ledger.md` (section 1, decision 3).
+
+### 2026-10-28: P4 Maintain traceability (product)
+
+Records already pointed back to their artifacts; the Artifact Ledger now points forward too. Each entry lists the records it produced and the drafts rejected (by error path, never model text), and its history names the run ID that the LLM event log shares, so one artifact can be followed from intake to records and to the calls that cost money.
+Evidence: `examples/sample-project/ledger/ART-0001.json`, ADR-0015.
+
+### 2026-10-28: P10 Distrust the happy path (product)
+
+Files the Sensor (intake and input guardrail) cannot safely send to a model, such as invalid UTF-8, oversized files or text that could close the artifact delimiter, are quarantined and kept for the Operator (human in the loop) instead of being dropped or truncated. Writes go record, views, then Ledger, so an interrupted run leaves the Ledger behind, never ahead, and the next run says so instead of recording the artifact twice. A stored copy that no longer matches its hash is refused.
+Evidence: `src/knowledge_automata/pipeline.py`, `tests/test_cli.py`.
+
+### 2026-10-28: P16 Reuse what compounds, delete what doesn't (product)
+
+The deterministic JSON writer moved out of the record store into one shared module, so Ledger entries and records use the same format and the same atomic write. Before and after hashes of every committed record were identical. The handoff 004 stand-ins (artifact IDs by hand, files found by name, input checks in the pipeline) were deleted rather than kept beside the Sensor.
+Evidence: `src/knowledge_automata/storage/json_files.py`, handoff 005 section 6.5.
+
+### 2026-10-28: P2 Architecture is a first-class deliverable (bend)
+
+The handoff placed the artifact copy and the Ledger writes in the Sensor, but an existing test enforces the AGENTS.md rule that agents never import storage. The rule won: the Sensor decides from bytes alone, and the pipeline stand-in for the Governor (orchestrator) does the file work. The deviation is recorded in ADR-0015 and the pull request, not left to the code.
+Evidence: `tests/test_registrar.py` (`test_agents_do_not_touch_storage_or_the_provider_sdk`), ADR-0015.

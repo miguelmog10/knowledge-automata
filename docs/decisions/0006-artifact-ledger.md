@@ -1,6 +1,6 @@
 # 0006. Artifact Ledger
 
-- **Status:** Accepted
+- **Status:** Accepted (amended 2026-10-27: storage, transitions and the Operator release in ADR-0015)
 - **Date:** 2026-10-24
 
 ## Context
@@ -13,7 +13,7 @@ Maintain a ledger of every artifact the system receives, holding:
 
 - Identity: ID, title, source URI, source type, artifact date.
 - Content hash.
-- Status with a reason: `received`, then `accepted`, `quarantined` or `rejected`, then `processed` or `failed`.
+- Status with a reason: `received`, then `accepted`, `quarantined` or `rejected`, then `processed` or `failed`. Storage, the allowed transitions and the Operator release are set out in [ADR-0015](0015-artifact-ledger-storage-and-sensor-checks.md).
 - Timestamps.
 - The records produced.
 - The model, prompt and schema versions used.

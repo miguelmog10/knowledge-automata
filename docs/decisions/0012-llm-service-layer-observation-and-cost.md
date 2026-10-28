@@ -1,6 +1,6 @@
 # 0012. LLM service layer: structured chat, observation and cost
 
-- **Status:** Accepted
+- **Status:** Accepted (amended 2026-10-27: `finish_reason` and error messages in events)
 - **Date:** 2026-10-25
 
 ## Context
@@ -12,7 +12,7 @@ ADR-0003 requires one internal interface each for chat, embeddings and reranking
 - The interfaces live in `knowledge_automata.llm` and use provider-neutral names. In v0.1 chat is structured only (`chat_json`): instructions and user content go in separate messages, and the result is a parsed JSON object. Validating it against a record schema, and retrying, stays with the caller.
 - The Cohere adapter uses the official Python SDK and is the only module that imports it. It reduces schemas to the keywords Cohere documents and raises an error on any other keyword. Model IDs are configuration.
 - Retries for rate limits and server errors use the SDK's built-in mechanism, bounded by configuration. Provider errors map to a small set of project exceptions whose messages never contain keys, prompts or artifact text.
-- An observation wrapper records one event per call as JSON Lines, validated against `schemas/core/llm-event.v1.json`. Events hold metadata only (timing, model, the billed and raw units the provider reports, estimated cost, agent, artifact ID, a run ID grouping the calls of one run, and the event schema version), never prompts, artifact text or output.
+- An observation wrapper records one event per call as JSON Lines, validated against `schemas/core/llm-event.v1.json`. Events hold metadata only (timing, model, the billed and raw units the provider reports, estimated cost, agent, artifact ID, a run ID grouping the calls of one run, and the event schema version), never prompts, artifact text or output. Events may also carry the provider's `finish_reason` and, for failed calls, the project exception's message (event schema 1.1, amended 2026-10-27).
 - The event log is append-only and survives across runs: lines are only ever added, never rewritten. If the file is deleted, the next call starts a new one.
 - Cost is estimated from billed units and a dated price table copied from the provider's official pricing page. A missing price is left out, never guessed; the units are always recorded, so cost can be computed later.
 - Settings come from environment variables (`CO_API_KEY`, `KA_*`); locally `.env` is loaded with `uv run --env-file .env`.

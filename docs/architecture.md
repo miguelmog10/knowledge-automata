@@ -26,13 +26,13 @@ Understanding an artifact, drafting a record and judging how it relates to exist
 
 ## Data flow for one artifact
 
-1. **Sensor (intake):** the artifact arrives. The Sensor checks it, hashes it and records it in the Artifact Ledger as accepted, quarantined or rejected. If accepted, it normalizes the text and adds metadata.
+1. **Sensor (intake):** the artifact arrives. The Sensor checks it, hashes it and records it in the Artifact Ledger as accepted, quarantined or rejected. If accepted, it normalizes the text and adds metadata. Its checks are deterministic (format, empty, encoding, size, delimiter), and accepted and quarantined artifacts are kept as read-only copies ([ADR-0015](decisions/0015-artifact-ledger-storage-and-sensor-checks.md)).
 2. **Governor (orchestrator):** reads the artifact, identifies its content (for example two decisions and one risk) and sends work orders to the Decision and Risk Registrars.
 3. **Comparator (reconciliation):** for each work order, retrieves related existing records and proposes a classification (new, update, reaffirmation or supersession) and a target record. Code checks the proposal before anything is written.
 4. **Registrars (specialist record keepers):** draft records as structured data, with evidence quotes from the artifact. Code checks the evidence quotes, validates the draft against the schema, assigns the ID and stores the record. A rejected draft affects only that record. Independent Registrars can run in parallel. All Registrars share one drafting loop: an invalid draft gets one retry with its validation errors, and if the retry fails too, the record is rejected and nothing is written ([ADR-0014](decisions/0014-registrar-drafting-loop.md)).
 5. **Governor:** marks the artifact as processed in the Ledger, listing the records it produced.
 
-The first thin slice (handoff 004) runs step 4 for the decision log on its own, without steps 1 to 3: the artifact ID and date are passed by hand, and every record is `new` until the Comparator exists.
+The Sensor and the Artifact Ledger run since handoff 005: `knowledge-automata ingest` is step 1, and `knowledge-automata record-decision` runs step 4 for the decision log on an accepted artifact. Steps 2 and 3 are still skipped, so every record is `new` until the Comparator exists, and a pipeline stand-in for the Governor sets `processed` and `failed`. The Sensor decides from bytes alone; the stand-in writes the artifact copies and Ledger entries, because agents never touch storage. A quarantined artifact waits for the Operator's `knowledge-automata release`.
 
 Around this loop: the Observer (quality control) checks register health, the Oracle (query interface) answers questions from stored records, and the Operator (human in the loop) approves sensitive changes.
 
@@ -59,12 +59,14 @@ Records live in a **memory folder**: the stored institutional memory of one grou
 
 ```
 <memory>/
-  artifacts/                         raw artifacts (read-only; only the sample project keeps them here)
+  artifacts/ART-0001-board-notes.md  copies of accepted and quarantined artifacts (read-only)
+  ledger/ART-0001.json               one Artifact Ledger entry per artifact
   registers/decision-log/DEC-0001.json
   views/decision-log.md              index (generated)
   views/decision-log/DEC-0001.md     one page per decision (generated)
 ```
 
+- **The Ledger tracks every artifact.** Each entry is one JSON file in the same deterministic format as records, validated before every write, with the current status and an append-only history of transitions. Only a valid status change may overwrite it ([ADR-0015](decisions/0015-artifact-ledger-storage-and-sensor-checks.md)). Writes go record, views, then Ledger, so an interrupted run leaves the Ledger behind the records, and the next run detects it.
 - **JSON records are the source of truth.** Each record is one file, validated (envelope and content) before it is written, written to a temporary file and moved into place, and never overwritten by a new record. Files are deterministic (UTF-8, LF line endings, two-space indentation, fixed key order), so diffs show only real changes.
 - **Views are generated.** Code renders the Markdown views from the records with standard relative links (index to pages, pages to their source artifacts, supersession both ways), so the registers browse like a wiki on GitHub. Nobody edits them by hand: `knowledge-automata views` regenerates them, and CI runs `knowledge-automata views --check` on the sample project, which fails when the committed views differ from the generator's output.
 
@@ -102,7 +104,7 @@ Supply-chain security (dependency auditing, pinned CI actions and an SBOM per re
 
 ## Observability
 
-Every LLM call through the service layer writes one event to a JSON Lines log (by default `runtime/logs/llm-events.jsonl`, git-ignored). Events hold metadata only: the event schema version, time, a run ID that groups the calls of one run (one smoke check, later one pipeline run), the provider's request ID, provider, model, operation, the calling agent, the artifact ID and prompt version, status and error type, latency, and every unit the provider reports: billed units (input and output tokens, search units) and, when reported separately, raw token counts. They never hold prompts, artifact text, model output or keys, so the log is safe to keep and share and cannot become an unvalidated second copy of the institutional memory. Each event is validated against `schemas/core/llm-event.v1.json` before it is written; failed calls are logged too, with the units they were billed for. The log is append-only and survives across runs: lines are only ever added, never rewritten or rotated, and if the file is deleted the next call starts a new one.
+Every LLM call through the service layer writes one event to a JSON Lines log (by default `runtime/logs/llm-events.jsonl`, git-ignored). Events hold metadata only: the event schema version, time, a run ID that groups the calls of one run (one smoke check, later one pipeline run), the provider's request ID, provider, model, operation, the calling agent, the artifact ID and prompt version, status and error type, latency, and every unit the provider reports: billed units (input and output tokens, search units) and, when reported separately, raw token counts. Since event schema 1.1 they also carry the provider's reason the model stopped (`finish_reason`, for example `MAX_TOKENS`) and, for failed calls, the project exception's message, whose text never holds keys, prompts or artifact text. They never hold prompts, artifact text, model output or keys, so the log is safe to keep and share and cannot become an unvalidated second copy of the institutional memory. Each event is validated against `schemas/core/llm-event.v1.json` before it is written; failed calls are logged too, with the units they were billed for. The log is append-only and survives across runs: lines are only ever added, never rewritten or rotated, and if the file is deleted the next call starts a new one.
 
 Cost is estimated from billed units and a dated price table (`prices.toml`, inside the package) copied from the provider's official pricing page. A model without a published price is left out of the table, and its events carry no cost rather than a guess; the units are always recorded, so cost can be computed later. Because every event carries the artifact ID, and the Ledger links artifacts to records, cost per artifact and per record can be derived. The event format should stay compatible with a later move to a standard such as OpenTelemetry. See [ADR-0012](decisions/0012-llm-service-layer-observation-and-cost.md).
 

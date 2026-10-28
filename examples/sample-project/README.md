@@ -10,6 +10,7 @@ This folder is a memory folder (see [ADR-0013](../../docs/decisions/0013-record-
 
 ```
 artifacts/                            raw artifacts (meeting notes); read-only
+ledger/ART-0001.json                  Artifact Ledger entry for each artifact
 registers/decision-log/DEC-0001.json  decision records: the source of truth
 views/decision-log.md                 decision log index (generated)
 views/decision-log/DEC-0001.md        one page per decision (generated)
@@ -20,6 +21,8 @@ Start with the [decision log](views/decision-log.md).
 ## How the records were made
 
 `DEC-0001` was recorded from [ART-0001](artifacts/ART-0001-project-board-2026-02-03.md) by one real run of `knowledge-automata record-decision` against Cohere Command (handoff 004). The first response was unusable, so the Decision Registrar (specialist record keeper) retried once, and the retry's draft passed validation. The record and its views were committed exactly as written and have not been edited. The record's history names the model and prompt version that produced it.
+
+The Artifact Ledger came later (handoff 005), so [ART-0001's entry](ledger/ART-0001.json) was backfilled once through the Ledger code: its history says so, and it lists `DEC-0001` as the record produced.
 
 ## Views
 
