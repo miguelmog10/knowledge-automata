@@ -43,6 +43,7 @@ Handoffs 001 to 004 merged (PR #1 to PR #5). The first slice works end to end: o
   - Attempt 2 (`decision-registrar.v1+registrar-retry.v1`): accepted after 2.1 s, billed 756 input and 322 output tokens.
   - Total: 1,453 input and 2,712 output billed tokens; about 15 s for the whole command.
   - Against handoff section 5: statement, rationale, alternatives, date and context match; the QR codes, the offline-sync risk and the actions were left out; the decision quote comes first, and quotes wrapped across lines passed the evidence check. Miguel accepted the record as is. Quality notes for a future `decision-registrar.v2`, to be judged on the evaluation set: `decided_by` listed everyone present instead of the group named in the decision ("the board"), and `impacts` is a generic summary not supported by the artifact, although the prompt says to omit unsupported fields. No evidence quote contains the artifact's typographic apostrophe, so that case was not exercised.
+- README pass before the Cohere application (Miguel and Claude, 2026-10-26): a "See it working" link to `DEC-0001`, Status moved up with what works and what is next, a "Design principles" section, built versus planned roles in "How it works", and American spelling.
 
 ## In progress
 
