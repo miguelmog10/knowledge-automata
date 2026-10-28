@@ -177,3 +177,14 @@ Suggested improvement: support `$lineStyle` and a legend as in C4-PlantUML. For 
 
 Note: GitHub draws every Mermaid node with a drop shadow, whatever the theme, and serves the diagram in a frame whose light or dark mode follows the account setting, not the page. Neither can be changed from the diagram source.
 Suggested improvement: honor the diagram's own theme without extra effects, or document them.
+
+### 2026-10-28: Claude file bridge to the local computer (confusing)
+
+Note: two PNG previews written to the repository came back with different SHA-256 hashes and about 6 KB larger than the files sent, while the pixels were identical (compared pixel by pixel). The bridge appears to re-encode PNG files in transit. Text files came back byte for byte.
+Suggested improvement (Claude): copy binary files unchanged, or say when a file is re-encoded. For us: verify images by pixels, text files by hash.
+
+### 2026-10-28: Microsoft Edge headless screenshots (confusing)
+
+Note: `msedge --headless=new --screenshot` follows the Windows color setting, so on a computer in dark mode the "light" preview came out dark. `--force-dark-mode` forces dark, but nothing forces light by default.
+Suggested improvement: document how headless mode picks the color scheme. For us: `--blink-settings=preferredColorScheme=1` forces light and `=0` forces dark (steps in `docs/guide/README.md`).
+

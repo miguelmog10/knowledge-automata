@@ -21,3 +21,17 @@ This is a living guide. A refresh never needs a special handoff:
 2. Update the diagrams in `docs/diagrams/` first (solid when built on `main`, dashed or dotted when planned), then their copies in `README.md` and `docs/architecture.md`.
 3. Update `index.html`: the stations, the status figures and lists, and the walkthrough if a new real run replaces it. Every "built" label must match `main`.
 4. Change the refresh date and commit in the footer, and check the page in light and dark, at desktop and phone width.
+5. Retake the preview screenshots (below), keeping the names `preview-light.png` and `preview-dark.png`, so the README needs no edit.
+
+## Preview screenshots
+
+`README.md` shows the top of the guide as `preview-light.png` or `preview-dark.png`, matching the reader's GitHub theme. To retake them after the guide changes, run this in PowerShell from the repository folder, on Windows with Microsoft Edge:
+
+```powershell
+$edge = "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
+$url  = "https://miguelmog10.github.io/knowledge-automata/guide/"
+& $edge --headless=new --hide-scrollbars --blink-settings=preferredColorScheme=1 --window-size=1280,1200 --force-device-scale-factor=2 --virtual-time-budget=8000 --screenshot="$PWD\docs\guide\preview-light.png" $url
+& $edge --headless=new --hide-scrollbars --blink-settings=preferredColorScheme=0 --window-size=1280,1200 --force-device-scale-factor=2 --virtual-time-budget=8000 --screenshot="$PWD\docs\guide\preview-dark.png" $url
+```
+
+`preferredColorScheme=1` forces light and `=0` forces dark, whatever the system setting. Then crop both images to the top of the page, down to the rule above "On the line" (2560 by 1330 pixels from the top left), and resize them to 1600 pixels wide. Any image tool works; Claude can do the crop when asked.

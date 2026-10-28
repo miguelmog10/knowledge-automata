@@ -3,6 +3,15 @@
 *Knowledge on autopilot.*
 *The living memory of any group that makes decisions together.*
 
+<a href="https://miguelmog10.github.io/knowledge-automata/guide/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/guide/preview-dark.png">
+    <img src="docs/guide/preview-light.png" alt="The Knowledge Automata visual guide: the closed loop, what is built today, and how one artifact became one decision record.">
+  </picture>
+</a>
+
+**[Open the visual guide →](https://miguelmog10.github.io/knowledge-automata/guide/)** The closed loop, the status at a glance, and a click-through of one real run.
+
 [![CI](https://github.com/miguelmog10/knowledge-automata/actions/workflows/ci.yml/badge.svg)](https://github.com/miguelmog10/knowledge-automata/actions/workflows/ci.yml)
 
 ## What it is
