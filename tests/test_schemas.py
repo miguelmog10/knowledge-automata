@@ -71,6 +71,8 @@ def test_all_expected_schema_files_are_found():
     assert set(schemas.list_schemas()) >= {
         "core/record.v1.json",
         "core/draft.v1.json",
+        "core/ledger-entry.v1.json",
+        "core/llm-event.v1.json",
         "core/reconciliation.v1.json",
         "project-management/decision.v1.json",
         "project-management/risk.v1.json",

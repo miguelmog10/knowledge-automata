@@ -1,4 +1,4 @@
-"""Validators for records, Registrar drafts and Comparator results (ADR-0011).
+"""Validators for records, Registrar drafts, Comparator results and Ledger entries (ADR-0011).
 
 Validators never raise for invalid data: they return a ``ValidationResult`` whose error
 messages start with the JSON path of the problem. They raise only for programming errors,
@@ -15,8 +15,10 @@ from typing import Any
 from jsonschema import Draft202012Validator, FormatChecker
 
 from knowledge_automata.core.evidence import QuoteCheck, check_evidence
+from knowledge_automata.core.ledger import CHECK_OUTCOMES, STORED_COPY_STATUSES, TRANSITIONS
 from knowledge_automata.core.registers import RegisterSpec
 from knowledge_automata.core.schemas import (
+    LEDGER_ENTRY_SCHEMA,
     LLM_EVENT_SCHEMA,
     RECONCILIATION_SCHEMA,
     RECORD_SCHEMA,
@@ -231,3 +233,98 @@ def validate_reconciliation(
 def validate_llm_event(event: Any) -> ValidationResult:
     """Validate one LLM event log line against ``core/llm-event.v1.json`` (ADR-0012)."""
     return ValidationResult(tuple(_schema_errors(_schema_validator(LLM_EVENT_SCHEMA), event)))
+
+
+def _ledger_history_errors(history: list[dict[str, Any]]) -> list[str]:
+    errors = []
+    previous: str | None = None
+    for index, step in enumerate(history):
+        path = f"$.history[{index}]"
+        status, by = step["status"], step["by"]
+        owners = TRANSITIONS.get((previous, status))
+        if owners is None:
+            errors.append(f"{path}.status: cannot change from {previous!r} to {status!r}")
+        elif by not in owners:
+            errors.append(f"{path}.by: {by!r} cannot change from {previous!r} to {status!r}")
+        if index and step["at"] < history[index - 1]["at"]:
+            errors.append(f"{path}.at: earlier than the previous history entry")
+
+        decided_by_check = by == "sensor" and status in ("rejected", "quarantined")
+        check = step.get("check")
+        if decided_by_check and check is None:
+            errors.append(f"{path}: a Sensor {status!r} entry needs the check that decided it")
+        elif check is not None and not decided_by_check:
+            errors.append(
+                f"{path}.check: only Sensor 'rejected' and 'quarantined' entries have one"
+            )
+        elif check is not None and CHECK_OUTCOMES[check] != status:
+            errors.append(
+                f"{path}.check: {check!r} leads to {CHECK_OUTCOMES[check]!r}, not {status!r}"
+            )
+        if by == "operator" and "reason" not in step:
+            errors.append(f"{path}: an Operator entry needs a reason")
+
+        ran = status in ("processed", "failed")
+        if ran and "run_id" not in step:
+            errors.append(f"{path}: a {status!r} entry needs a run_id")
+        elif not ran and "run_id" in step:
+            errors.append(f"{path}.run_id: only 'processed' and 'failed' entries have one")
+        if status == "failed" and "error_type" not in step:
+            errors.append(f"{path}: a 'failed' entry needs an error_type")
+        elif status != "failed" and "error_type" in step:
+            errors.append(f"{path}.error_type: only 'failed' entries have one")
+        previous = status
+    return errors
+
+
+def _sequence(artifact_id: str) -> int:
+    return int(artifact_id.split("-", 1)[1])
+
+
+def validate_ledger_entry(entry: Any) -> ValidationResult:
+    """Validate a stored Artifact Ledger entry: schema, history path and status rules (ADR-0015).
+
+    The history must be a valid path through the transition table, starting with
+    ``received`` by ``sensor``, and the entry's fields must agree with its last status.
+    """
+    errors = _schema_errors(_schema_validator(LEDGER_ENTRY_SCHEMA), entry)
+    if errors:
+        return ValidationResult(tuple(errors))
+
+    history = entry["history"]
+    status = entry["status"]
+    errors.extend(_ledger_history_errors(history))
+    if status != history[-1]["status"]:
+        errors.append(f"$.status: {status!r} does not match the last history entry")
+    if entry["updated_at"] != history[-1]["at"]:
+        errors.append("$.updated_at: does not match the last history entry's time")
+    if entry["created_at"] != history[0]["at"]:
+        errors.append("$.created_at: does not match the first history entry's time")
+    if status == "received":
+        errors.append("$.status: an entry is stored only after the Sensor's checks")
+
+    has_copy = status in STORED_COPY_STATUSES
+    if has_copy and "stored_path" not in entry:
+        errors.append(f"$: a {status!r} entry needs a stored_path")
+    elif not has_copy and "stored_path" in entry:
+        errors.append(f"$.stored_path: a {status!r} entry has no stored copy")
+
+    unsupported = any(step.get("check") == "unsupported-format" for step in history)
+    if unsupported and "media_type" in entry:
+        errors.append("$.media_type: must be absent when the format is unsupported")
+    elif not unsupported and "media_type" not in entry:
+        errors.append("$: media_type is required unless the format is unsupported")
+
+    if status != "processed":
+        for field in ("produced", "rejected"):
+            if entry[field]:
+                errors.append(f"$.{field}: must be empty unless the status is 'processed'")
+
+    same_name_as = entry.get("same_name_as")
+    if same_name_as is not None:
+        sequences = [_sequence(artifact_id) for artifact_id in same_name_as]
+        if sequences != sorted(sequences):
+            errors.append("$.same_name_as: IDs must be in ascending order")
+        if max(sequences) >= _sequence(entry["id"]):
+            errors.append("$.same_name_as: may list only earlier entries")
+    return ValidationResult(tuple(errors))
