@@ -171,3 +171,13 @@ Evidence: `src/knowledge_automata/agents/registrar.py`, ADR-0014, `dev/STATUS.md
 
 Building one artifact to one record ahead of the Sensor (intake), Governor (orchestrator) and Comparator (reconciliation) proved the real Cohere path end to end with two calls, and surfaced the unusable first response, line-ending differences between Windows and CI, and missing event metadata while they are cheap to fix. Each surfaced item is now a backlog entry instead of a surprise inside a larger pipeline.
 Evidence: handoff 004, `dev/backlog.md`.
+
+### 2026-10-27: P13 Documentation is part of development (teamwork)
+
+Miguel and Claude planned a visual, interactive guide to the repo (`docs/guide/`) for the owner first and for outside readers later. It is refreshed from the same sources every time (README, STATUS, the latest handoff and new ADRs), so keeping it current is part of the work, not a separate effort.
+Evidence: `docs/guide/index.html` (once added).
+
+### 2026-10-27: P5 AI generates. Humans own (teamwork)
+
+Handoff 005 was designed by Miguel and Claude in a voice conversation before any code. Claude proposed flagging an artifact that reuses an earlier file name as a "possible revision"; Miguel pushed back, using Claude's own example that a name like `notes.md` can arrive many times in a project's life. The Ledger now records only the fact ("same file name as ART-0003") and makes no guess.
+Evidence: `dev/handoffs/005-sensor-and-ledger.md` (section 1, decision 3).
