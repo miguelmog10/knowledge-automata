@@ -19,3 +19,4 @@ Short records of significant decisions: why the system looks the way it does. Ne
 | [0013](0013-record-storage-json-files.md) | Record storage: one JSON file per record | Accepted |
 | [0014](0014-registrar-drafting-loop.md) | Registrar drafting loop | Accepted |
 | [0015](0015-artifact-ledger-storage-and-sensor-checks.md) | Artifact Ledger storage and Sensor checks | Accepted |
+| [0016](0016-guide-on-github-pages.md) | Guide published with GitHub Pages | Proposed |

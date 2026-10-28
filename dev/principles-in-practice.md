@@ -175,7 +175,7 @@ Evidence: handoff 004, `dev/backlog.md`.
 ### 2026-10-27: P13 Documentation is part of development (teamwork)
 
 Miguel and Claude planned a visual, interactive guide to the repo (`docs/guide/`) for the owner first and for outside readers later. It is refreshed from the same sources every time (README, STATUS, the latest handoff and new ADRs), so keeping it current is part of the work, not a separate effort.
-Evidence: `docs/guide/index.html` (once added).
+Evidence: `docs/guide/index.html`, `docs/guide/README.md` (How to refresh), `docs/diagrams/`.
 
 ### 2026-10-27: P5 AI generates. Humans own (teamwork)
 
@@ -201,3 +201,8 @@ Evidence: `src/knowledge_automata/storage/json_files.py`, handoff 005 section 6.
 
 The handoff placed the artifact copy and the Ledger writes in the Sensor, but an existing test enforces the AGENTS.md rule that agents never import storage. The rule won: the Sensor decides from bytes alone, and the pipeline stand-in for the Governor (orchestrator) does the file work. The deviation is recorded in ADR-0015 and the pull request, not left to the code.
 Evidence: `tests/test_registrar.py` (`test_agents_do_not_touch_storage_or_the_provider_sdk`), ADR-0015.
+
+### 2026-10-28: P11 Build evidence, not just confidence (product)
+
+Before choosing a diagram format, Claude rendered the drafts on GitHub's light and dark backgrounds and checked the mise-en-place diagram on github.com. Native Mermaid C4 was ruled out on evidence (no dashed lines, no legend, unreadable labels in dark mode), and the check found that the style guide's Mermaid font setting was silently ignored. Both findings went to the style guide brief instead of into the diagrams as workarounds.
+Evidence: `docs/diagrams/README.md`, `dev/tool-feedback.md`.

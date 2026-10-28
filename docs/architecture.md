@@ -6,6 +6,184 @@
 
 Knowledge Automata is designed as a closed-loop control system for the knowledge of any decision-making group: it senses inputs, decides what to do, compares against current state, acts, and monitors the result, with a human operator overseeing it.
 
+The diagrams in [diagrams/](diagrams/) are the source for this page, the README and the [guide](https://miguelmog10.github.io/knowledge-automata/guide/).
+
+### System context
+
+<!-- diagram: system-context. Copy of docs/diagrams/01-system-context.md; edit that file first. -->
+```mermaid
+---
+config:
+  theme: base
+  fontFamily: "system-ui, -apple-system, \"Segoe UI\", \"Roboto\", \"Helvetica\", \"Arial\", sans-serif"
+  themeVariables:
+    background: "#e9e5de"
+    fontFamily: "system-ui, -apple-system, \"Segoe UI\", \"Roboto\", \"Helvetica\", \"Arial\", sans-serif"
+    fontSize: "16px"
+    primaryColor: "#e9e5de"
+    primaryTextColor: "#22201d"
+    primaryBorderColor: "#22201d"
+    secondaryColor: "#e9e5de"
+    secondaryTextColor: "#22201d"
+    secondaryBorderColor: "#57524b"
+    tertiaryColor: "#e9e5de"
+    tertiaryTextColor: "#22201d"
+    tertiaryBorderColor: "#c9c2b7"
+    lineColor: "#807a71"
+    textColor: "#22201d"
+    titleColor: "#22201d"
+    nodeTextColor: "#22201d"
+    clusterBkg: "#e9e5de"
+    clusterBorder: "#c9c2b7"
+    edgeLabelBackground: "#e9e5de"
+    noteBkgColor: "#e9e5de"
+    noteTextColor: "#22201d"
+    noteBorderColor: "#c9c2b7"
+    actorBkg: "#e9e5de"
+    actorBorder: "#22201d"
+    actorTextColor: "#22201d"
+    actorLineColor: "#807a71"
+    signalColor: "#807a71"
+    signalTextColor: "#807a71"
+    labelBoxBkgColor: "#e9e5de"
+    labelBoxBorderColor: "#c9c2b7"
+    labelTextColor: "#22201d"
+    loopTextColor: "#807a71"
+---
+flowchart TB
+  classDef built fill:#e9e5de,stroke:#22201d,stroke-width:1.5px,color:#22201d
+  classDef planned fill:#e9e5de,stroke:#57524b,stroke-width:1.5px,stroke-dasharray:6 4,color:#57524b
+  classDef focus fill:#e9e5de,stroke:#9c4426,stroke-width:3px,color:#22201d
+  accTitle: Knowledge Automata system context
+  accDescr: A group writes artifacts. Its Operator runs Knowledge Automata, which turns the artifacts into validated records using Cohere Command and publishes Markdown views. Retrieval with Embed and Rerank and question answering are planned.
+
+  subgraph group["The group, for example a project team"]
+    members["Group members<br/>[Person]<br/>meet, chat, write documents,<br/>read the records"]:::built
+    operator["Operator (human in the loop)<br/>[Person]<br/>runs the commands,<br/>reviews quarantined files"]:::built
+  end
+  artifacts["Artifacts<br/>[Input]<br/>meeting notes, chats, documents<br/>(.md and .txt files today)"]:::built
+  ka["Knowledge Automata<br/>[Software system]<br/>turns artifacts into validated records<br/>that trace back to their sources"]:::focus
+  cohere["Cohere platform<br/>[External system]<br/>Command, Embed, Rerank"]:::built
+
+  members -- "write" --> artifacts
+  artifacts -- "ingested from files" --> ka
+  operator -- "runs ingest, record-decision, release" --> ka
+  ka -- "drafts records with Command" --> cohere
+  ka -. "finds related records with Embed and Rerank" .-> cohere
+  ka -- "Markdown views" --> members
+  ka -. "answers with citations" .-> members
+
+  subgraph legend["Legend"]
+    direction LR
+    k1["Built"]:::built -- "built flow" --> k2["Built"]:::built
+    k3["Planned"]:::planned -. "planned flow" .-> k4["Planned"]:::planned
+  end
+```
+<!-- /diagram -->
+
+Solid boxes and arrows are built on `main` today; dashed boxes and dotted arrows are planned. See the [interactive version in the guide](https://miguelmog10.github.io/knowledge-automata/guide/#context).
+
+### Containers
+
+<!-- diagram: containers. Copy of docs/diagrams/02-containers.md; edit that file first. -->
+```mermaid
+---
+config:
+  theme: base
+  fontFamily: "system-ui, -apple-system, \"Segoe UI\", \"Roboto\", \"Helvetica\", \"Arial\", sans-serif"
+  themeVariables:
+    background: "#e9e5de"
+    fontFamily: "system-ui, -apple-system, \"Segoe UI\", \"Roboto\", \"Helvetica\", \"Arial\", sans-serif"
+    fontSize: "16px"
+    primaryColor: "#e9e5de"
+    primaryTextColor: "#22201d"
+    primaryBorderColor: "#22201d"
+    secondaryColor: "#e9e5de"
+    secondaryTextColor: "#22201d"
+    secondaryBorderColor: "#57524b"
+    tertiaryColor: "#e9e5de"
+    tertiaryTextColor: "#22201d"
+    tertiaryBorderColor: "#c9c2b7"
+    lineColor: "#807a71"
+    textColor: "#22201d"
+    titleColor: "#22201d"
+    nodeTextColor: "#22201d"
+    clusterBkg: "#e9e5de"
+    clusterBorder: "#c9c2b7"
+    edgeLabelBackground: "#e9e5de"
+    noteBkgColor: "#e9e5de"
+    noteTextColor: "#22201d"
+    noteBorderColor: "#c9c2b7"
+    actorBkg: "#e9e5de"
+    actorBorder: "#22201d"
+    actorTextColor: "#22201d"
+    actorLineColor: "#807a71"
+    signalColor: "#807a71"
+    signalTextColor: "#807a71"
+    labelBoxBkgColor: "#e9e5de"
+    labelBoxBorderColor: "#c9c2b7"
+    labelTextColor: "#22201d"
+    loopTextColor: "#807a71"
+---
+flowchart LR
+  classDef built fill:#e9e5de,stroke:#22201d,stroke-width:1.5px,color:#22201d
+  classDef planned fill:#e9e5de,stroke:#57524b,stroke-width:1.5px,stroke-dasharray:6 4,color:#57524b
+  classDef focus fill:#e9e5de,stroke:#9c4426,stroke-width:3px,color:#22201d
+  accTitle: Knowledge Automata containers
+  accDescr: Knowledge Automata is one Python command-line app plus two file stores. Inside the app, a pipeline stand-in for the Governor runs the Sensor and the Decision Registrar and does every file write to the memory folder. Every model call goes through the LLM service layer to Cohere and is logged to the event log. The Governor, Comparator, Risk Registrar, Observer and Oracle are planned.
+
+  operator["Operator<br/>(human in the loop)<br/>[Person]"]:::built
+
+  subgraph ka["Knowledge Automata"]
+    pipeline["CLI and pipeline<br/>[Container: Python app]<br/>stand-in for the Governor,<br/>does every file write"]:::built
+    subgraph roles["Roles [Components of the app]"]
+      sensor["Sensor<br/>(intake and input guardrail)"]:::built
+      decision["Decision Registrar<br/>(specialist record keeper)"]:::built
+      risk["Risk Registrar<br/>(specialist record keeper)"]:::planned
+      governor["Governor<br/>(orchestrator)"]:::planned
+      comparator["Comparator<br/>(reconciliation)"]:::planned
+      observer["Observer (quality control)<br/>Oracle (query interface)"]:::planned
+    end
+    subgraph llm["LLM service layer [Component]"]
+      command["Command<br/>structured chat"]:::built
+      embed["Embed"]:::built
+      rerank["Rerank"]:::built
+    end
+    subgraph memory["Memory folder [Container: files]"]
+      ledger[("Artifact Ledger<br/>and read-only copies")]:::built
+      declog[("Decision log")]:::built
+      risklog[("Risk register")]:::planned
+      views[("Markdown views")]:::built
+    end
+    events[("Event log<br/>[Container: JSON Lines]")]:::built
+  end
+
+  cohere["Cohere platform<br/>[External system]"]:::built
+
+  operator -- "commands" --> pipeline
+  pipeline -- "checks bytes" --> sensor
+  pipeline -- "drafts" --> decision
+  pipeline -- "writes" --> memory
+  governor -. "work orders" .-> comparator
+  decision --> command
+  risk -.-> command
+  comparator -.-> embed
+  comparator -.-> rerank
+
+  comparator ~~~ observer
+  llm -- "API calls" --> cohere
+  llm -- "one event per call" --> events
+
+  subgraph legend["Legend"]
+    direction TB
+    k1["Built"]:::built -- "built flow" --> k2["Built"]:::built
+    k3["Planned"]:::planned -. "planned flow" .-> k4["Planned"]:::planned
+  end
+```
+<!-- /diagram -->
+
+Solid boxes and arrows are built on `main` today; dashed boxes and dotted arrows are planned. See the [interactive version in the guide](https://miguelmog10.github.io/knowledge-automata/guide/#containers).
+
 ## Design principle
 
 **Use the LLM only where judgement is needed; use deterministic code for everything that can be checked.**
@@ -35,6 +213,99 @@ Understanding an artifact, drafting a record and judging how it relates to exist
 The Sensor and the Artifact Ledger run since handoff 005: `knowledge-automata ingest` is step 1, and `knowledge-automata record-decision` runs step 4 for the decision log on an accepted artifact. Steps 2 and 3 are still skipped, so every record is `new` until the Comparator exists, and a pipeline stand-in for the Governor sets `processed` and `failed`. The Sensor decides from bytes alone; the stand-in writes the artifact copies and Ledger entries, because agents never touch storage. A quarantined artifact waits for the Operator's `knowledge-automata release`.
 
 Around this loop: the Observer (quality control) checks register health, the Oracle (query interface) answers questions from stored records, and the Operator (human in the loop) approves sensitive changes.
+
+<!-- diagram: closed-loop. Copy of docs/diagrams/03-closed-loop.md; edit that file first. -->
+```mermaid
+---
+config:
+  theme: base
+  fontFamily: "system-ui, -apple-system, \"Segoe UI\", \"Roboto\", \"Helvetica\", \"Arial\", sans-serif"
+  themeVariables:
+    background: "#e9e5de"
+    fontFamily: "system-ui, -apple-system, \"Segoe UI\", \"Roboto\", \"Helvetica\", \"Arial\", sans-serif"
+    fontSize: "16px"
+    primaryColor: "#e9e5de"
+    primaryTextColor: "#22201d"
+    primaryBorderColor: "#22201d"
+    secondaryColor: "#e9e5de"
+    secondaryTextColor: "#22201d"
+    secondaryBorderColor: "#57524b"
+    tertiaryColor: "#e9e5de"
+    tertiaryTextColor: "#22201d"
+    tertiaryBorderColor: "#c9c2b7"
+    lineColor: "#807a71"
+    textColor: "#22201d"
+    titleColor: "#22201d"
+    nodeTextColor: "#22201d"
+    clusterBkg: "#e9e5de"
+    clusterBorder: "#c9c2b7"
+    edgeLabelBackground: "#e9e5de"
+    noteBkgColor: "#e9e5de"
+    noteTextColor: "#22201d"
+    noteBorderColor: "#c9c2b7"
+    actorBkg: "#e9e5de"
+    actorBorder: "#22201d"
+    actorTextColor: "#22201d"
+    actorLineColor: "#807a71"
+    signalColor: "#807a71"
+    signalTextColor: "#807a71"
+    labelBoxBkgColor: "#e9e5de"
+    labelBoxBorderColor: "#c9c2b7"
+    labelTextColor: "#22201d"
+    loopTextColor: "#807a71"
+---
+flowchart TB
+  classDef built fill:#e9e5de,stroke:#22201d,stroke-width:1.5px,color:#22201d
+  classDef planned fill:#e9e5de,stroke:#57524b,stroke-width:1.5px,stroke-dasharray:6 4,color:#57524b
+  classDef focus fill:#e9e5de,stroke:#9c4426,stroke-width:3px,color:#22201d
+  accTitle: The closed loop for one artifact
+  accDescr: An artifact enters through the Sensor, which records it in the Artifact Ledger. The planned Governor sends work orders through the planned Comparator to the Registrars, which write validated records; the Governor then marks the artifact processed in the Ledger. Today the record-decision command sends an accepted artifact straight to the Decision Registrar and a pipeline stand-in marks it processed. The Operator releases quarantined files today; the Observer and Oracle are planned, and Oracle insight notes approved by the Operator will re-enter as new artifacts through the Sensor.
+
+  artifact["Artifact<br/>(file)"]:::built
+  sensor["1. Sensor<br/>(intake)"]:::built
+  ledger[("Artifact Ledger")]:::built
+  governor["2. Governor<br/>(orchestrator)"]:::planned
+  comparator["3. Comparator<br/>(reconciliation)"]:::planned
+  subgraph registrars["4. Registrars (specialist record keepers)"]
+    decision["Decision Registrar"]:::built
+    risk["Risk Registrar"]:::planned
+  end
+  registers[("Registers and views")]:::built
+
+  operator["Operator<br/>(human in the loop)"]:::built
+  observer["Observer<br/>(quality control)"]:::planned
+  oracle["Oracle<br/>(query interface)"]:::planned
+
+  artifact --> sensor
+  sensor -- "accepted, quarantined<br/>or rejected" --> ledger
+  operator -- "releases quarantine" --> ledger
+  ledger -.-> governor
+  governor -. "work orders" .-> comparator
+  comparator -. "new, update, reaffirmation<br/>or supersession" .-> registrars
+  ledger -- "today: record-decision" --> decision
+  decision -- "validated record" --> registers
+  risk -.-> registers
+  registrars -. "5. Governor marks processed" .-> ledger
+  decision -- "today: stand-in<br/>marks processed" --> ledger
+  comparator -. "related records" .-> registers
+  observer -. "checks health" .-> registers
+  oracle -. "answers with citations" .-> registers
+  operator -. "approves sensitive changes" .-> registers
+  oracle -. "insight notes, after Operator approval" .-> artifact
+
+  subgraph legend["Legend"]
+    direction LR
+    k1["Built"]:::built -- "built flow" --> k2["Built"]:::built
+    k3["Planned"]:::planned -. "planned flow" .-> k4["Planned"]:::planned
+  end
+  registers ~~~ k1
+  registers ~~~ k3
+```
+<!-- /diagram -->
+
+Solid boxes and arrows are built on `main` today; dashed boxes and dotted arrows are planned. See the [interactive version in the guide](https://miguelmog10.github.io/knowledge-automata/guide/#loop).
+
+The [ART-0001 to DEC-0001 sequence diagram](diagrams/04-art-0001-to-dec-0001.md) follows the real run that produced the sample decision record, including the one retry.
 
 ## Write rules
 
