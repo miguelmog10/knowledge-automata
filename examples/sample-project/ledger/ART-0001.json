@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0",
+  "id": "ART-0001",
+  "title": "Tallyleaf greenhouse inventory app: project board meeting",
+  "source": {
+    "type": "file",
+    "name": "ART-0001-project-board-2026-02-03.md"
+  },
+  "artifact_date": "2026-02-03",
+  "media_type": "text/markdown",
+  "size_bytes": 1433,
+  "content_hash": "sha256:ea5866af681470dce5b36c580dee0395268c6db2c050a004573388b338a15447",
+  "stored_path": "artifacts/ART-0001-project-board-2026-02-03.md",
+  "status": "processed",
+  "created_at": "2026-10-28T04:55:17Z",
+  "updated_at": "2026-10-28T04:55:17Z",
+  "produced": [
+    {
+      "register": "decision-log",
+      "record_id": "DEC-0001",
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v1+registrar-retry.v1",
+      "schema_version": "1.0"
+    }
+  ],
+  "rejected": [],
+  "history": [
+    {
+      "at": "2026-10-28T04:55:17Z",
+      "status": "received",
+      "by": "sensor",
+      "reason": "Backfilled: recorded by handoff 004 before the Artifact Ledger existed"
+    },
+    {
+      "at": "2026-10-28T04:55:17Z",
+      "status": "accepted",
+      "by": "sensor",
+      "reason": "Backfilled: recorded by handoff 004 before the Artifact Ledger existed"
+    },
+    {
+      "at": "2026-10-28T04:55:17Z",
+      "status": "processed",
+      "by": "pipeline",
+      "reason": "Backfilled: recorded by handoff 004 before the Artifact Ledger existed",
+      "run_id": "98ebfd14-8f1a-4937-961f-242554938b23"
+    }
+  ]
+}
