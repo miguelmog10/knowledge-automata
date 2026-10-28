@@ -1,6 +1,7 @@
 """Observation: one metadata-only event per LLM call (ADR-0012).
 
-Events hold timing, model, billed units, estimated cost and the caller's context. They
+Events hold timing, model, billed units, estimated cost, the caller's context, the
+provider's finish reason and, for failed calls, the project exception's message. They
 never hold prompts, artifact text, model output or keys, so the log is safe to keep and
 cannot become an unvalidated second copy of the institutional memory.
 """
@@ -17,6 +18,7 @@ from typing import Any, Protocol, TypeVar, runtime_checkable
 
 from knowledge_automata.core.schemas import LLM_EVENT_SCHEMA, load_schema
 from knowledge_automata.core.validation import validate_llm_event
+from knowledge_automata.llm.errors import LLMError
 from knowledge_automata.llm.interfaces import (
     CallContext,
     ChatResult,
@@ -32,6 +34,8 @@ from knowledge_automata.llm.pricing import PriceTable, estimate_cost, format_cos
 _PROVIDER = re.compile(r"[a-z][a-z0-9-]*")
 _Result = TypeVar("_Result", ChatResult, EmbedResult, RerankResult)
 _UNITS = ("input_tokens", "output_tokens", "raw_input_tokens", "raw_output_tokens", "search_units")
+MAX_FINISH_REASON = 64
+MAX_ERROR_MESSAGE = 500
 
 
 @functools.cache
@@ -165,7 +169,11 @@ class ObservedLLM:
                 model=self.models.for_operation(operation),
                 usage=usage if isinstance(usage, Usage) else Usage(),
                 request_id=request_id if isinstance(request_id, str) else None,
+                finish_reason=getattr(exc, "finish_reason", None),
                 error_type=type(exc).__name__,
+                # Project exceptions guarantee messages without keys, prompts or artifact
+                # text (llm/errors.py); any other exception's message is never logged.
+                error_message=str(exc) if isinstance(exc, LLMError) else None,
             )
             raise
         self._emit(
@@ -176,6 +184,7 @@ class ObservedLLM:
             model=result.model,
             usage=result.usage,
             request_id=result.request_id,
+            finish_reason=getattr(result, "finish_reason", None),
         )
         return result
 
@@ -189,7 +198,9 @@ class ObservedLLM:
         model: str,
         usage: Usage,
         request_id: str | None = None,
+        finish_reason: Any = None,
         error_type: str | None = None,
+        error_message: str | None = None,
     ) -> None:
         event: dict[str, Any] = {
             "schema_version": event_schema_version(),
@@ -212,6 +223,11 @@ class ObservedLLM:
         event["status"] = "ok" if error_type is None else "error"
         if error_type is not None:
             event["error_type"] = error_type
+            if error_message:
+                event["error_message"] = error_message[:MAX_ERROR_MESSAGE]
+        # The SDK types finish_reason as a string or anything, so only a string is kept.
+        if isinstance(finish_reason, str) and finish_reason:
+            event["finish_reason"] = finish_reason[:MAX_FINISH_REASON]
         event["latency_ms"] = max(0, round(latency_seconds * 1000))
         event["items"] = items
         for name in _UNITS:

@@ -11,6 +11,7 @@ from knowledge_automata.llm import (
     CallContext,
     JsonlFileSink,
     LLMConfigError,
+    LLMResponseError,
     LLMSettings,
     MemorySink,
     ObservedLLM,
@@ -118,7 +119,9 @@ def test_smoke_script_runs_every_check(tmp_path, decision_draft):
     assert len(events) == 7
     (run_id,) = {event["run_id"] for event in events}
     assert f"Run ID: {run_id}" in output
-    assert all(event["schema_version"] == "1.0" for event in events)
+    assert all(event["schema_version"] == "1.1" for event in events)
+    assert [event.get("finish_reason") for event in events] == ["COMPLETE"] * 4 + [None] * 3
+    assert output.count("finish_reason COMPLETE") == 4
     assert KEY not in output
 
 
@@ -146,6 +149,22 @@ def test_smoke_script_reports_failed_checks_and_carries_on(tmp_path):
     assert failures == 3
     assert output.count("validate_draft: FAILED") == 2
     assert "== 4. Rerank" in output
+
+
+def test_smoke_script_prints_the_error_message_of_a_failed_call(tmp_path, decision_draft):
+    smoke = load_smoke_script()
+    truncated = LLMResponseError(
+        "The chat response was truncated at the token limit (finish_reason MAX_TOKENS)",
+        finish_reason="MAX_TOKENS",
+    )
+    vermilion = {"color": "vermilion"}
+    fake = FakeLLM([vermilion, vermilion, truncated, decision_draft])
+    lines = []
+    settings = LLMSettings(api_key=KEY, event_log=tmp_path / "events.jsonl")
+    assert smoke.run(settings, build=fake_builder(fake, []), out=lines.append) == 1
+    output = "\n".join(lines)
+    assert "finish_reason MAX_TOKENS" in output
+    assert "error_message The chat response was truncated at the token limit" in output
 
 
 def test_smoke_script_without_a_key_exits_with_the_hint(monkeypatch, capsys):

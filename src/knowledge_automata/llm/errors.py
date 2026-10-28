@@ -43,12 +43,19 @@ class LLMResponseError(LLMError):
     """The response is not usable: not JSON, not a JSON object, truncated or incomplete.
 
     ``usage`` carries the billed units when the provider charged for the unusable response,
-    so the event log still records the cost; ``request_id`` is the provider's response ID.
+    so the event log still records the cost; ``request_id`` is the provider's response ID;
+    ``finish_reason`` is the provider's reason the model stopped, for chat responses.
     """
 
     def __init__(
-        self, message: str, *, usage: Usage | None = None, request_id: str | None = None
+        self,
+        message: str,
+        *,
+        usage: Usage | None = None,
+        request_id: str | None = None,
+        finish_reason: str | None = None,
     ) -> None:
         super().__init__(message)
         self.usage = usage
         self.request_id = request_id
+        self.finish_reason = finish_reason
