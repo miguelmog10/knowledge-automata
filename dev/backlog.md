@@ -31,6 +31,7 @@
 - Format converters (PDF, Word) as a step before the Sensor; the Ledger hashes the original file and stores the extracted text that evidence is checked against.
 - Artifact Ledger Markdown view.
 - Reprocessing `processed` artifacts after a prompt change, with the Comparator.
+- Rerunning an artifact whose draft was rejected: it becomes `processed`, which is final, and the duplicate check blocks ingesting the same file again, so it stays stuck until reprocessing exists. A rerun is safe without the Comparator when nothing was produced (review of handoff 005).
 - Repair for a Ledger left behind its records by an interrupted run (today the pipeline detects it and stops).
 - Sensor relevance check and prompt-injection detection.
 - Oracle insight feedback loop: Operator-confirmed conclusions from Oracle conversations are saved as new raw artifacts ("insight notes") and re-enter through the Sensor, so there is still one write path.
@@ -91,3 +92,5 @@
 ## Technical debt
 
 - If writing the views or the Ledger entry fails after a record is saved, a rerun of `record-decision` is refused because the Ledger is behind the records. The fix is by hand today (`knowledge-automata views`, then the Ledger entry); the error could say so step by step.
+- `release` does not check the stored copy's hash: a quarantined copy edited in place is released, then refused by `record-decision`. Checking the hash at release would fail sooner, with the same message.
+- A crash between writing an artifact copy and its Ledger entry leaves an orphan copy, and the next `ingest` stops on "file exists" for the same ID until the copy is deleted. It fails loudly; the error could say which file to remove.

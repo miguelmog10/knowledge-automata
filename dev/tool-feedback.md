@@ -157,3 +157,8 @@ Suggested improvement: type it as the literal plus `str` (the usual pattern for 
 
 Note: `Set-Content -Encoding UTF8` writes a byte order mark, which turned up as a stray character in a Python source file, and quoting a multi-line `python -c` argument is mangled. Piping a here-string to `uv run python -` and writing files with `[IO.File]::WriteAllText` and a `UTF8Encoding($false)` avoided both.
 Suggested improvement: for us, prefer the editor's file tools for source files and here-strings for scripts; PowerShell 7 writes UTF-8 without a BOM by default.
+
+### 2026-10-28: Claude file bridge to the local computer (bug, again)
+
+Note: the same problem as on 2026-10-25. A second write of the Cohere journal, sent from the same staging path as the first, delivered the earlier version although the write reported success. Reading the file back and comparing hashes caught it; writing the same content from a new staging path delivered it correctly.
+Suggested improvement (Claude): as before, verify delivered content or fail the write. Workaround that worked: stage every new version of a file from a new path, then read it back and compare hashes.
