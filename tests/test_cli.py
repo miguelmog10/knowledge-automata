@@ -259,7 +259,7 @@ def test_a_file_system_error_exits_2_naming_the_path(
     def locked(source, target):
         raise PermissionError(13, "Permission denied", str(target))
 
-    monkeypatch.setattr("knowledge_automata.storage.record_store.os.replace", locked)
+    monkeypatch.setattr("knowledge_automata.storage.json_files.os.replace", locked)
     assert record(FakeBuild(decision_draft), artifact, memory) == 2
     err = capsys.readouterr().err
     assert "Cannot access " in err and "DEC-0001.json: Permission denied" in err

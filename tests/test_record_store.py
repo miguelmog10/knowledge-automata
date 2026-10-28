@@ -96,7 +96,7 @@ def test_save_new_leaves_no_temporary_file_when_writing_fails(tmp_path, monkeypa
     def failing_replace(source, target):
         raise PermissionError(13, "locked", str(target))
 
-    monkeypatch.setattr("knowledge_automata.storage.record_store.os.replace", failing_replace)
+    monkeypatch.setattr("knowledge_automata.storage.json_files.os.replace", failing_replace)
     with pytest.raises(PermissionError):
         RecordStore(tmp_path).save_new(make_record(), DECISION_LOG)
     assert list(register(tmp_path).iterdir()) == []
