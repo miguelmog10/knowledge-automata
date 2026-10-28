@@ -50,6 +50,7 @@ class DraftOutcome:
     model: str | None  # model that produced the accepted draft
     prompt_version: str  # of the accepted attempt, or of the last attempt
     usage: tuple[Usage, ...]  # one per billed call, including unusable responses
+    error_type: str | None = None  # exception class name when the last response was unusable
 
     @property
     def accepted(self) -> bool:
@@ -93,6 +94,7 @@ def draft_record(
     user = user_message(artifact_text)
     usage: list[Usage] = []
     errors: tuple[str, ...] = ()
+    error_type: str | None = None
     version = registrar.prompt.version
 
     for attempt in range(1, registrar.max_attempts + 1):
@@ -106,7 +108,7 @@ def draft_record(
         except LLMResponseError as error:
             if error.usage is not None:
                 usage.append(error.usage)
-            errors = (str(error),)
+            errors, error_type = (str(error),), type(error).__name__
             continue
         usage.append(result.usage)
         validation = validate_draft(result.data, registrar.spec, artifact_text)
@@ -119,7 +121,7 @@ def draft_record(
                 prompt_version=version,
                 usage=tuple(usage),
             )
-        errors = validation.errors
+        errors, error_type = validation.errors, None
 
     return DraftOutcome(
         draft=None,
@@ -128,4 +130,5 @@ def draft_record(
         model=None,
         prompt_version=version,
         usage=tuple(usage),
+        error_type=error_type,
     )

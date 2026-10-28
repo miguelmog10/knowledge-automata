@@ -125,7 +125,17 @@ def test_unusable_twice_is_rejected_with_the_message(artifact_text):
     outcome = draft_record(REGISTRAR, llm, artifact_text, artifact_id="ART-0001")
     assert not outcome.accepted
     assert outcome.errors == ("not an object",)
+    assert outcome.error_type == "LLMResponseError"
     assert outcome.usage == ()
+
+
+def test_error_type_follows_the_last_attempt_only(decision_draft, artifact_text):
+    invalid = decision_draft | {"evidence": ["The group chose supplier C."]}
+    _, _, llm = observed(LLMResponseError("truncated"), invalid)
+    outcome = draft_record(REGISTRAR, llm, artifact_text, artifact_id="ART-0001")
+    assert not outcome.accepted
+    assert outcome.errors[0].startswith("$.evidence[0]: ")
+    assert outcome.error_type is None
 
 
 def test_rate_limit_is_not_retried(decision_draft, artifact_text):

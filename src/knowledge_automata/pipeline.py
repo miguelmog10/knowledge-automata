@@ -1,16 +1,17 @@
-"""Recording one decision from one artifact: the stand-in for the Governor in this slice.
+"""The stand-in for the Governor (orchestrator): intake, recording, release and views.
 
-Handoff 004 runs step 4 of the data flow (the Registrar) without the Sensor (intake and
-input guardrail), the Artifact Ledger, the Governor (orchestrator) or the Comparator
-(reconciliation), so every record is ``new``. Until the Ledger exists, the caller passes
-the artifact ID and date, rerunning on a recorded artifact is refused, and artifact files
-are found by name in ``<memory>/artifacts/``. All of this is replaced by those roles.
+The Sensor (intake and input guardrail) decides; this module reads and writes the files:
+artifact copies, Artifact Ledger entries, records and views. ``record_decision`` runs step
+4 of the data flow (the Decision Registrar) for one artifact the Ledger has accepted. There
+is no Comparator (reconciliation) yet, so every record is ``new``.
+
+Write order when recording: record, then views, then the Ledger. An interruption leaves the
+Ledger behind the records, never ahead, and the next run detects it.
 """
 
 import dataclasses
-import re
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,9 +20,9 @@ from knowledge_automata.agents.registrar import (
     ArtifactRefusedError,
     DraftOutcome,
     Registrar,
-    check_artifact,
     draft_record,
 )
+from knowledge_automata.core import ledger
 from knowledge_automata.core.prompts import load_prompt
 from knowledge_automata.core.records import new_record
 from knowledge_automata.domains.project_management.decision_log_view import (
@@ -30,10 +31,10 @@ from knowledge_automata.domains.project_management.decision_log_view import (
     render_decision_log,
 )
 from knowledge_automata.domains.project_management.registers import DECISION_LOG
-from knowledge_automata.llm import ChatModel, LLMSettings
+from knowledge_automata.llm import ChatModel, LLMConfigError, LLMError, LLMSettings
 from knowledge_automata.llm.settings import Thinking
 from knowledge_automata.storage import artifact_files
-from knowledge_automata.storage.ledger_store import LedgerStore
+from knowledge_automata.storage.ledger_store import ARTIFACT_ID, LedgerStore
 from knowledge_automata.storage.record_store import RecordStore
 from knowledge_automata.views.markdown import (
     VIEWS_FOLDER,
@@ -43,20 +44,16 @@ from knowledge_automata.views.markdown import (
 )
 
 DEFAULT_MEMORY = Path("runtime/memory")
-ARTIFACTS_FOLDER = "artifacts"
-MAX_ARTIFACT_CHARACTERS = 50_000
+RECORDABLE_STATUSES = frozenset({"accepted", "failed"})
 
 # Thinking cost about 6x the billed output tokens for the same validation result in the
 # handoff 003 smoke check; revisited with the sample project's evaluation set (ADR-0014).
 DECISION_REGISTRAR_THINKING: Thinking = "disabled"
 
-_ARTIFACT_ID = re.compile(r"ART-[0-9]{4,}", re.ASCII)
-_ARTIFACT_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", re.ASCII)
-_ARTIFACT_FILE = re.compile(r"(ART-[0-9]{4,})[-.]", re.ASCII)
-
 
 class InputError(Exception):
-    """Input the user must fix: bad arguments, a refused artifact, or one already recorded."""
+    """Input the user must fix: bad arguments, an unreadable file, or an artifact the
+    Ledger does not allow to be recorded."""
 
 
 def decision_registrar() -> Registrar:
@@ -140,34 +137,18 @@ def release_artifact(
     return outcome
 
 
-def scan_artifacts(memory: Path) -> dict[str, str]:
-    """Map artifact IDs to files in ``<memory>/artifacts/``, relative to the memory folder.
-
-    A file belongs to an artifact when its name starts with the ID followed by ``-`` or
-    ``.``. Two files for one ID is an error. The Artifact Ledger replaces this convention.
-    """
-    folder = memory / ARTIFACTS_FOLDER
-    if not folder.is_dir():
-        return {}
-    links: dict[str, str] = {}
-    for path in sorted(folder.iterdir()):
-        match = _ARTIFACT_FILE.match(path.name)
-        if match is None or not path.is_file():
-            continue
-        artifact_id = match.group(1)
-        relative = path.relative_to(memory).as_posix()
-        if artifact_id in links:
-            raise InputError(
-                f"Two files in {folder} belong to {artifact_id}: "
-                f"{Path(links[artifact_id]).name!r} and {path.name!r}"
-            )
-        links[artifact_id] = relative
-    return links
+def artifact_links(memory: Path) -> dict[str, str]:
+    """Map artifact IDs to their stored copies (relative to the memory folder) via the Ledger."""
+    return {
+        entry["id"]: entry["stored_path"]
+        for entry in LedgerStore(memory).load_all()
+        if "stored_path" in entry
+    }
 
 
 def render_views(memory: Path) -> dict[str, str]:
     records = RecordStore(memory).load_all(DECISION_LOG)
-    return render_decision_log(records, scan_artifacts(memory))
+    return render_decision_log(records, artifact_links(memory))
 
 
 def write_decision_log_views(memory: Path) -> ViewDifferences:
@@ -182,8 +163,9 @@ def check_decision_log_views(memory: Path) -> ViewDifferences:
 
 @dataclass(frozen=True)
 class RecordOutcome:
-    run_id: str | None
+    run_id: str
     draft: DraftOutcome  # attempts, usage, model, prompt version, and errors when rejected
+    entry: dict[str, Any]  # the Ledger entry after the processed transition
     record_id: str | None = None
     record_path: Path | None = None
     index_path: Path | None = None
@@ -193,75 +175,124 @@ class RecordOutcome:
         return self.record_id is not None
 
 
-def validate_artifact_arguments(artifact_id: str, artifact_date: str | None) -> None:
-    if not _ARTIFACT_ID.fullmatch(artifact_id):
-        raise InputError(f"--artifact-id must look like ART-0001, got {artifact_id!r}")
-    if artifact_date is not None:
-        try:
-            if not _ARTIFACT_DATE.fullmatch(artifact_date):
-                raise ValueError
-            date.fromisoformat(artifact_date)
-        except ValueError:
-            raise InputError(
-                f"--artifact-date must be a real date as YYYY-MM-DD, got {artifact_date!r}"
-            ) from None
+def recordable_entry(artifact_id: str, memory: Path) -> dict[str, Any]:
+    """Return the artifact's Ledger entry if it may be recorded, or raise ``InputError``.
 
-
-def read_artifact(path: Path) -> str:
-    """Read an artifact as UTF-8 (a BOM is tolerated), with line endings as LF."""
-    try:
-        raw = path.read_bytes()
-    except OSError as error:
-        raise InputError(f"Cannot read the artifact {path}: {error.strerror or error}") from None
-    try:
-        text = raw.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        raise InputError(f"The artifact {path} is not valid UTF-8 text") from None
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    if not text.strip():
-        raise InputError(f"The artifact {path} is empty")
-    if len(text) > MAX_ARTIFACT_CHARACTERS:
+    Only ``accepted`` and ``failed`` artifacts may be recorded. Reads only, so the CLI can
+    call it before building the LLM. Raises ``LedgerEntryNotFoundError`` for an unknown ID.
+    """
+    if not ARTIFACT_ID.fullmatch(artifact_id):
+        raise InputError(f"The artifact ID must look like ART-0001, got {artifact_id!r}")
+    entry = LedgerStore(memory).load(artifact_id)
+    status = entry["status"]
+    nothing_sent = "nothing was sent to the model"
+    if status == "quarantined":
         raise InputError(
-            f"The artifact {path} has {len(text):,} characters; the limit is "
-            f"{MAX_ARTIFACT_CHARACTERS:,}"
+            f"{artifact_id} is quarantined ({_last_check(entry)}); {nothing_sent}. Release it "
+            f"with `knowledge-automata release {artifact_id} --reason TEXT`, or fix the file "
+            "and ingest it again."
         )
-    try:
-        check_artifact(text)
-    except ArtifactRefusedError as error:
-        raise InputError(f"The artifact {path} was refused: {error}") from None
-    return text
+    if status == "rejected":
+        raise InputError(
+            f"{artifact_id} was rejected by the Sensor ({_last_check(entry)}); {nothing_sent}. "
+            "Fix the file and ingest it again."
+        )
+    if status not in RECORDABLE_STATUSES:
+        raise InputError(f"{artifact_id} is already {status} ({_results(entry)}); {nothing_sent}.")
+
+    cited = RecordStore(memory).ids_citing(DECISION_LOG, artifact_id)
+    if cited:
+        raise InputError(
+            f"{artifact_id} is {status} in the Ledger but already recorded in "
+            f"{', '.join(cited)}: the Ledger is behind the records, for example after an "
+            f"interrupted run. {nothing_sent.capitalize()}; correct the Ledger entry by hand."
+        )
+    return entry
+
+
+def _last_check(entry: dict[str, Any]) -> str:
+    return entry["history"][-1].get("check", "no check recorded")
+
+
+def _results(entry: dict[str, Any]) -> str:
+    produced = [item["record_id"] for item in entry["produced"]]
+    if produced:
+        return f"recorded in {', '.join(produced)}"
+    if entry["rejected"]:
+        return "its draft was rejected"
+    return "nothing was recorded"
+
+
+def read_artifact_text(memory: Path, entry: dict[str, Any]) -> str:
+    """The stored copy as text: UTF-8 without a BOM, line endings as LF.
+
+    Evidence quotes are checked against this text. A copy whose hash no longer matches the
+    Ledger is refused, because copies are read-only.
+    """
+    raw = artifact_files.read_copy(memory, entry["stored_path"])
+    where = f"The stored copy of {entry['id']} ({entry['stored_path']})"
+    if sensor.content_hash(raw) != entry["content_hash"]:
+        raise InputError(
+            f"{where} no longer matches its hash in the Ledger; nothing was sent to the model. "
+            "Artifact copies are read-only: restore the file or ingest the new version."
+        )
+    text = sensor.decode(raw)
+    if text is None:
+        raise InputError(f"{where} is not valid UTF-8; nothing was sent to the model.")
+    return sensor.normalize_newlines(text)
 
 
 def record_decision(
-    *,
-    artifact_path: Path,
-    artifact_id: str,
-    artifact_date: str | None,
-    memory: Path,
-    llm: ChatModel,
-    now: datetime,
+    *, artifact_id: str, memory: Path, llm: ChatModel, now: datetime
 ) -> RecordOutcome:
-    """Draft, validate and store one decision record from one artifact, then the views.
+    """Draft, validate and store one decision record from one Ledger artifact.
 
-    Raises ``InputError`` before any call for bad input or an artifact already recorded.
-    ``OSError`` from reading or writing records and views propagates.
+    On an accepted draft: the record, the views, then the ``processed`` transition listing
+    the record. On a rejected draft: ``processed`` listing the rejected draft, and nothing
+    in the register. On a provider error other than ``LLMConfigError``: the ``failed``
+    transition, then the error is raised again. Raises ``InputError`` before any call when
+    the Ledger does not allow the artifact to be recorded. ``OSError`` propagates.
     """
-    validate_artifact_arguments(artifact_id, artifact_date)
-    text = read_artifact(artifact_path)
+    run_id = getattr(llm, "run_id", None)
+    if not run_id:
+        raise ValueError("record_decision needs an LLM with a run_id, such as ObservedLLM")
+    entry = recordable_entry(artifact_id, memory)
+    text = read_artifact_text(memory, entry)
+    ledger_store = LedgerStore(memory)
+
+    try:
+        outcome = draft_record(decision_registrar(), llm, text, artifact_id=artifact_id)
+    except ArtifactRefusedError as error:
+        raise InputError(f"{artifact_id} was refused: {error}") from None
+    except LLMConfigError:
+        raise
+    except LLMError as error:
+        failed = ledger.transition(
+            entry,
+            to="failed",
+            by="pipeline",
+            at=now,
+            run_id=run_id,
+            error_type=type(error).__name__,
+        )
+        ledger_store.save_transition(entry, failed)
+        raise
+
+    processed = ledger.transition(entry, to="processed", by="pipeline", at=now, run_id=run_id)
+    if not outcome.accepted:
+        rejected: dict[str, Any] = {
+            "register": DECISION_LOG.name,
+            "attempts": outcome.attempts,
+            "prompt_version": outcome.prompt_version,
+            "error_paths": ledger.error_paths(outcome.errors),
+        }
+        if outcome.error_type is not None:
+            rejected["error_type"] = outcome.error_type
+        processed = ledger.with_results(processed, produced=[], rejected=[rejected])
+        ledger_store.save_transition(entry, processed)
+        return RecordOutcome(run_id=run_id, draft=outcome, entry=processed)
 
     store = RecordStore(memory)
-    existing = store.ids_citing(DECISION_LOG, artifact_id)
-    if existing:
-        raise InputError(
-            f"{artifact_id} is already recorded in {', '.join(existing)}; nothing was sent "
-            "to the model. Rerunning an artifact needs the Artifact Ledger."
-        )
-
-    outcome = draft_record(decision_registrar(), llm, text, artifact_id=artifact_id)
-    run_id = getattr(llm, "run_id", None)
-    if not outcome.accepted:
-        return RecordOutcome(run_id=run_id, draft=outcome)
-
     record_id = store.next_id(DECISION_LOG)
     record = new_record(
         spec=DECISION_LOG,
@@ -269,16 +300,26 @@ def record_decision(
         content=outcome.draft["content"],
         quotes=outcome.draft["evidence"],
         artifact_id=artifact_id,
-        artifact_date=artifact_date,
+        artifact_date=entry.get("artifact_date"),
         model=outcome.model,
         prompt_version=outcome.prompt_version,
         now=now,
     )
     path = store.save_new(record, DECISION_LOG)
     write_decision_log_views(memory)
+    produced = {
+        "register": record["register"],
+        "record_id": record_id,
+        "model": outcome.model,
+        "prompt_version": outcome.prompt_version,
+        "schema_version": record["schema_version"],
+    }
+    processed = ledger.with_results(processed, produced=[produced], rejected=[])
+    ledger_store.save_transition(entry, processed)
     return RecordOutcome(
         run_id=run_id,
         draft=outcome,
+        entry=processed,
         record_id=record_id,
         record_path=path,
         index_path=memory / VIEWS_FOLDER / INDEX,
