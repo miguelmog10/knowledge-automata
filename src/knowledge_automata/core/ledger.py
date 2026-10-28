@@ -17,6 +17,8 @@ STATUSES = ("received", "accepted", "quarantined", "rejected", "processed", "fai
 FINAL_STATUSES = frozenset({"rejected", "processed"})
 STORED_COPY_STATUSES = frozenset({"accepted", "quarantined", "processed", "failed"})
 ACTORS = ("sensor", "operator", "pipeline", "governor")
+# Copies live in <memory>/artifacts/; stored_path is relative to the memory folder.
+ARTIFACTS_FOLDER = "artifacts"
 
 _PIPELINE = frozenset({"pipeline", "governor"})
 

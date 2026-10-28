@@ -12,7 +12,9 @@ import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 
+from knowledge_automata.agents import sensor
 from knowledge_automata.agents.registrar import (
     ArtifactRefusedError,
     DraftOutcome,
@@ -30,6 +32,8 @@ from knowledge_automata.domains.project_management.decision_log_view import (
 from knowledge_automata.domains.project_management.registers import DECISION_LOG
 from knowledge_automata.llm import ChatModel, LLMSettings
 from knowledge_automata.llm.settings import Thinking
+from knowledge_automata.storage import artifact_files
+from knowledge_automata.storage.ledger_store import LedgerStore
 from knowledge_automata.storage.record_store import RecordStore
 from knowledge_automata.views.markdown import (
     VIEWS_FOLDER,
@@ -69,6 +73,71 @@ def decision_registrar_settings(settings: LLMSettings) -> LLMSettings:
     if settings.chat_thinking is None:
         return dataclasses.replace(settings, chat_thinking=DECISION_REGISTRAR_THINKING)
     return settings
+
+
+@dataclass(frozen=True)
+class IngestOutcome:
+    status: str  # accepted, quarantined, rejected or duplicate
+    entry: dict[str, Any]  # the new entry, or the existing one for a duplicate
+
+    @property
+    def duplicate(self) -> bool:
+        return self.status == "duplicate"
+
+
+def ingest_file(
+    *, path: Path, memory: Path, artifact_date: str | None, max_bytes: int, now: datetime
+) -> IngestOutcome:
+    """Run the Sensor on one file and store its Ledger entry, and its copy when kept.
+
+    An exact duplicate of an entry that is not ``rejected`` writes nothing. Bad arguments
+    and an unreadable file raise before anything is written. The copy is written before the
+    entry, so an entry never points at a missing file.
+    """
+    sensor.check_artifact_date(artifact_date)
+    sensor.check_source_name(path.name)
+    try:
+        raw = path.read_bytes()
+    except OSError as error:
+        raise InputError(f"Cannot read {path}: {error.strerror or error}") from None
+
+    store = LedgerStore(memory)
+    existing = store.find_by_hash(sensor.content_hash(raw))
+    if existing is not None:
+        return IngestOutcome("duplicate", existing)
+
+    entry = sensor.assess(
+        raw=raw,
+        name=path.name,
+        artifact_id=store.next_id(),
+        artifact_date=artifact_date,
+        same_name_as=store.ids_with_name(path.name),
+        max_bytes=max_bytes,
+        now=now,
+    )
+    if "stored_path" in entry:
+        artifact_files.write_copy(memory, entry["stored_path"], raw)
+    store.save_new(entry)
+    return IngestOutcome(entry["status"], entry)
+
+
+def release_artifact(
+    *, artifact_id: str, memory: Path, reason: str, now: datetime
+) -> sensor.ReleaseOutcome:
+    """The Operator's release of a quarantined artifact (the Sensor decides; this stores it).
+
+    Raises ``SensorInputError`` for a missing reason or an entry that is not quarantined,
+    and ``LedgerEntryNotFoundError`` for an unknown ID, before the copy is read.
+    """
+    sensor.check_reason(reason)
+    store = LedgerStore(memory)
+    entry = store.load(artifact_id)
+    sensor.check_releasable(entry)
+    raw = artifact_files.read_copy(memory, entry["stored_path"])
+    outcome = sensor.release(entry, raw, reason=reason, now=now)
+    if outcome.released:
+        store.save_transition(entry, outcome.entry)
+    return outcome
 
 
 def scan_artifacts(memory: Path) -> dict[str, str]:

@@ -16,7 +16,7 @@ from knowledge_automata.core.validation import validate_draft
 from knowledge_automata.llm import CallContext, ChatModel, LLMResponseError, Usage
 
 ERRORS_PLACEHOLDER = "{errors}"
-_CLOSING_TAG = re.compile(r"</artifact", re.IGNORECASE)
+CLOSING_TAG = re.compile(r"</artifact", re.IGNORECASE)
 
 
 class ArtifactRefusedError(ValueError):
@@ -73,7 +73,7 @@ def check_artifact(artifact_text: str) -> None:
     """Raise ``ArtifactRefusedError`` if the artifact cannot be sent to a Registrar."""
     if not artifact_text.strip():
         raise ArtifactRefusedError("The artifact is empty")
-    if _CLOSING_TAG.search(artifact_text):
+    if CLOSING_TAG.search(artifact_text):
         raise ArtifactRefusedError(
             "The artifact contains '</artifact', which could close the artifact delimiter "
             "early; it was not sent to the model"
