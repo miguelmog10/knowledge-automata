@@ -6,25 +6,19 @@ the file system is not caught here; callers report it with the path.
 """
 
 import json
-import os
 import re
-import tempfile
 from pathlib import Path
 from typing import Any
 
 from knowledge_automata.core.registers import RegisterSpec
 from knowledge_automata.core.validation import validate_record
+from knowledge_automata.storage.json_files import write_json_atomic
 
 REGISTERS_FOLDER = "registers"
 
 
 class RecordStoreError(Exception):
     """A record cannot be written, or a stored file is not a valid record."""
-
-
-def format_record(record: dict[str, Any]) -> str:
-    """Return the deterministic file content of a record: two-space indent, keys as given."""
-    return json.dumps(record, indent=2, ensure_ascii=False) + "\n"
 
 
 class RecordStore:
@@ -69,18 +63,7 @@ class RecordStore:
         path = folder / f"{record['id']}.json"
         if path.exists():
             raise RecordStoreError(f"Record file already exists, not overwritten: {path}")
-        folder.mkdir(parents=True, exist_ok=True)
-
-        descriptor, temporary = tempfile.mkstemp(
-            dir=folder, prefix=f".{record['id']}.", suffix=".tmp"
-        )
-        try:
-            with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as file:
-                file.write(format_record(record))
-            os.replace(temporary, path)
-        except BaseException:
-            Path(temporary).unlink(missing_ok=True)
-            raise
+        write_json_atomic(path, record, overwrite=False)
         return path
 
     def load(self, path: Path, spec: RegisterSpec) -> dict[str, Any]:

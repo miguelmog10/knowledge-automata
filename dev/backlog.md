@@ -8,7 +8,6 @@
   - Each page starts with a short front matter block (ID, status, dates).
   - Standard relative Markdown links only, no double-bracket wiki links: supersession linked both ways, each record linked to its source artifacts, and the index linked to each record, so the registers browse like a wiki.
   - A test renders fixture records against expected output, and a CI check fails if committed views differ from the generator's output (done for the decision log).
-- Sensor (intake and input guardrail) with deterministic checks (empty, unsupported format, oversized, encoding, duplicate hash), Artifact Ledger and quarantine path.
 - Governor (orchestrator and router): classification and work orders.
 - Comparator (reconciliation) using Embed and Rerank.
 - Risk Registrar, and the Decision Registrar's remaining write rules (update, reaffirmation, supersession).
@@ -25,7 +24,15 @@
 - Observer (quality control): periodic health and cross-register consistency checks.
 - Remaining registrars: issue log, assumption log, change log, lessons learned, stakeholder register; glossary as a minor register.
 - Additional domains beyond project management (for example associations or research groups), each as its own set of Registrars and schemas.
-- Operator (human in the loop) approval workflow for sensitive changes; quarantine review and release.
+- Operator (human in the loop) approval workflow for sensitive changes.
+- Operator release workflow beyond the `release` command (review queue, reasons, notifications).
+- Chunking long artifacts after Operator approval: evidence quotes must still match the original text, and a decision can span two chunks.
+- Document versions: treat an artifact as a new version of an earlier one and process only what changed.
+- Format converters (PDF, Word) as a step before the Sensor; the Ledger hashes the original file and stores the extracted text that evidence is checked against.
+- Artifact Ledger Markdown view.
+- Reprocessing `processed` artifacts after a prompt change, with the Comparator.
+- Rerunning an artifact whose draft was rejected: it becomes `processed`, which is final, and the duplicate check blocks ingesting the same file again, so it stays stuck until reprocessing exists. A rerun is safe without the Comparator when nothing was produced (review of handoff 005).
+- Repair for a Ledger left behind its records by an interrupted run (today the pipeline detects it and stops).
 - Sensor relevance check and prompt-injection detection.
 - Oracle insight feedback loop: Operator-confirmed conclusions from Oracle conversations are saved as new raw artifacts ("insight notes") and re-enter through the Sensor, so there is still one write path.
 - Enterprise connectors (Jira, Confluence, Microsoft Teams) as Sensor sources.
@@ -70,12 +77,13 @@
 
 ## Open questions
 
-- Storage for records: decided, one JSON file per record ([ADR-0013](../docs/decisions/0013-record-storage-json-files.md)). The Artifact Ledger's storage is decided with the Sensor.
-- Artifact Ledger status when some of an artifact's records are rejected (for example a `processed` status with a list of rejections).
+- Storage for records: decided, one JSON file per record ([ADR-0013](../docs/decisions/0013-record-storage-json-files.md)). The Artifact Ledger's storage: decided, one JSON file per artifact with an append-only history ([ADR-0015](../docs/decisions/0015-artifact-ledger-storage-and-sensor-checks.md)).
+- Artifact Ledger status when some of an artifact's records are rejected: decided, `processed` with a list of rejected drafts ([ADR-0015](../docs/decisions/0015-artifact-ledger-storage-and-sensor-checks.md)).
 - How a Registrar reports that an artifact has nothing to record. The draft schema always requires content; this is probably the Governor's job (it only sends work orders for items it found).
-- Persisting rejected drafts and their errors: with the Artifact Ledger's `failed` status (ADR-0006).
-- Sensor content hashes must ignore line endings (CRLF versus LF), so the same artifact hashes the same on Windows and in CI.
-- Record finish_reason and the adapter's error message (both metadata, no content) in LLM events, as an optional field in a minor event schema version, so failed attempts can be diagnosed.
+- Persisting rejected drafts and their errors: decided, the Ledger lists each rejected draft by register, attempts, prompt version and error paths, plus the error type when the last response was unusable, never the full error messages, because evidence errors quote model output ([ADR-0015](../docs/decisions/0015-artifact-ledger-storage-and-sensor-checks.md)).
+- Sensor content hashes must ignore line endings (CRLF versus LF): decided, SHA-256 over the bytes without a leading BOM and with line endings as LF ([ADR-0015](../docs/decisions/0015-artifact-ledger-storage-and-sensor-checks.md)).
+- Record finish_reason and the adapter's error message in LLM events: done, event schema 1.1 ([ADR-0012](../docs/decisions/0012-llm-service-layer-observation-and-cost.md), amended).
+- Keep artifact copies byte-identical on every checkout, for example a .gitattributes rule marking examples/*/artifacts/** as -text, so stored_path holds the original bytes and size_bytes matches the file.
 - Cohere's trial monthly cap: the docs give no exact wording for the 429 it returns, so the adapter marks a 429 as the monthly cap only when the message mentions "month" (`llm/cohere_adapter.py`). Confirm the wording the first time it happens.
 - Chat thinking default for the Registrars: decided for the Decision Registrar, thinking disabled unless `KA_CHAT_THINKING` is set ([ADR-0014](../docs/decisions/0014-registrar-drafting-loop.md)); revisited with the evaluation set (see *Later*).
 - Prices: Cohere's pricing page lists no per-token or per-search-unit prices for the configured models, so `prices.toml` has no model entries and events carry no `cost_usd`. Fill the table when prices are published, or record an official source.
@@ -83,4 +91,6 @@
 
 ## Technical debt
 
-- If writing the views fails after a record is saved, a rerun of `record-decision` is refused as "already recorded"; the error should suggest running `knowledge-automata views`.
+- If writing the views or the Ledger entry fails after a record is saved, a rerun of `record-decision` is refused because the Ledger is behind the records. The fix is by hand today (`knowledge-automata views`, then the Ledger entry); the error could say so step by step.
+- `release` does not check the stored copy's hash: a quarantined copy edited in place is released, then refused by `record-decision`. Checking the hash at release would fail sooner, with the same message.
+- A crash between writing an artifact copy and its Ledger entry leaves an orphan copy, and the next `ingest` stops on "file exists" for the same ID until the copy is deleted. It fails loudly; the error could say which file to remove.

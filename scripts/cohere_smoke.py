@@ -196,8 +196,11 @@ def run(
         )
         out(
             f"       schema_version {event['schema_version']}, run_id {event['run_id']}, "
-            f"request_id {event.get('request_id', '(none)')}"
+            f"request_id {event.get('request_id', '(none)')}, "
+            f"finish_reason {event.get('finish_reason', '(none)')}"
         )
+        if "error_message" in event:
+            out(f"       error_message {event['error_message']}")
     run_ids = {event["run_id"] for event in memory.events}
     out(f"Run IDs in events: {sorted(run_ids)}")
     costs = [Decimal(event["cost_usd"]) for event in memory.events if "cost_usd" in event]

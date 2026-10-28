@@ -88,8 +88,10 @@ def test_chat_emits_one_complete_event():
         "items",
         "input_tokens",
         "output_tokens",
+        "finish_reason",
     }
-    assert event["schema_version"] == "1.0"
+    assert event["schema_version"] == "1.1"
+    assert event["finish_reason"] == "COMPLETE"
     assert event["run_id"] == RUN_ID
     assert event["ts"] == "2026-10-25T09:30:00.123Z"
     assert event["provider"] == "fake"
@@ -167,7 +169,7 @@ def test_every_event_of_one_observer_shares_its_run_id():
     llm.rerank("q", ["a"], top_n=1, context=CONTEXT)
     assert len(sink.events) == 4
     assert {event["run_id"] for event in sink.events} == {RUN_ID}
-    assert {event["schema_version"] for event in sink.events} == {"1.0"}
+    assert {event["schema_version"] for event in sink.events} == {"1.1"}
     assert len({event["event_id"] for event in sink.events}) == 4
     assert all(validate_llm_event(event).ok for event in sink.events)
 
@@ -190,8 +192,53 @@ def test_errors_are_logged_and_reraised_unchanged():
     (event,) = sink.events
     assert event["status"] == "error"
     assert event["error_type"] == "LLMRateLimitError"
+    assert event["error_message"] == "monthly cap"
+    assert "finish_reason" not in event
     assert event["model"] == "fake-chat"
     assert "input_tokens" not in event
+    assert validate_llm_event(event).ok
+
+
+def test_a_truncated_response_logs_its_finish_reason_and_message():
+    message = "The chat response was truncated at the token limit (finish_reason MAX_TOKENS)"
+    error = LLMResponseError(message, finish_reason="MAX_TOKENS")
+    llm, sink = observed(FakeLLM([error]))
+    with pytest.raises(LLMResponseError):
+        chat(llm)
+    (event,) = sink.events
+    assert (event["finish_reason"], event["error_message"]) == ("MAX_TOKENS", message)
+    assert validate_llm_event(event).ok
+
+
+def test_long_messages_and_finish_reasons_are_cut_to_the_schema_limits():
+    error = LLMResponseError("x" * 600, finish_reason="Y" * 80)
+    llm, sink = observed(FakeLLM([error]))
+    with pytest.raises(LLMResponseError):
+        chat(llm)
+    (event,) = sink.events
+    assert (len(event["error_message"]), len(event["finish_reason"])) == (500, 64)
+    assert validate_llm_event(event).ok
+
+
+def test_finish_reasons_that_are_not_strings_are_left_out():
+    error = LLMResponseError("no text", finish_reason=None)
+    error.finish_reason = 7
+    llm, sink = observed(FakeLLM([error, LLMResponseError("")]))
+    for _ in range(2):
+        with pytest.raises(LLMResponseError):
+            chat(llm)
+    assert all("finish_reason" not in event for event in sink.events)
+    assert "error_message" not in sink.events[1]
+    assert all(validate_llm_event(event).ok for event in sink.events)
+
+
+def test_other_exceptions_are_logged_without_a_message():
+    llm, sink = observed(FakeLLM([RuntimeError(f"bug {SENTINEL}")]))
+    with pytest.raises(RuntimeError):
+        chat(llm)
+    (event,) = sink.events
+    assert event["error_type"] == "RuntimeError"
+    assert "error_message" not in event
     assert validate_llm_event(event).ok
 
 
@@ -224,22 +271,34 @@ def test_error_events_keep_the_request_id_and_raw_tokens():
 
 
 def test_sentinels_never_reach_the_event_log(tmp_path):
+    """Sentinels in the system message, the user message and the model output (6.9)."""
     path = tmp_path / "events.jsonl"
-    fake = FakeLLM([{"summary": SENTINEL}, LLMResponseError(f"bad {SENTINEL}")])
+    errors = [
+        LLMResponseError("The chat response is not valid JSON (line 1, column 9)"),
+        LLMResponseError("truncated", finish_reason="MAX_TOKENS"),
+        LLMRateLimitError("Cohere rate limit reached (HTTP 429) after 2 retries"),
+        RuntimeError(f"not a project exception {SENTINEL}"),
+    ]
+    fake = FakeLLM([{"summary": SENTINEL}, *errors])
     llm, _ = observed(fake, sink=JsonlFileSink(path))
     artifact_text = f"Meeting notes. {SENTINEL}"
-    llm.chat_json(
-        system=f"Instructions {SENTINEL}",
-        user=artifact_text,
-        schema={"type": "object"},
-        context=CONTEXT,
-    )
-    with pytest.raises(LLMResponseError):
-        chat(llm, user=artifact_text)
+
+    def call():
+        return llm.chat_json(
+            system=f"Instructions {SENTINEL}",
+            user=artifact_text,
+            schema={"type": "object"},
+            context=CONTEXT,
+        )
+
+    call()
+    for error in errors:
+        with pytest.raises(type(error)):
+            call()
     llm.embed([artifact_text], input_type="document", context=CONTEXT)
     llm.rerank(SENTINEL, [artifact_text], top_n=1, context=CONTEXT)
     log = path.read_text(encoding="utf-8")
-    assert len(log.splitlines()) == 4
+    assert len(log.splitlines()) == 7
     assert SENTINEL not in log
 
 
@@ -351,6 +410,11 @@ def valid_event(**changes):
         ({"schema_version": "v1"}, "does not match"),
         ({"request_id": ""}, "should be non-empty"),
         ({"raw_output_tokens": -1}, "less than the minimum"),
+        ({"error_message": "bad"}, "should not be valid"),
+        ({"status": "error", "error_type": "LLMError", "error_message": ""}, "non-empty"),
+        ({"status": "error", "error_type": "LLMError", "error_message": "x" * 501}, "too long"),
+        ({"finish_reason": ""}, "should be non-empty"),
+        ({"finish_reason": "X" * 65}, "too long"),
     ],
 )
 def test_invalid_events_are_rejected(changes, message):
@@ -358,3 +422,21 @@ def test_invalid_events_are_rejected(changes, message):
     result = validate_llm_event(valid_event(**changes))
     assert not result.ok
     assert any(message in error for error in result.errors), result.errors
+
+
+def test_version_1_0_events_still_validate():
+    assert validate_llm_event(valid_event()).ok
+    failed = valid_event(status="error", error_type="LLMResponseError")
+    assert validate_llm_event(failed).ok
+
+
+def test_version_1_1_fields_validate():
+    assert validate_llm_event(valid_event(schema_version="1.1", finish_reason="COMPLETE")).ok
+    failed = valid_event(
+        schema_version="1.1",
+        status="error",
+        error_type="LLMResponseError",
+        error_message="The chat response was truncated at the token limit",
+        finish_reason="MAX_TOKENS",
+    )
+    assert validate_llm_event(failed).ok

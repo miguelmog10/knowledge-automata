@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:knowledge-automata:schema:core:llm-event:v1",
-  "x-version": "1.0",
+  "x-version": "1.1",
   "title": "LLM call event",
   "description": "One line of the LLM event log: metadata about one call through the service layer. It never contains prompts, artifact text, model output or keys. Never sent to an LLM provider.",
   "type": "object",
@@ -52,6 +52,18 @@
       "type": "string",
       "description": "Project exception class name, for example LLMRateLimitError. Present only when status is error."
     },
+    "error_message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "The project exception's message. Present only when status is error; never prompts, artifact text or model output."
+    },
+    "finish_reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "The provider's reason the model stopped, when it reports one, for example COMPLETE or MAX_TOKENS."
+    },
     "latency_ms": { "type": "integer", "minimum": 0 },
     "items": {
       "type": "integer",
@@ -100,7 +112,9 @@
     {
       "if": { "properties": { "status": { "const": "error" } }, "required": ["status"] },
       "then": { "required": ["error_type"] },
-      "else": { "not": { "required": ["error_type"] } }
+      "else": {
+        "not": { "anyOf": [{ "required": ["error_type"] }, { "required": ["error_message"] }] }
+      }
     },
     {
       "if": { "required": ["cost_usd"] },

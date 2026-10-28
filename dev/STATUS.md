@@ -2,11 +2,11 @@
 
 ## Last updated
 
-2026-10-26
+2026-10-28
 
 ## Current phase
 
-Handoffs 001 to 004 merged (PR #1 to PR #5). The first slice works end to end: one artifact goes to one validated decision record on a real Command call. Next is the Sensor (intake and input guardrail) and the Artifact Ledger.
+Handoffs 001 to 004 merged (PR #1 to PR #5), then the PR #5 credits and status (PR #6) and the README pass (PR #7). Handoff 005, the Sensor (intake and input guardrail) and the Artifact Ledger, is implemented on `feat/sensor-ledger` and waits for Miguel's review. Next is the Comparator (reconciliation).
 
 ## Done
 
@@ -43,15 +43,25 @@ Handoffs 001 to 004 merged (PR #1 to PR #5). The first slice works end to end: o
   - Attempt 2 (`decision-registrar.v1+registrar-retry.v1`): accepted after 2.1 s, billed 756 input and 322 output tokens.
   - Total: 1,453 input and 2,712 output billed tokens; about 15 s for the whole command.
   - Against handoff section 5: statement, rationale, alternatives, date and context match; the QR codes, the offline-sync risk and the actions were left out; the decision quote comes first, and quotes wrapped across lines passed the evidence check. Miguel accepted the record as is. Quality notes for a future `decision-registrar.v2`, to be judged on the evaluation set: `decided_by` listed everyone present instead of the group named in the decision ("the board"), and `impacts` is a generic summary not supported by the artifact, although the prompt says to omit unsupported fields. No evidence quote contains the artifact's typographic apostrophe, so that case was not exercised.
-- README pass before the Cohere application (Miguel and Claude, 2026-10-26): a "See it working" link to `DEC-0001`, Status moved up with what works and what is next, a "Design principles" section, built versus planned roles in "How it works", and American spelling.
+- PR #5 Copilot credits and a status update merged as PR #6.
+- README pass before the Cohere application (Miguel and Claude, 2026-10-26), merged as PR #7: a "See it working" link to `DEC-0001`, Status moved up with what works and what is next, a "Design principles" section, built versus planned roles in "How it works", and American spelling.
 
 ## In progress
 
-None.
+- Handoff 005 on `feat/sensor-ledger` (`dev/handoffs/005-sensor-and-ledger.md`, ADR-0015), eight commits, 603 tests passing, every LLM call mocked:
+  - Event schema 1.1: `finish_reason` on chat events and `error_message` on failed calls; `LLMResponseError` carries `finish_reason`, and `scripts/cohere_smoke.py` prints both.
+  - `storage/json_files.py`: the deterministic JSON writer shared by records and Ledger entries. Every committed record kept the same bytes (SHA-256 before and after compared).
+  - `schemas/core/ledger-entry.v1.json`, `core/ledger.py` (transitions, history, `error_paths`), `validate_ledger_entry` and `storage/ledger_store.py` (`save_new`, `save_transition` with a lost-update check).
+  - `agents/sensor.py`: content hash (no BOM, LF), checks in order (format, empty, encoding, size, delimiter), title, copy name, and the Operator release; `KA_SENSOR_MAX_BYTES` (default 100,000). `storage/artifact_files.py` writes and reads read-only copies.
+  - `pipeline.py`: `ingest_file`, `release_artifact` and a Ledger-driven `record_decision` (record, views, then Ledger; a provider error marks the artifact `failed`; a stored copy that no longer matches its hash is refused). Views link artifacts through the Ledger.
+  - CLI: `ingest`, `record-decision ARTIFACT_ID`, `release`, `ledger`; the `--artifact-id` and `--artifact-date` arguments of `record-decision` are gone.
+  - `examples/sample-project/ledger/ART-0001.json`, backfilled once through the Ledger code from the committed blob; the sample record and views are unchanged.
+  - Deviations, approved or to review in the pull request: rejected drafts also carry `error_type` when the last response was unusable (approved); the backfill commit came before the Ledger-driven views (approved); copies go through `storage/artifact_files.py` (approved); the Sensor stays free of file access and the pipeline does the I/O, because agents never import storage (to review).
+  - No real Cohere call was made. The optional smoke rerun (7 calls) to see `finish_reason` on real events was not done.
 
 ## Next
 
-- The Sensor (intake and input guardrail) and the Artifact Ledger, replacing the stand-ins in `pipeline.py` (artifact ID and date by hand, artifacts found by name).
+- Miguel reviews and merges handoff 005, and adds its Copilot credits to `dev/costs.md`.
 - Then the Comparator, the Governor (orchestrator), the Risk Registrar, the sample project as an evaluation set, and the v0.1.0 release (see `dev/backlog.md`).
 
 ## Blockers
@@ -61,7 +71,7 @@ None.
 ## Notes for the next session
 
 - The sample record is evidence: never rerun the real call to get a nicer `DEC-0001`. Prompt changes are new version files (`decision-registrar.v2`) judged on the evaluation set.
-- Line endings: `core.autocrlf` is on for this clone, so committed text may be CRLF in the working tree. The record store and views always write LF, `views --check` ignores CRLF versus LF, and `read_artifact` normalizes line endings before the evidence check. The Sensor's content hashes must do the same (backlog, *Open questions*).
+- Line endings: `core.autocrlf` is on for this clone, so committed text may be CRLF in the working tree. The record store and views always write LF, `views --check` ignores CRLF versus LF, `record-decision` normalizes the stored copy's line endings before the evidence check, and the Sensor's content hash ignores them too (ADR-0015). A Windows checkout may hold an artifact copy with CRLF, so its size differs from the Ledger's `size_bytes` (the original bytes); never compare the two. Keeping copies byte-identical (`.gitattributes`) is an open question in the backlog.
 - Local checks: `uv sync --all-extras` (a plain `uv sync` removes ruff and pytest), then `uv run ruff check`, `uv run ruff format --check`, `uv run pytest`, and `uv run knowledge-automata views --memory examples/sample-project --check`.
 - Python 3.15: the Cohere SDK pulls in PyYAML, which has no 3.15 wheel yet and builds from source. If a dependency fails to install on 3.15 in CI, stop and report it; do not drop 3.15 without Miguel's approval.
 - Trial keys are rate limited and capped at 1,000 calls a month, so real calls (smoke checks, evaluation runs) are budgeted. The key lives only in `.env` as `CO_API_KEY` (never committed).
@@ -69,3 +79,4 @@ None.
 - Record each pull request's Copilot credits in `dev/costs.md` as the last commit on its branch, before merging. The rows for PR #4 and PR #5 were added after their merges.
 - When squash merging, copy the `Co-authored-by:` trailers from the code block in `AGENTS.md` (Commit conventions). In PR #4 they were indented, and in PR #5 the Claude address became a Markdown link and the Copilot line was missing, so GitHub may not credit the co-authors on those two commits.
 - Local setup: `uv sync --all-extras`, then `uv run pytest`. Keep the clone outside cloud-synced folders (see README).
+- Before trying `ingest` locally, clear any `runtime/memory` made before handoff 005: records there without Ledger entries make `record-decision` stop with "the Ledger is behind the records".

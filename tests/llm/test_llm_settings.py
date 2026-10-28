@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from knowledge_automata.agents.sensor import DEFAULT_MAX_BYTES, max_bytes_from_env
 from knowledge_automata.llm import LLMConfigError, LLMSettings
 from knowledge_automata.llm.settings import MISSING_KEY_HINT
 
@@ -110,5 +111,7 @@ def test_env_example_documents_every_setting_with_its_default():
         "KA_LLM_MAX_RETRIES",
         "KA_CHAT_THINKING",
         "KA_EVENT_LOG",
+        "KA_SENSOR_MAX_BYTES",
     }
     assert LLMSettings.from_env(assignments) == LLMSettings()
+    assert max_bytes_from_env(assignments) == DEFAULT_MAX_BYTES

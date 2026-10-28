@@ -98,15 +98,17 @@ class CohereAdapter:
                 "The chat response was truncated at the token limit (finish_reason MAX_TOKENS)",
                 usage=usage,
                 request_id=request_id,
+                finish_reason=finish_reason,
             )
         if finish_reason not in (None, "COMPLETE"):
             raise LLMResponseError(
                 f"The chat response did not complete (finish_reason {finish_reason})",
                 usage=usage,
                 request_id=request_id,
+                finish_reason=finish_reason,
             )
         return ChatResult(
-            data=_parse_json_object(response, usage, request_id),
+            data=_parse_json_object(response, usage, request_id, finish_reason),
             model=self.models.chat,
             usage=usage,
             finish_reason=finish_reason,
@@ -240,13 +242,18 @@ class CohereAdapter:
         return message[:_MAX_PROVIDER_MESSAGE]
 
 
-def _parse_json_object(response: Any, usage: Usage, request_id: str | None) -> dict[str, Any]:
+def _parse_json_object(
+    response: Any, usage: Usage, request_id: str | None, finish_reason: str | None
+) -> dict[str, Any]:
     # Reasoning models such as Command A+ may put a thinking block before the text block.
     content = getattr(getattr(response, "message", None), "content", None) or []
     text = next((item.text for item in content if getattr(item, "type", None) == "text"), None)
     if text is None:
         raise LLMResponseError(
-            "The chat response has no text content", usage=usage, request_id=request_id
+            "The chat response has no text content",
+            usage=usage,
+            request_id=request_id,
+            finish_reason=finish_reason,
         )
     try:
         data = json.loads(text)
@@ -256,12 +263,14 @@ def _parse_json_object(response: Any, usage: Usage, request_id: str | None) -> d
             f"The chat response is not valid JSON (line {exc.lineno}, column {exc.colno})",
             usage=usage,
             request_id=request_id,
+            finish_reason=finish_reason,
         ) from None
     if not isinstance(data, dict):
         raise LLMResponseError(
             f"The chat response is a JSON {_JSON_TYPES.get(type(data), 'value')}, not an object",
             usage=usage,
             request_id=request_id,
+            finish_reason=finish_reason,
         )
     return data
 

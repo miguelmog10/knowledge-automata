@@ -188,6 +188,7 @@ def test_unusable_chat_responses_raise_with_billed_usage(body, message):
         input_tokens=12, output_tokens=5, raw_input_tokens=300, raw_output_tokens=9
     )
     assert excinfo.value.request_id == "chat-1"
+    assert excinfo.value.finish_reason == body["finish_reason"]
     assert PROMPT_SENTINEL not in str(excinfo.value)
 
 
@@ -233,10 +234,11 @@ def test_embed_rejects_a_vector_count_mismatch():
         body["embeddings"]["float"].pop()
         return status, body
 
-    with pytest.raises(LLMResponseError, match="1 embeddings for 2 texts"):
+    with pytest.raises(LLMResponseError, match="1 embeddings for 2 texts") as excinfo:
         adapter_for(FakeCohereAPI(short)).embed(
             ["text-1", "text-2"], input_type="query", context=CONTEXT
         )
+    assert excinfo.value.finish_reason is None
 
 
 # Rerank
