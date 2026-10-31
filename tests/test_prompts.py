@@ -5,10 +5,12 @@ from knowledge_automata.core import prompts
 REPO_PROMPTS = prompts.prompts_root()
 
 
-def test_both_registrar_prompts_are_listed():
+def test_registrar_and_comparator_prompts_are_listed():
     assert set(prompts.list_prompts()) >= {
         "core/registrar-retry.v1",
         "project-management/decision-registrar.v1",
+        "core/comparator-retry.v1",
+        "project-management/decision-comparator.v1",
     }
 
 
@@ -17,6 +19,8 @@ def test_both_registrar_prompts_are_listed():
     [
         ("project-management/decision-registrar.v1", "decision-registrar.v1"),
         ("core/registrar-retry.v1", "registrar-retry.v1"),
+        ("project-management/decision-comparator.v1", "decision-comparator.v1"),
+        ("core/comparator-retry.v1", "comparator-retry.v1"),
     ],
 )
 def test_prompt_loads_with_its_version(name, version):
@@ -27,8 +31,9 @@ def test_prompt_loads_with_its_version(name, version):
     assert "\r" not in prompt.text
 
 
-def test_retry_prompt_has_the_errors_placeholder():
-    assert "{errors}" in prompts.load_prompt("core/registrar-retry.v1").text
+@pytest.mark.parametrize("name", ["core/registrar-retry.v1", "core/comparator-retry.v1"])
+def test_retry_prompt_has_the_errors_placeholder(name):
+    assert "{errors}" in prompts.load_prompt(name).text
 
 
 def test_missing_prompt_names_the_prompt():

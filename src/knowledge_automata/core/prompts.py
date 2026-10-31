@@ -6,11 +6,13 @@ install they are read from the repository's ``prompts/`` folder.
 """
 
 import functools
+from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path, PurePosixPath
 
 PROMPT_SUFFIX = ".md"
+ERRORS_PLACEHOLDER = "{errors}"
 
 
 @dataclass(frozen=True)
@@ -19,6 +21,14 @@ class Prompt:
 
     version: str
     text: str
+
+
+def retry_system_text(prompt: Prompt, retry_prompt: Prompt, errors: Iterable[str]) -> str:
+    """The prompt, a blank line, then the retry prompt with the errors listed in it."""
+    listed = "\n".join(f"- {error}" for error in errors)
+    # str.replace, not str.format: error messages contain braces.
+    retry = retry_prompt.text.replace(ERRORS_PLACEHOLDER, listed)
+    return prompt.text.rstrip("\n") + "\n\n" + retry
 
 
 @functools.cache
