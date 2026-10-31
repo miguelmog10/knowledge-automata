@@ -18,7 +18,7 @@
 
 Knowledge Automata is a general-purpose institutional memory for any group that makes decisions together: a project team, a company department, a research group, a neighborhood association. A multi-agent LLM system turns messy artifacts (meeting notes, chats, documents) into validated, structured records, each traceable to the artifacts it came from, so people and AI tools can ask what the group knows and why. v0.1 targets project teams with PMI-aligned registers: a decision log and a risk register. It is open source (Apache 2.0) and built on Cohere's platform (Command, Embed, Rerank) behind a provider-agnostic service layer.
 
-**See it working:** [a real decision record](examples/sample-project/views/decision-log/DEC-0001.md) that Command drafted from [fictional meeting notes](examples/sample-project/artifacts/ART-0001-project-board-2026-02-03.md), with every quote checked against the source and committed unedited.
+**See it working:** [a real decision record](examples/sample-project/views/decision-log/DEC-0001.md) that Command drafted from [fictional meeting notes](examples/sample-project/artifacts/ART-0001-project-board-2026-02-03.md), with every quote checked against the source and committed unedited, and [the decision log](examples/sample-project/views/decision-log.md) that four later meetings added to, reaffirmed, updated and superseded.
 
 ## Status
 

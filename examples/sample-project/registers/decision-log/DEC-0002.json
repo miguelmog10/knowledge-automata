@@ -1,0 +1,110 @@
+{
+  "id": "DEC-0002",
+  "register": "decision-log",
+  "schema_version": "1.0",
+  "record_status": "superseded",
+  "revision": 3,
+  "created_at": "2026-10-31T14:17:36Z",
+  "updated_at": "2026-10-31T15:40:42Z",
+  "content": {
+    "title": "Define batch status workflow",
+    "statement": "Every batch of plants moves through one status ladder: propagating, growing, ready, sold. A batch can be marked discarded at any step.",
+    "context": "Aisha showed two versions of the count screen. Both need a status for each batch of plants, and the prototype has no status field yet.",
+    "rationale": "The group needed a consistent way to track plant batches through the greenhouse lifecycle.",
+    "alternatives": [
+      "Keep the prototype without a status field",
+      "Add a status field but not define a workflow"
+    ],
+    "decided_by": [
+      "Julie Tremblay",
+      "Marc Gagnon",
+      "Aisha Benali",
+      "Paul Nguyen"
+    ],
+    "decided_on": "2026-03-03",
+    "impacts": "Adds status field to count screen prototype and batch table, defines workflow for all batches"
+  },
+  "sources": [
+    {
+      "artifact_id": "ART-0002",
+      "artifact_date": "2026-03-03",
+      "excerpt": "Decision: every batch of plants moves through one status ladder: propagating, growing, ready, sold. A batch can be marked discarded at any step.",
+      "added_at": "2026-10-31T14:17:36Z"
+    },
+    {
+      "artifact_id": "ART-0002",
+      "artifact_date": "2026-03-03",
+      "excerpt": "Aisha showed two versions of the count screen. Both need a status for each batch of plants, and the prototype has none yet.",
+      "added_at": "2026-10-31T14:17:36Z"
+    },
+    {
+      "artifact_id": "ART-0002",
+      "artifact_date": "2026-03-03",
+      "excerpt": "Aisha: add the status ladder to the count screen prototype by 17 March.",
+      "added_at": "2026-10-31T14:17:36Z"
+    },
+    {
+      "artifact_id": "ART-0002",
+      "artifact_date": "2026-03-03",
+      "excerpt": "Marc: add a status field to the batch table in the local database.",
+      "added_at": "2026-10-31T14:17:36Z"
+    },
+    {
+      "artifact_id": "ART-0004",
+      "artifact_date": "2026-03-31",
+      "excerpt": "Decision: the board kept the one status ladder for every batch for version 1, and separate statuses per crop type were set aside.",
+      "added_at": "2026-10-31T15:26:04Z"
+    },
+    {
+      "artifact_id": "ART-0004",
+      "artifact_date": "2026-03-31",
+      "excerpt": "Julie explained why the board chose a single ladder: growers move between benches all day, and one set of statuses means they learn the screen once.",
+      "added_at": "2026-10-31T15:26:04Z"
+    },
+    {
+      "artifact_id": "ART-0004",
+      "artifact_date": "2026-03-31",
+      "excerpt": "Paul asked again for separate statuses for each crop type, because cuttings and bought-in plants do not start from seed.",
+      "added_at": "2026-10-31T15:26:04Z"
+    }
+  ],
+  "relations": {
+    "superseded_by": "DEC-0003"
+  },
+  "history": [
+    {
+      "revision": 1,
+      "at": "2026-10-31T14:17:36Z",
+      "change": "new",
+      "artifact_id": "ART-0002",
+      "fields": [
+        "title",
+        "statement",
+        "context",
+        "rationale",
+        "alternatives",
+        "decided_by",
+        "decided_on",
+        "impacts"
+      ],
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v1+registrar-retry.v1"
+    },
+    {
+      "revision": 2,
+      "at": "2026-10-31T15:26:04Z",
+      "change": "update",
+      "artifact_id": "ART-0004",
+      "fields": [],
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v1"
+    },
+    {
+      "revision": 3,
+      "at": "2026-10-31T15:40:42Z",
+      "change": "superseded",
+      "artifact_id": "ART-0005",
+      "related_id": "DEC-0003"
+    }
+  ]
+}
