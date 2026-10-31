@@ -62,9 +62,10 @@ DEFAULT_MEMORY = Path("runtime/memory")
 RECORDABLE_STATUSES = frozenset({"accepted", "failed", "processed"})
 RERUN_REASON = "Rerun: the earlier run recorded nothing"
 
-# Thinking cost about 6x the billed output tokens for the same validation result in the
-# handoff 003 smoke check; revisited with the sample project's evaluation set (ADR-0014).
-DECISION_REGISTRAR_THINKING: Thinking = "disabled"
+# Command A+ is a reasoning model: with thinking disabled it wrote its reasoning as prose
+# before the JSON, and most replies were rejected (handoff 006, Addendum A; ADR-0014).
+# Sent explicitly rather than left to the provider's default.
+CHAT_THINKING_DEFAULT: Thinking = "enabled"
 
 
 class InputError(Exception):
@@ -90,14 +91,14 @@ def decision_comparator() -> Comparator:
     )
 
 
-def decision_registrar_settings(settings: LLMSettings) -> LLMSettings:
+def record_decision_settings(settings: LLMSettings) -> LLMSettings:
     """Apply the thinking default unless ``KA_CHAT_THINKING`` is set.
 
     One model client serves the Decision Registrar and the Comparator, so this is the
     single place that sets the default for both.
     """
     if settings.chat_thinking is None:
-        return dataclasses.replace(settings, chat_thinking=DECISION_REGISTRAR_THINKING)
+        return dataclasses.replace(settings, chat_thinking=CHAT_THINKING_DEFAULT)
     return settings
 
 

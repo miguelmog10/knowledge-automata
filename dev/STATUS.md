@@ -6,7 +6,7 @@
 
 ## Current phase
 
-Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the PR #5 credits and status (PR #6), the README pass (PR #7), the architecture diagrams and visual guide (PR #9) and the guide preview in the README (PR #10). Handoff 006, the Comparator (reconciliation), is implemented on `feat/comparator`, reviewed and approved by Claude with four small fixes (now committed), and its diagrams are refreshed; the real run waits for Miguel's go.
+Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the PR #5 credits and status (PR #6), the README pass (PR #7), the architecture diagrams and visual guide (PR #9) and the guide preview in the README (PR #10). Handoff 006, the Comparator (reconciliation), is implemented on `feat/comparator`, reviewed and approved by Claude with four small fixes (now committed), and its diagrams are refreshed. The real run started on 2026-10-31 and stopped at ART-0003: with thinking disabled, Command A+ wrote prose before the JSON. Thinking is now enabled by default (handoff 006, Addendum A); the run resumes with Miguel's go.
 
 ## Done
 
@@ -75,10 +75,17 @@ Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the
   - Docs: ADR-0017; ADR-0004, ADR-0013 and ADR-0015 amended; architecture text, README, backlog, tool feedback and principles. The sample project README waits for the real run.
   - No real Cohere call was made.
 - Claude's code review (2026-10-31) approved the implementation with four fixes, made by Copilot in one commit, 726 tests passing offline: a supersession checks the old record's revision (valid, and `revision_errors` empty) before writing the new record, so a refusal writes nothing; `check_supersession_links` also reports an `active` record that has `relations.superseded_by`; an update treats an empty string or list as absent on both sides, like `comparison_text`; and Embed vectors of different lengths raise an `LLMResponseError`, so the artifact is marked `failed`. Claude refreshed the diagrams on the branch.
+- The real run (handoff 7.3), with Miguel's go on 2026-10-31, after a small commit that words the supersession link heading for both kinds of problem. The four inbox files matched their SHA-256; ingest accepted ART-0002 to ART-0005 (no calls).
+  - ART-0002: `new`, `DEC-0002` (run `620095ee-ccda-41af-964e-4efdd5640040`, thinking disabled), 7 calls: the draft and the comparison each needed the retry. Candidate `DEC-0001` (0.02).
+  - ART-0003: both draft attempts rejected, "The chat response is not valid JSON (line 1, column 1)", `finish_reason` COMPLETE, 1,364 and 2,736 output tokens (run `bab2ba3b-fe45-4495-b631-8577f9cc51f1`, exit 1). The run stopped there, as section 7.3 requires. Its Ledger entry is `processed` with no records and one rejected draft; the outputs so far stay uncommitted until the run finishes.
+  - Diagnosis (handoff 006, Addendum A): Claude's throwaway script, run by Miguel on ART-0003 (4 calls, outside the event log), showed that with thinking disabled Command A+ writes its reasoning as prose before the JSON (0 of 2 valid), and with thinking enabled it returns a thinking block and a JSON-only text block (2 of 2 valid, about 1,100 reasoning tokens).
+  - Decision (proposed by Claude, confirmed by Miguel): thinking enabled by default for the Registrars and the Comparator, sent explicitly (`CHAT_THINKING_DEFAULT`, `pipeline.record_decision_settings`), `KA_CHAT_THINKING` still overrides; the adapter stays strict (no JSON extraction from prose); no token budget yet (backlog); the billing line prints the units each provider reports, for example `rerank (input tokens 162)`. ADR-0014 amended. Copilot renamed `decision_registrar_settings` to `record_decision_settings` along with the constant, since it now covers both agents.
+  - Calls used: 13 (9 in the run, 4 diagnostic); the limit is now 40.
+  - Known before committing the run: `tests/test_sample_project.py` expects each Ledger entry's source name to equal its stored copy's name, which held only for `ART-0001`; the Sensor stores copies as `ART-NNNN-<name>`. It fails on the uncommitted run outputs and needs a fix before the run commit.
 
 ## Next
 
-- With Miguel's go, Copilot does the handoff 006 real run (handoff 7.3: inbox files with LF line endings, ART-0002 to ART-0005 in date order, stop at 35 calls), commits it unedited with the sample project README, and updates this file.
+- With Miguel's go, Copilot resumes the handoff 006 real run (Addendum A.4: `record-decision` for ART-0003, ART-0004 and ART-0005, one at a time, stop at 40 calls in total), commits it unedited with the sample project README (explaining the restart from thinking disabled to enabled), and updates this file.
 - Enable GitHub Pages in the repository settings, if not done yet, and mark ADR-0016 accepted once the guide is online.
 - Then the Governor (orchestrator), the Risk Registrar, the sample project as an evaluation set, and the v0.1.0 release (see `dev/backlog.md`).
 - A mise-en-place v0.2 brief (screen theme, Mermaid font fix, sequence diagram pattern) runs in its own chat; the guide moves to those tokens when it ships.

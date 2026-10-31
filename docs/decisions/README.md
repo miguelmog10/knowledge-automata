@@ -17,7 +17,7 @@ Short records of significant decisions: why the system looks the way it does. Ne
 | [0011](0011-record-model-and-write-rules.md) | Record model and write rules | Accepted |
 | [0012](0012-llm-service-layer-observation-and-cost.md) | LLM service layer: structured chat, observation and cost | Accepted (amended 2026-10-27) |
 | [0013](0013-record-storage-json-files.md) | Record storage: one JSON file per record | Accepted (amended 2026-10-30) |
-| [0014](0014-registrar-drafting-loop.md) | Registrar drafting loop | Accepted |
+| [0014](0014-registrar-drafting-loop.md) | Registrar drafting loop | Accepted (amended 2026-10-31) |
 | [0015](0015-artifact-ledger-storage-and-sensor-checks.md) | Artifact Ledger storage and Sensor checks | Accepted (amended 2026-10-30) |
 | [0016](0016-guide-on-github-pages.md) | Guide published with GitHub Pages | Proposed |
 | [0017](0017-comparator-reconciliation.md) | Comparator (reconciliation): compare checked drafts before writing | Accepted |

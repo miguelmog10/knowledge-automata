@@ -15,6 +15,7 @@ from knowledge_automata.llm import (
     MemorySink,
     ObservedLLM,
     RankedDocument,
+    Usage,
 )
 from knowledge_automata.llm.fake import FakeLLM
 from knowledge_automata.storage.ledger_store import LedgerStore
@@ -203,7 +204,7 @@ def test_the_four_classifications_from_an_empty_memory_folder(memory, clock, cap
     out = capsys.readouterr().out.splitlines()
     assert out[1:4] == [
         "Drafted a decision from ART-0001 in 1 attempt "
-        "(model fake-chat, prompt decision-registrar.v1, thinking disabled)",
+        "(model fake-chat, prompt decision-registrar.v1, thinking enabled)",
         "No active decisions to compare with: recorded as new without a comparison.",
         "Recorded DEC-0001 as a new decision",
     ]
@@ -554,6 +555,37 @@ def test_a_provider_error_during_the_comparison_marks_the_artifact_failed(
     assert failed["history"][-1]["error_type"] == "LLMRateLimitError"
     assert (memory / "registers" / "decision-log" / "DEC-0001.json").read_bytes() == before
     assert list(records(memory)) == ["DEC-0001"]
+
+
+class BilledRerank(ScoredLLM):
+    def __init__(self, responses, usage):
+        super().__init__(responses)
+        self.rerank_usage = usage
+
+    def rerank(self, query, documents, *, top_n, context):
+        result = super().rerank(query, documents, top_n=top_n, context=context)
+        return dataclasses.replace(result, usage=self.rerank_usage)
+
+
+@pytest.mark.parametrize(
+    ("usage", "expected"),
+    [
+        (Usage(input_tokens=162), "; rerank (input tokens 162)"),
+        (Usage(input_tokens=162, search_units=1), "; rerank (input tokens 162, search units 1)"),
+        (Usage(search_units=1), "; rerank (search units 1)"),
+        (Usage(), "; rerank (not reported)"),
+    ],
+)
+def test_the_billing_line_shows_the_units_rerank_reports(memory, clock, capsys, usage, expected):
+    assert record(FakeBuild(FLUTTER), clock, memory, "ART-0001") == 0
+    capsys.readouterr()
+    build = FakeBuild()
+    build.fake = BilledRerank([LADDER, answer("new", reason="Another topic.")], usage)
+    assert record(build, clock, memory, "ART-0002") == 0
+    billed = next(
+        line for line in capsys.readouterr().out.splitlines() if line.startswith("Billed")
+    )
+    assert billed.endswith(expected)
 
 
 class MixedDimensions(ScoredLLM):

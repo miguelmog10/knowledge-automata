@@ -19,10 +19,11 @@ def test_decision_registrar_uses_the_v1_prompts():
     assert registrar.retry_version == "decision-registrar.v1+registrar-retry.v1"
 
 
-def test_thinking_defaults_to_disabled_unless_set():
-    assert pipeline.decision_registrar_settings(LLMSettings()).chat_thinking == "disabled"
-    enabled = LLMSettings(chat_thinking="enabled")
-    assert pipeline.decision_registrar_settings(enabled).chat_thinking == "enabled"
+def test_thinking_defaults_to_enabled_unless_set():
+    assert pipeline.CHAT_THINKING_DEFAULT == "enabled"
+    assert pipeline.record_decision_settings(LLMSettings()).chat_thinking == "enabled"
+    disabled = LLMSettings(chat_thinking="disabled")
+    assert pipeline.record_decision_settings(disabled).chat_thinking == "disabled"
 
 
 def ingest(memory, tmp_path, name, raw, **extra):

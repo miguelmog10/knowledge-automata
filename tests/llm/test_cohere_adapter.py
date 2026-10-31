@@ -21,6 +21,7 @@ from knowledge_automata.llm import (
 )
 from knowledge_automata.llm.cohere_adapter import EMBED_BATCH_SIZE, CohereAdapter
 from knowledge_automata.llm.provider_schema import to_cohere_schema
+from knowledge_automata.pipeline import record_decision_settings
 
 KEY = "test-KEY-not-real-0123456789"
 PROMPT_SENTINEL = "PROMPT-SENTINEL-7f3a"
@@ -135,6 +136,20 @@ def test_chat_uses_the_configured_schema_field_and_thinking():
     body = api.bodies()[0]
     assert body["response_format"] == {"type": "json_object", "schema": to_cohere_schema(SCHEMA)}
     assert body["thinking"] == {"type": "disabled"}
+
+
+def test_the_record_decision_default_sends_thinking_enabled_explicitly():
+    api = FakeCohereAPI((200, chat_body('{"color": "vermilion"}')))
+    settings = record_decision_settings(LLMSettings(api_key=KEY, max_retries=0))
+    client = cohere.ClientV2(
+        api_key=KEY,
+        max_retries=0,
+        httpx_client=httpx.Client(transport=httpx.MockTransport(api.handler)),
+    )
+    CohereAdapter(settings, client=client).chat_json(
+        system="s", user="u", schema=SCHEMA, context=CONTEXT
+    )
+    assert api.bodies()[0]["thinking"] == {"type": "enabled"}
 
 
 def test_chat_accepts_the_real_decision_draft_schema():

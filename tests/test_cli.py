@@ -202,7 +202,7 @@ def test_record_decision_stores_the_record_the_views_and_the_ledger(
     assert f"Run ID: {RUN_ID}" in out
     assert (
         "Drafted a decision from ART-0001 in 1 attempt "
-        "(model fake-chat, prompt decision-registrar.v1, thinking disabled)"
+        "(model fake-chat, prompt decision-registrar.v1, thinking enabled)"
     ) in out
     assert "No active decisions to compare with: recorded as new without a comparison." in out
     assert "Recorded DEC-0001 as a new decision" in out
@@ -443,20 +443,20 @@ def test_an_invalid_stored_record_exits_2_naming_the_file(ingested, memory, caps
     assert "DEC-0001.json" in capsys.readouterr().err
 
 
-def test_thinking_defaults_to_disabled(ingested, memory, decision_draft):
+def test_thinking_defaults_to_enabled(ingested, memory, decision_draft):
     build = FakeBuild(decision_draft)
     record(build, memory)
-    assert build.settings[0].chat_thinking == "disabled"
+    assert build.settings[0].chat_thinking == "enabled"
 
 
 def test_ka_chat_thinking_overrides_the_default(
     ingested, memory, decision_draft, monkeypatch, capsys
 ):
-    monkeypatch.setenv("KA_CHAT_THINKING", "enabled")
+    monkeypatch.setenv("KA_CHAT_THINKING", "disabled")
     build = FakeBuild(decision_draft)
     assert record(build, memory) == 0
-    assert build.settings[0].chat_thinking == "enabled"
-    assert "thinking enabled" in capsys.readouterr().out
+    assert build.settings[0].chat_thinking == "disabled"
+    assert "thinking disabled" in capsys.readouterr().out
 
 
 def test_missing_arguments_and_unknown_commands_exit_2(capsys):

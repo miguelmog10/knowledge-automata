@@ -36,7 +36,6 @@
 - A cheap pre-check that skips drafting for obvious repeats, if reaffirmation drafts become a visible cost in the event log.
 - A git-ignored embedding cache next to the records, if the register grows large.
 - Automatic repair of an interrupted supersession.
-- Thinking on versus off for the Comparator, measured on the evaluation set.
 - Supersession of more than one record at once (`relations.supersedes` already allows a list).
 - Repair for a Ledger left behind its records by an interrupted run (today the pipeline detects it and stops).
 - Sensor relevance check and prompt-injection detection.
@@ -64,12 +63,12 @@
 - Store the envelope version in each record before the first envelope change.
 - Probability-impact heat map in the risk register view.
 - Links across registers, for example a risk mitigated by a decision (a minor schema change).
-- Opt-in debug capture of prompts and responses to a git-ignored folder, for prompt tuning (never in the event log).
+- Opt-in debug capture of prompts and responses to a git-ignored folder, for prompt tuning (never in the event log). A throwaway version (`runtime/diagnostics/inspect_chat_reply.py`, handoff 006 Addendum A) found the thinking problem with four calls.
 - Plain-text `chat` in the service layer, when an agent needs it (for example the Oracle).
 - Budget guard: stop a run before it exceeds a call or cost limit (trial keys are capped).
 - Event log rotation or archiving, if the file grows large.
 - A small report that sums calls, units and cost per run, per agent and per artifact from the event log.
-- Thinking on versus off for the Registrars, measured on the evaluation set.
+- Thinking token budget (`token_budget`) for the Registrars and the Comparator, measured on the evaluation set.
 - Prompt v2 candidates for the Decision Registrar, judged on the evaluation set, not on one artifact:
   - `decided_by` listed everyone present instead of the group named in the decision ("the board").
   - `impacts` was a generic summary not supported by the artifact, although the prompt says to omit unsupported fields.
@@ -93,7 +92,7 @@
 - Record finish_reason and the adapter's error message in LLM events: done, event schema 1.1 ([ADR-0012](../docs/decisions/0012-llm-service-layer-observation-and-cost.md), amended).
 - Keep artifact copies byte-identical on every checkout, for example a .gitattributes rule marking examples/*/artifacts/** as -text, so stored_path holds the original bytes and size_bytes matches the file.
 - Cohere's trial monthly cap: the docs give no exact wording for the 429 it returns, so the adapter marks a 429 as the monthly cap only when the message mentions "month" (`llm/cohere_adapter.py`). Confirm the wording the first time it happens.
-- Chat thinking default for the Registrars: decided for the Decision Registrar, thinking disabled unless `KA_CHAT_THINKING` is set ([ADR-0014](../docs/decisions/0014-registrar-drafting-loop.md)); revisited with the evaluation set (see *Later*).
+- Chat thinking default for the Registrars and the Comparator: decided, thinking enabled unless `KA_CHAT_THINKING` is set (amended 2026-10-31 after the handoff 006 real run, [ADR-0014](../docs/decisions/0014-registrar-drafting-loop.md)); the token budget is measured with the evaluation set (see *Later*).
 - Prices: Cohere's pricing page lists no per-token or per-search-unit prices for the configured models, so `prices.toml` has no model entries and events carry no `cost_usd`. Fill the table when prices are published, or record an official source.
 - Python 3.15: PyYAML (pulled in by the Cohere SDK through `tokenizers` and `huggingface-hub`) has no 3.15 wheel yet and builds from source. CI shows whether that works on Ubuntu; on Windows it needs a C compiler.
 - Embed input types for comparing records with records: the Comparator embeds records as documents and the draft as a query (the usual search setup); whether a symmetric input type compares decisions better is untested.

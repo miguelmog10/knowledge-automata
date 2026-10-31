@@ -195,7 +195,7 @@ def _record_decision(
     # API key and never costs a call.
     entry = pipeline.recordable_entry(artifact_id, args.memory)
     comparator_settings = ComparatorSettings.from_env()
-    settings = pipeline.decision_registrar_settings(LLMSettings.from_env())
+    settings = pipeline.record_decision_settings(LLMSettings.from_env())
     if entry["status"] == "processed":
         print(f"Rerunning {artifact_id}: its earlier run recorded nothing.")
     llm = build(settings)
@@ -393,6 +393,16 @@ def _billed(result: pipeline.RecordOutcome) -> str:
         values = [getattr(item, name) for item in usage if getattr(item, name) is not None]
         return f"{label} {sum(values):,}" if values else f"{label} not reported"
 
+    def reported(usage: Sequence[Usage], units: Sequence[tuple[str, str]]) -> str:
+        """Only the units the provider reports: Rerank v5 bills input tokens, older
+        models search units (tool feedback, 2026-10-25)."""
+        present = [
+            total(usage, name, label)
+            for name, label in units
+            if any(getattr(item, name) is not None for item in usage)
+        ]
+        return ", ".join(present) or "not reported"
+
     stages = [
         (
             "draft",
@@ -411,7 +421,13 @@ def _billed(result: pipeline.RecordOutcome) -> str:
                 + total(comparison.chat_usage, "output_tokens", "output tokens"),
             ),
             ("embed", total(comparison.embed_usage, "input_tokens", "input tokens")),
-            ("rerank", total(comparison.rerank_usage, "search_units", "search units")),
+            (
+                "rerank",
+                reported(
+                    comparison.rerank_usage,
+                    [("input_tokens", "input tokens"), ("search_units", "search units")],
+                ),
+            ),
         ]
     return "Billed: " + "; ".join(f"{stage} ({units})" for stage, units in stages)
 
