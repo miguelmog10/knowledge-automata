@@ -130,7 +130,7 @@ The Governor refuses at construction a prompt without `{registers}` and a regist
 
 - schema errors;
 - every quote passes `check_evidence`, path `$.items[i].evidence[j]`;
-- two items in the same register share a quote (after `normalize_quote`, one contains the other): `$.items[j].evidence[k]: also quoted by item i in the same register; return one item for one thing`.
+- two items in the same register share a quote (after `normalize_quote`, one contains the other; quotes within one item may overlap, for example a summary line that repeats part of a sentence): `$.items[j].evidence[k]: also quoted by item i in the same register; return one item for one thing`.
 
 The count is **not** a validation error.
 
@@ -290,7 +290,7 @@ Index: .../decision-log.md
 
 ## 6. Part 7C: evidence
 
-**Before 7A, already planned:** Miguel runs Claude's throwaway spike (`runtime/diagnostics/spike_governor.py`, git-ignored) on ART-0001 to ART-0008 with the real prompts, about 11 calls. If it shows a problem, Claude changes the prompts before 7A starts (none is cited yet).
+**Before 7A, done on 2026-10-31:** Miguel ran Claude's throwaway spike (`runtime/diagnostics/spike_governor.py`, git-ignored) on ART-0001 to ART-0008 with the real prompts (11 calls, thinking enabled). Every reply was valid JSON and every quote passed the evidence check. The counts matched on 7 of 8 artifacts: on ART-0004 the Governor returned the rationale sentence ("the board chose a single ladder") as a second decision, so `governor.v1` gained one line on passages that only explain an item. Before 7A, Miguel runs the spike again on ART-0004, ART-0006 and ART-0007 (3 calls) to check the fix and that nothing else changed. ART-0007's split trap passed: each decision was one item, quoting its section and the summary. The three v2 drafts for ART-0006 invented no rationale or alternatives, and `decided_by` was "the board" or absent.
 
 **7C, after Claude's review of 7B and Miguel's go:**
 

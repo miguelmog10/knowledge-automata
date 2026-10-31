@@ -13,6 +13,7 @@ Return one item for each distinct thing in the artifact that fits a register's d
 - Read the whole artifact before you answer. List the items in the order they first appear.
 - Set `register` to the name of the register the item belongs to, copied exactly from its heading.
 - One item is one thing: one decision, or one risk. When the artifact mentions the same thing more than once, for example in a discussion and again in a summary at the end, return it once, with quotes from both places.
+- A passage that only mentions an item to explain it, for example why the group made a choice it confirms in the same artifact, is part of that item, not a new one. Quote it with the item it explains.
 - Leave out everything that fits no register, such as open questions, proposals nobody agreed to, action items and status reports. Leaving them out loses nothing: the artifact itself stays on file.
 - When something could fit two registers, use the definitions to choose one. Return two items only when the artifact states two separate things, for example a decision and a separate risk.
 - If nothing in the artifact fits a register, return an empty list of items. That is a valid answer.
