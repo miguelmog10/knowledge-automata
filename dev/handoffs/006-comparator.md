@@ -42,7 +42,7 @@ Read `AGENTS.md`, `dev/STATUS.md`, ADR-0004, ADR-0011, ADR-0013, ADR-0014, ADR-0
 - **Only active records are searched.** A superseded record can never be a target (ADR-0011), so it is never a candidate.
 - **The full retrieval path runs whenever the register has at least one active record**, even when it has fewer than K records, so Embed and Rerank are exercised the same way in tests and in the real run. Skipping Embed for small registers is a backlog optimization.
 - **An update also adds the draft's verified quotes as sources**, so the filled fields cite the artifact they came from (P4). `docs/architecture.md`'s Write rules table says so after this handoff.
-- **The Comparator's input is one JSON object** with every `<` escaped as `<`, so the closing tag can never appear inside it and there is no refusal path (6.3).
+- **The Comparator's input is one JSON object** with every `<` escaped as `\u003c`, so the closing tag can never appear inside it and there is no refusal path (6.3).
 - **The Comparator uses the same thinking setting as the Decision Registrar:** disabled by default, `KA_CHAT_THINKING` overrides both. Revisited with the evaluation set.
 - **Comparator metadata goes into the Ledger, not the record:** the change applied, and for a comparison its model, prompt version, attempts and the candidates' Rerank scores (Ledger entry schema 1.1, 6.7). The record envelope stays at version 1.0.
 - **Rejected drafts accumulate across reruns,** each with the run ID that produced it, so a rerun never erases the evidence of the earlier rejection.
@@ -168,7 +168,7 @@ docs/decisions/0017-comparator-reconciliation.md
 
 ### 5.1 The Comparator's user message
 
-One JSON object between tags, candidates in Rerank order, `<` escaped as `<`:
+One JSON object between tags, candidates in Rerank order, `<` escaped as `\u003c`:
 
 ```
 <comparison>
@@ -281,7 +281,7 @@ Agents never import storage or `knowledge_automata.llm.*` submodules (the existi
   1. No active records: return `new` with no calls and no candidates.
   2. Embed the records (`document`) and the draft (`query`), `CallContext("comparator", artifact_id)`.
   3. Top K by cosine, then Rerank with `top_n` = N.
-  4. Build the user message (5.1): `json.dumps(..., ensure_ascii=False, indent=2)` with every `<` replaced by `<`, between `<comparison>` lines. Candidate content is sent in full; evidence is the draft's quotes.
+  4. Build the user message (5.1): `json.dumps(..., ensure_ascii=False, indent=2)` with every `<` replaced by `\u003c`, between `<comparison>` lines. Candidate content is sent in full; evidence is the draft's quotes.
   5. `chat_json` with `reconciliation.v1.json`, `CallContext("comparator", artifact_id, prompt_version)`. Validate with `validate_reconciliation(result, spec, candidates)`, where `candidates` are the N records shown. On errors or `LLMResponseError`, one retry with the system message built like the Registrar's (prompt, blank line, retry prompt with `{errors}` replaced); the prompt version is then `decision-comparator.v1+comparator-retry.v1`.
 - `ComparisonOutcome`: classification, target ID, reason, candidates with scores, attempts, model, prompt version, usage per call, errors and error type when rejected, and `accepted`.
 - Every other `LLMError` propagates unchanged, as in the Registrar loop. Sharing a small retry helper with `registrar.py` is welcome if `registrar.py`'s behavior and tests stay unchanged; otherwise keep two loops.
