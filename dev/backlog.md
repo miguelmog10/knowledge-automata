@@ -22,6 +22,8 @@
 
 - Observer (quality control): periodic health and cross-register consistency checks.
 - Remaining registrars: issue log, assumption log, change log, lessons learned, stakeholder register; glossary as a minor register.
+- Project status summary: a generated Markdown view built from the registers (recent decisions, open risks, open issues, what changed since a given date), like the decision log views. No new register is needed; it is most useful once the risk register and the issue log exist (Miguel and Claude, 2026-10-31).
+- Project charter as a register maintained from artifacts: objectives, scope, key stakeholders, success criteria and constraints as records drafted from kickoff meetings and early documents, then updated or superseded as later meetings change them, each change traced to its meeting, so a project manager can ask when the scope changed and why. Agile teams revise the charter more often than waterfall teams, especially in software, so it is not written once and frozen (Miguel, 2026-10-31). Check it against the PMBOK Guide's project charter before designing.
 - Additional domains beyond project management (for example associations or research groups), each as its own set of Registrars and schemas.
 - Operator (human in the loop) approval workflow for sensitive changes.
 - Operator release workflow beyond the `release` command (review queue, reasons, notifications).
