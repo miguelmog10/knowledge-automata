@@ -334,6 +334,21 @@ def test_the_four_classifications_from_an_empty_memory_folder(memory, clock, cap
 
     assert run(FakeBuild(), clock, "views", "--memory", str(memory), "--check") == 0
     capsys.readouterr()
+    pages = memory / "views" / "decision-log"
+    flutter_page = (pages / "DEC-0001.md").read_text(encoding="utf-8")
+    assert "### [ART-0001](../../artifacts/ART-0001-tech-sync-2026-02-03.md), 2026-02-03\n" in (
+        flutter_page
+    )
+    assert "### [ART-0003](../../artifacts/ART-0003-tech-sync-2026-03-17.md), 2026-03-17\n" in (
+        flutter_page
+    )
+    assert "| superseded | Superseded by [DEC-0003](DEC-0003.md) | ART-0005 |" in flutter_page
+    assert "| update | Filled: rationale | ART-0004 |" in (pages / "DEC-0002.md").read_text(
+        encoding="utf-8"
+    )
+    assert "| supersession | Supersedes [DEC-0001](DEC-0001.md) | ART-0005 |" in (
+        pages / "DEC-0003.md"
+    ).read_text(encoding="utf-8")
     assert run(FakeBuild(), clock, "ledger", "--memory", str(memory)) == 0
     lines = capsys.readouterr().out.splitlines()
     assert lines[0].endswith("(new DEC-0001)")

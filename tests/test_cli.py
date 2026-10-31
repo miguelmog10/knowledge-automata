@@ -219,7 +219,7 @@ def test_record_decision_stores_the_record_the_views_and_the_ledger(
     assert stored["history"][0]["model"] == "fake-chat"
 
     page = (memory / "views" / "decision-log" / "DEC-0001.md").read_text(encoding="utf-8")
-    assert "From [ART-0001](../../artifacts/ART-0001-steering-group.md), 2026-03-12." in page
+    assert "### [ART-0001](../../artifacts/ART-0001-steering-group.md), 2026-03-12\n" in page
     assert (memory / "views" / "decision-log.md").is_file()
     assert [event["artifact_id"] for event in build.sink.events] == ["ART-0001"]
 

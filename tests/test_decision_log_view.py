@@ -41,7 +41,7 @@ def source(artifact_id, excerpt, at, date=None):
 
 def entry(revision, at, change, artifact_id, fields=None, model=None, prompt=None, related=None):
     built = {"revision": revision, "at": at, "change": change, "artifact_id": artifact_id}
-    if fields:
+    if fields is not None:
         built["fields"] = fields
     if related:
         built["related_id"] = related
@@ -119,6 +119,44 @@ def superseded_records():
     return [new, old]  # out of order on purpose: views sort by ID
 
 
+def revised_records():
+    first, second, third = "2026-02-03T09:00:00Z", "2026-03-03T09:00:00Z", "2026-03-31T09:00:00Z"
+    ladder = record(
+        "DEC-0001",
+        {
+            "title": "One status ladder for every batch",
+            "statement": "Every batch moves through one status ladder.",
+            "rationale": "Growers learn one screen.",
+        },
+        [
+            source("ART-0001", "Every batch moves through one status ladder.", first, "2026-02-03"),
+            source("ART-0001", "Whatever the crop.", first, "2026-02-03"),
+            source("ART-0002", "We confirmed the single ladder.", second, "2026-03-03"),
+            source("ART-0003", "Growers learn one screen.", third),
+        ],
+        [
+            entry(1, first, "new", "ART-0001", ["title", "statement"], "fake-chat", "registrar.v1"),
+            entry(2, second, "reaffirmation", "ART-0002", None, "fake-chat", "registrar.v1"),
+            entry(3, third, "update", "ART-0003", ["rationale"], "fake-chat", "registrar.v1"),
+        ],
+    )
+    labels = record(
+        "DEC-0002",
+        {"title": "Print bench labels", "statement": "Print a label for every bench."},
+        [
+            source("ART-0002", "Every bench gets a printed label.", second, "2026-03-03"),
+            source("ART-0003", "Labels stay printed.", third),
+        ],
+        [
+            entry(
+                1, second, "new", "ART-0002", ["title", "statement"], "fake-chat", "registrar.v1"
+            ),
+            entry(2, third, "update", "ART-0003", [], "fake-chat", "registrar.v1"),
+        ],
+    )
+    return [ladder, labels]
+
+
 def escaping_records():
     at = "2026-04-01T08:00:00Z"
     return [
@@ -152,6 +190,10 @@ CASES = {
     ),
     "minimal": lambda fixture: (minimal_records(), {}),
     "superseded": lambda fixture: (superseded_records(), {"ART-0003": "artifacts/ART-0003.md"}),
+    "revised": lambda fixture: (
+        revised_records(),
+        {"ART-0001": "artifacts/ART-0001-tech-sync.md", "ART-0003": "artifacts/ART-0003.md"},
+    ),
     "escaping": lambda fixture: (escaping_records(), {"ART-0009": "artifacts/ART-0009.md"}),
     "empty": lambda fixture: ([], {}),
 }
