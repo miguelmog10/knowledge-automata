@@ -1,8 +1,10 @@
 """One JSON file per record, inside a memory folder (ADR-0013).
 
 Layout: ``<memory>/registers/<register>/<ID>.json``. Every record is validated before it
-is written and when it is read. One writing process at a time is assumed. ``OSError`` from
-the file system is not caught here; callers report it with the path.
+is written and when it is read. A new record is written once with ``save_new``; an
+existing record changes only through ``save_revision``, one revision at a time. One
+writing process at a time is assumed. ``OSError`` from the file system is not caught
+here; callers report it with the path.
 """
 
 import json
@@ -11,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from knowledge_automata.core.registers import RegisterSpec
-from knowledge_automata.core.validation import validate_record
+from knowledge_automata.core.validation import revision_errors, validate_record
 from knowledge_automata.storage.json_files import write_json_atomic
 
 REGISTERS_FOLDER = "registers"
@@ -85,6 +87,36 @@ class RecordStore:
     def load_all(self, spec: RegisterSpec) -> list[dict[str, Any]]:
         """Return every record in the register, sorted by ID, each validated."""
         return [self.load(path, spec) for _, path in self._files(spec)]
+
+    def load_active(self, spec: RegisterSpec) -> list[dict[str, Any]]:
+        """Return the register's ``active`` records, sorted by ID, each validated."""
+        return [record for record in self.load_all(spec) if record["record_status"] == "active"]
+
+    def save_revision(self, old: dict[str, Any], new: dict[str, Any], spec: RegisterSpec) -> Path:
+        """Replace ``old`` with ``new``, its next revision (ADR-0013 amendment).
+
+        Refused unless ``new`` is valid, the stored file still equals ``old`` (no lost
+        update) and ``new`` follows ``revision_errors``' rules. Nothing is written on refusal.
+        """
+        result = validate_record(new, spec)
+        if not result.ok:
+            raise RecordStoreError(
+                f"Record {new.get('id')!r} is invalid and was not written:\n"
+                + "\n".join(f"- {error}" for error in result.errors)
+            )
+        path = self.register_dir(spec) / f"{old['id']}.json"
+        if not path.is_file() or self.load(path, spec) != old:
+            raise RecordStoreError(
+                f"{old['id']} changed in the register since it was read; nothing was written"
+            )
+        errors = revision_errors(old, new)
+        if errors:
+            raise RecordStoreError(
+                f"Record {old['id']}: not the next revision, nothing was written:\n"
+                + "\n".join(f"- {error}" for error in errors)
+            )
+        write_json_atomic(path, new, overwrite=True)
+        return path
 
     def ids_citing(self, spec: RegisterSpec, artifact_id: str) -> list[str]:
         """Return the IDs of records with at least one source from ``artifact_id``."""

@@ -157,6 +157,49 @@ def validate_record(record: Any, spec: RegisterSpec) -> ValidationResult:
     return ValidationResult(tuple(errors))
 
 
+def revision_errors(old: Mapping[str, Any], new: Mapping[str, Any]) -> list[str]:
+    """Return why ``new`` is not the next revision of ``old`` (ADR-0013 amendment).
+
+    Both are assumed to be valid records. The next revision keeps the ID, register and
+    creation time, raises ``revision`` by one, appends exactly one history entry, keeps the
+    old sources as they are, and either stays ``active`` or goes from ``active`` to
+    ``superseded`` while gaining ``superseded_by``. ``relations.supersedes`` never changes.
+    """
+    errors = []
+    for field in ("id", "register", "created_at"):
+        if new.get(field) != old.get(field):
+            errors.append(f"$.{field}: a revision cannot change it")
+    if new.get("revision") != old["revision"] + 1:
+        errors.append(
+            f"$.revision: must be {old['revision'] + 1}, the next after {old['revision']}"
+        )
+    old_history, new_history = old["history"], new["history"]
+    if len(new_history) != len(old_history) + 1 or new_history[:-1] != old_history:
+        errors.append("$.history: must be the old history plus exactly one entry")
+    elif new["updated_at"] != new_history[-1]["at"]:
+        errors.append("$.updated_at: must match the new history entry's time")
+    if new["updated_at"] < old["updated_at"]:
+        errors.append("$.updated_at: earlier than the previous revision")
+    if new["sources"][: len(old["sources"])] != old["sources"]:
+        errors.append("$.sources: must start with the old sources unchanged")
+
+    old_status, new_status = old["record_status"], new["record_status"]
+    if old_status != "active":
+        errors.append(f"$.record_status: a {old_status!r} record cannot be revised")
+    elif new_status not in ("active", "superseded"):
+        errors.append(f"$.record_status: cannot go from 'active' to {new_status!r}")
+    old_relations, new_relations = old.get("relations", {}), new.get("relations", {})
+    if new_relations.get("supersedes") != old_relations.get("supersedes"):
+        errors.append("$.relations.supersedes: a revision cannot change it")
+    gained = "superseded_by" in new_relations and "superseded_by" not in old_relations
+    if gained != (old_status == "active" and new_status == "superseded"):
+        errors.append(
+            "$.relations.superseded_by: added only when the record goes from 'active' "
+            "to 'superseded'"
+        )
+    return errors
+
+
 def _evidence_errors(
     quotes: Iterable[tuple[int, str]], artifact_text: str
 ) -> tuple[list[str], tuple[QuoteCheck, ...]]:

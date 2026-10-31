@@ -1,10 +1,12 @@
+import copy
 import json
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from knowledge_automata.core.records import new_record
+from knowledge_automata.core.records import history_entry, new_record, new_sources, order_record
+from knowledge_automata.core.validation import revision_errors
 from knowledge_automata.domains.project_management.registers import DECISION_LOG, RISK_REGISTER
 from knowledge_automata.storage.record_store import RecordStore, RecordStoreError
 
@@ -158,3 +160,172 @@ def test_ids_citing_finds_records_by_artifact(tmp_path):
     store.save_new(make_record("DEC-0003", "ART-0007"), DECISION_LOG)
     assert store.ids_citing(DECISION_LOG, "ART-0007") == ["DEC-0001", "DEC-0003"]
     assert store.ids_citing(DECISION_LOG, "ART-0009") == []
+
+
+# Revisions
+
+LATER = "2026-10-27T09:15:00Z"
+
+
+def superseded(old, by="DEC-0002"):
+    new = copy.deepcopy(old)
+    new["record_status"] = "superseded"
+    new["revision"] = old["revision"] + 1
+    new["updated_at"] = LATER
+    new["relations"] = {"superseded_by": by}
+    new["history"].append(
+        history_entry(
+            revision=new["revision"],
+            timestamp=LATER,
+            change="superseded",
+            artifact_id="ART-0008",
+            related_id=by,
+        )
+    )
+    return order_record(new)
+
+
+def reaffirmed(old):
+    new = copy.deepcopy(old)
+    new["revision"] = old["revision"] + 1
+    new["updated_at"] = LATER
+    new["sources"] += new_sources(
+        ["Paul’s greenhouse again"], artifact_id="ART-0008", artifact_date=None, timestamp=LATER
+    )
+    new["history"].append(
+        history_entry(
+            revision=new["revision"],
+            timestamp=LATER,
+            change="reaffirmation",
+            artifact_id="ART-0008",
+            model="fake-chat",
+            prompt_version="decision-registrar.v1",
+        )
+    )
+    return new
+
+
+def saved(tmp_path, record=None):
+    store = RecordStore(tmp_path)
+    record = record or make_record()
+    store.save_new(record, DECISION_LOG)
+    return store, record
+
+
+def test_a_revision_writes_the_hand_written_bytes(tmp_path):
+    store, old = saved(tmp_path)
+    path = store.save_revision(old, superseded(old), DECISION_LOG)
+    expected = (FIXTURES / "store" / "DEC-0001.revision-2.json").read_bytes()
+    assert path.read_bytes() == expected.replace(b"\r\n", b"\n")
+    assert [p.name for p in register(tmp_path).iterdir()] == ["DEC-0001.json"]
+
+
+def test_revisions_follow_each_other(tmp_path):
+    store, old = saved(tmp_path)
+    second = reaffirmed(old)
+    store.save_revision(old, second, DECISION_LOG)
+    third = superseded(second)
+    store.save_revision(second, third, DECISION_LOG)
+    assert store.load_all(DECISION_LOG) == [third]
+    assert [entry["change"] for entry in third["history"]] == [
+        "new",
+        "reaffirmation",
+        "superseded",
+    ]
+
+
+def test_save_revision_refuses_a_stale_old_record(tmp_path):
+    store, old = saved(tmp_path)
+    store.save_revision(old, reaffirmed(old), DECISION_LOG)
+    with pytest.raises(RecordStoreError, match="changed in the register since it was read"):
+        store.save_revision(old, superseded(old), DECISION_LOG)
+    missing = make_record("DEC-0002")
+    with pytest.raises(RecordStoreError, match="changed in the register"):
+        store.save_revision(missing, reaffirmed(missing), DECISION_LOG)
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda new: new["history"][0].update(model="other"), "$.history: must be the old"),
+        (lambda new: new["history"].append(dict(new["history"][-1])), "$.history"),
+        (lambda new: new["sources"][0].update(excerpt="rewritten"), "$.sources: must start"),
+        (lambda new: new["sources"].pop(0), "$.sources: must start"),
+        (lambda new: new.update(created_at=LATER), "$.created_at: a revision cannot change it"),
+        (lambda new: new.update(updated_at="2026-10-28T00:00:00Z"), "$.updated_at: must match"),
+        (
+            lambda new: new.update(relations={"supersedes": ["DEC-0009"]}),
+            "$.relations.supersedes: a revision cannot change it",
+        ),
+        (
+            lambda new: new.update(relations={"superseded_by": "DEC-0009"}),
+            "$.relations.superseded_by: added only when",
+        ),
+    ],
+)
+def test_save_revision_refuses_rewritten_history_sources_or_envelope(tmp_path, change, message):
+    store, old = saved(tmp_path)
+    before = (register(tmp_path) / "DEC-0001.json").read_bytes()
+    new = reaffirmed(old)
+    change(new)
+    with pytest.raises(RecordStoreError) as raised:
+        store.save_revision(old, new, DECISION_LOG)
+    assert message in str(raised.value)
+    assert (register(tmp_path) / "DEC-0001.json").read_bytes() == before
+    assert [p.name for p in register(tmp_path).iterdir()] == ["DEC-0001.json"]
+
+
+def test_save_revision_refuses_a_revision_jump(tmp_path):
+    store, old = saved(tmp_path)
+    jump = reaffirmed(old)
+    jump["revision"] = 3
+    jump["history"][-1]["revision"] = 3
+    with pytest.raises(RecordStoreError):
+        store.save_revision(old, jump, DECISION_LOG)
+    # validate_record catches the gap first; revision_errors catches it on its own too.
+    assert "$.revision: must be 2, the next after 1" in revision_errors(old, jump)
+
+
+def test_a_superseded_record_never_goes_back_to_active(tmp_path):
+    store, old = saved(tmp_path)
+    gone = superseded(old)
+    store.save_revision(old, gone, DECISION_LOG)
+    back = reaffirmed(gone)
+    back["record_status"] = "active"
+    del back["relations"]
+    with pytest.raises(RecordStoreError, match="a 'superseded' record cannot be revised"):
+        store.save_revision(gone, back, DECISION_LOG)
+    again = reaffirmed(gone)
+    with pytest.raises(RecordStoreError, match="a 'superseded' record cannot be revised"):
+        store.save_revision(gone, again, DECISION_LOG)
+
+
+def test_save_revision_refuses_an_invalid_record(tmp_path):
+    store, old = saved(tmp_path)
+    new = superseded(old)
+    del new["relations"]
+    with pytest.raises(RecordStoreError, match="invalid and was not written"):
+        store.save_revision(old, new, DECISION_LOG)
+    assert store.load_all(DECISION_LOG) == [old]
+
+
+def test_save_revision_leaves_no_temporary_file_when_writing_fails(tmp_path, monkeypatch):
+    store, old = saved(tmp_path)
+
+    def failing_replace(source, target):
+        raise PermissionError(13, "locked", str(target))
+
+    monkeypatch.setattr("knowledge_automata.storage.json_files.os.replace", failing_replace)
+    with pytest.raises(PermissionError):
+        store.save_revision(old, reaffirmed(old), DECISION_LOG)
+    assert [p.name for p in register(tmp_path).iterdir()] == ["DEC-0001.json"]
+
+
+def test_load_active_skips_superseded_records(tmp_path):
+    store, first = saved(tmp_path)
+    second = make_record("DEC-0002")
+    store.save_new(second, DECISION_LOG)
+    assert store.load_active(DECISION_LOG) == [first, second]
+    store.save_revision(first, superseded(first), DECISION_LOG)
+    assert store.load_active(DECISION_LOG) == [second]
+    assert RecordStore(tmp_path / "empty").load_active(DECISION_LOG) == []
