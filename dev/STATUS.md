@@ -6,7 +6,7 @@
 
 ## Current phase
 
-Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation). Handoff 007, the Governor (orchestrator), is designed and written (`dev/handoffs/007-governor.md`, on `feat/governor`), in three parts, 7A, 7B and 7C. Next: Miguel runs Claude's Governor spike, then Copilot plans part 7A.
+Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation). Handoff 007, the Governor (orchestrator), is designed and written (`dev/handoffs/007-governor.md`, on `feat/governor`), in three parts, 7A, 7B and 7C. The Governor spike is done and the prompts are settled; next, Copilot plans part 7A.
 
 ## Done
 
@@ -97,11 +97,11 @@ Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation).
   - `KA_GOVERNOR_MAX_ITEMS` (default 10) is a security control: above it nothing is drafted, the artifact is `held` for review, and `release` approves it.
   - `process ARTIFACT_ID` replaces `record-decision`. No work orders means `processed` with zero records.
   - Three parts, each ending green, so Copilot can stop after any of them while credits are low.
-- Before part 7A: Claude's throwaway spike (`runtime/diagnostics/spike_governor.py`, git-ignored), about 11 calls, checks with the real prompts that Command A+ lists several items with verbatim quotes on ART-0001 to ART-0008.
+- The Governor spike (`runtime/diagnostics/spike_governor.py`, git-ignored), run by Miguel on 2026-10-31 with the real prompts, 17 calls in three rounds: every reply was valid JSON and every quote passed the evidence check. Round 1 (ART-0001 to ART-0008, and three `decision-registrar.v2` drafts) matched on 7 of 8 artifacts: ART-0004's rationale sentence came back as a second decision; the drafts invented no rationale or alternatives. A new prompt line fixed ART-0004 but dropped ART-0006's confirmation of `DEC-0003` (round 2); the narrowed line found every expected item on ART-0003, ART-0004 and ART-0006 (round 3). Details in `dev/handoffs/007-governor.md`, section 6.
 
 ## Next
 
-- Miguel runs the Governor spike and shares the output; Claude adjusts the prompts if needed (none is cited yet).
+- An evaluation harness grown from the spike, as a small step after handoff 007 (backlog).
 - Copilot plans and builds part 7A, then 7B, then the real run in 7C, each after Miguel's approval and Claude's review.
 - Claude: the visual guide still says "thinking off" (`docs/guide/index.html`, line 178); refresh it with the guide steps, together with the 007 diagrams.
 - Enable GitHub Pages in the repository settings, if not done yet, and mark ADR-0016 accepted once the guide is online.
