@@ -117,7 +117,9 @@ def test_new_record_does_not_modify_the_draft(decision_draft):
 
 
 def test_the_sample_decision_is_rebuilt_byte_for_byte():
-    path = SAMPLE / "registers" / "decision-log" / "DEC-0001.json"
+    # DEC-0001 as the handoff 004 real run wrote it. Later runs revise the sample record
+    # (handoff 006 reaffirmed it), so its first revision is kept as a fixture.
+    path = Path(__file__).parent / "fixtures" / "sample-DEC-0001.revision-1.json"
     stored = json.loads(path.read_text(encoding="utf-8"))
     entry = stored["history"][0]
     rebuilt = new_record(
@@ -133,6 +135,19 @@ def test_the_sample_decision_is_rebuilt_byte_for_byte():
     )
     expected = path.read_bytes().replace(b"\r\n", b"\n")
     assert format_json(rebuilt).encode("utf-8") == expected
+
+
+def test_the_sample_decision_keeps_its_first_revision():
+    first = json.loads(
+        (Path(__file__).parent / "fixtures" / "sample-DEC-0001.revision-1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    path = SAMPLE / "registers" / "decision-log" / "DEC-0001.json"
+    current = json.loads(path.read_text(encoding="utf-8"))
+    assert current["created_at"] == first["created_at"]
+    assert current["history"][0] == first["history"][0]
+    assert current["sources"][: len(first["sources"])] == first["sources"]
 
 
 def test_a_superseding_record_links_to_its_target(decision_draft):
