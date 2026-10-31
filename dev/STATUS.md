@@ -2,11 +2,11 @@
 
 ## Last updated
 
-2026-10-30
+2026-10-31
 
 ## Current phase
 
-Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the PR #5 credits and status (PR #6), the README pass (PR #7), the architecture diagrams and visual guide (PR #9) and the guide preview in the README (PR #10). Handoff 006, the Comparator (reconciliation), is implemented on `feat/comparator` and waiting for Claude's code review; the real run comes after it, with Miguel's go.
+Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the PR #5 credits and status (PR #6), the README pass (PR #7), the architecture diagrams and visual guide (PR #9) and the guide preview in the README (PR #10). Handoff 006, the Comparator (reconciliation), is implemented on `feat/comparator`, reviewed and approved by Claude with four small fixes (now committed), and its diagrams are refreshed; the real run waits for Miguel's go.
 
 ## Done
 
@@ -74,10 +74,11 @@ Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the
   - Views: sources grouped by artifact and a Details column in the history table; the sample view regenerated (its record unchanged).
   - Docs: ADR-0017; ADR-0004, ADR-0013 and ADR-0015 amended; architecture text, README, backlog, tool feedback and principles. The sample project README waits for the real run.
   - No real Cohere call was made.
+- Claude's code review (2026-10-31) approved the implementation with four fixes, made by Copilot in one commit, 726 tests passing offline: a supersession checks the old record's revision (valid, and `revision_errors` empty) before writing the new record, so a refusal writes nothing; `check_supersession_links` also reports an `active` record that has `relations.superseded_by`; an update treats an empty string or list as absent on both sides, like `comparison_text`; and Embed vectors of different lengths raise an `LLMResponseError`, so the artifact is marked `failed`. Claude refreshed the diagrams on the branch.
 
 ## Next
 
-- Claude reviews the handoff 006 code on the computer and refreshes the diagrams and the guide on the branch (the Comparator is now built, and data flow steps 3 and 4 swapped in the text). Then, with Miguel's go, Copilot does the real run (handoff 7.3: inbox files with LF line endings, ART-0002 to ART-0005 in date order, stop at 35 calls), commits it unedited with the sample project README, and updates this file.
+- With Miguel's go, Copilot does the handoff 006 real run (handoff 7.3: inbox files with LF line endings, ART-0002 to ART-0005 in date order, stop at 35 calls), commits it unedited with the sample project README, and updates this file.
 - Enable GitHub Pages in the repository settings, if not done yet, and mark ADR-0016 accepted once the guide is online.
 - Then the Governor (orchestrator), the Risk Registrar, the sample project as an evaluation set, and the v0.1.0 release (see `dev/backlog.md`).
 - A mise-en-place v0.2 brief (screen theme, Mermaid font fix, sequence diagram pattern) runs in its own chat; the guide moves to those tokens when it ships.

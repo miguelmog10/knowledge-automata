@@ -28,6 +28,11 @@ def order_like_schema(values: Mapping[str, Any], schema: Mapping[str, Any]) -> d
     return {key: values[key] for key in known + unknown}
 
 
+def has_value(content: Mapping[str, Any], field: str) -> bool:
+    """Return whether ``field`` is present and not empty: ``""`` and ``[]`` count as absent."""
+    return content.get(field) not in (None, "", [])
+
+
 def _defs(name: str) -> dict[str, Any]:
     return load_schema(RECORD_SCHEMA)["$defs"][name]
 

@@ -480,6 +480,60 @@ def test_an_interrupted_supersession_stops_record_decision_and_views(
         assert expected in err and "No view was written or checked." in err
 
 
+def rewrite(memory, record_id, change):
+    path = memory / "registers" / "decision-log" / f"{record_id}.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    change(data)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def test_a_supersession_the_old_record_would_refuse_writes_nothing(memory, clock, capsys):
+    record_first_two(memory, clock)
+
+    def from_the_future(data):
+        later = "2027-01-01T00:00:00Z"
+        data["created_at"] = data["updated_at"] = later
+        for item in data["sources"] + data["history"]:
+            item["added_at" if "added_at" in item else "at"] = later
+
+    path = rewrite(memory, "DEC-0001", from_the_future)
+    before_record, before_entry = path.read_bytes(), entry(memory, "ART-0005")
+    capsys.readouterr()
+
+    build = FakeBuild(NATIVE, answer("supersession", "DEC-0001"))
+    assert record(build, clock, memory, "ART-0005") == 2
+    err = capsys.readouterr().err
+    assert "DEC-0001 cannot be marked superseded, so nothing was written" in err
+    assert "$.updated_at: earlier than the previous revision" in err
+    assert list(records(memory)) == ["DEC-0001", "DEC-0002"]
+    assert path.read_bytes() == before_record
+    assert entry(memory, "ART-0005") == before_entry
+    assert pipeline.supersession_link_problems(memory) == []
+
+
+def test_an_active_record_with_a_replacement_stops_record_decision_and_views(memory, clock, capsys):
+    record_first_two(memory, clock)
+    build = FakeBuild(NATIVE, answer("supersession", "DEC-0001"))
+    assert record(build, clock, memory, "ART-0005") == 0
+    rewrite(memory, "DEC-0001", lambda data: data.update(record_status="active"))
+    capsys.readouterr()
+
+    expected = (
+        "DEC-0001 names DEC-0003 in relations.superseded_by but is still active: set "
+        "DEC-0001's record_status to superseded"
+    )
+    build = FakeBuild(FLUTTER_AGAIN)
+    assert record(build, clock, memory, "ART-0003") == 2
+    err = capsys.readouterr().err
+    assert expected in err and "nothing was sent to the model" in err
+    assert build.settings == []
+    for extra in ([], ["--check"]):
+        assert run(FakeBuild(), clock, "views", "--memory", str(memory), *extra) == 2
+        err = capsys.readouterr().err
+        assert expected in err and "No view was written or checked." in err
+
+
 @pytest.mark.parametrize("stage", ["embed", "chat"])
 def test_a_provider_error_during_the_comparison_marks_the_artifact_failed(
     memory, clock, capsys, stage
@@ -498,6 +552,28 @@ def test_a_provider_error_during_the_comparison_marks_the_artifact_failed(
     assert failed["history"][-1]["error_type"] == "LLMRateLimitError"
     assert (memory / "registers" / "decision-log" / "DEC-0001.json").read_bytes() == before
     assert list(records(memory)) == ["DEC-0001"]
+
+
+class MixedDimensions(ScoredLLM):
+    def embed(self, texts, *, input_type, context):
+        result = super().embed(texts, input_type=input_type, context=context)
+        if input_type == "document":
+            return result
+        return dataclasses.replace(result, vectors=[[*vector, 0.0] for vector in result.vectors])
+
+
+def test_embed_vectors_of_different_lengths_mark_the_artifact_failed(memory, clock, capsys):
+    assert record(FakeBuild(FLUTTER), clock, memory, "ART-0001") == 0
+    before = (memory / "registers" / "decision-log" / "DEC-0001.json").read_bytes()
+    build = FakeBuild()
+    build.fake = MixedDimensions([FLUTTER_AGAIN])
+    assert record(build, clock, memory, "ART-0003") == 3
+    assert "ART-0003 is now failed in the Ledger" in capsys.readouterr().err
+    failed = entry(memory, "ART-0003")
+    assert failed["status"] == "failed"
+    assert failed["history"][-1]["error_type"] == "LLMResponseError"
+    assert (memory / "registers" / "decision-log" / "DEC-0001.json").read_bytes() == before
+    assert [call.operation for call in build.fake.calls] == ["chat", "embed", "embed"]
 
 
 @pytest.mark.parametrize(

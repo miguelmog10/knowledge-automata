@@ -13,6 +13,7 @@ from typing import Any
 
 from knowledge_automata.core.records import (
     format_timestamp,
+    has_value,
     history_entry,
     new_record,
     new_sources,
@@ -80,17 +81,16 @@ def apply_update(
 
     Returns ``(record, filled, ignored)``: ``filled`` lists the fields copied over, and
     ``ignored`` the fields present in both whose values differ (kept as they are: a change
-    of substance is a supersession). Both follow the content schema's order.
+    of substance is a supersession). Both follow the content schema's order. An empty
+    string or list counts as absent on both sides, as in ``comparison_text``: an empty
+    target field can be filled, and an empty draft field fills and reports nothing.
     """
     _require_decision_log(spec, target)
     schema = load_schema(spec.content_schema)
     existing, drafted = target["content"], draft["content"]
-    filled = [key for key in schema["properties"] if key in drafted and key not in existing]
-    ignored = [
-        key
-        for key in schema["properties"]
-        if key in drafted and key in existing and drafted[key] != existing[key]
-    ]
+    offered = [key for key in schema["properties"] if has_value(drafted, key)]
+    filled = [key for key in offered if not has_value(existing, key)]
+    ignored = [key for key in offered if has_value(existing, key) and drafted[key] != existing[key]]
     record = _revise(
         target,
         draft["evidence"],
@@ -184,9 +184,9 @@ def check_supersession_links(records: Iterable[Mapping[str, Any]]) -> list[str]:
     """Return a message for every supersession link that does not point back.
 
     A record that supersedes another needs the other to exist, be ``superseded`` and name
-    it in ``superseded_by``; a ``superseded_by`` needs a record that supersedes it. The
-    usual cause is a run that stopped between writing the new record and marking the old
-    one (handoff 006, 3.5).
+    it in ``superseded_by``; a ``superseded_by`` needs a record that supersedes it, and a
+    record that has one cannot be ``active``. The usual cause is a run that stopped between
+    writing the new record and marking the old one (handoff 006, 3.5), or a hand edit.
     """
     by_id = {record["id"]: record for record in records}
     messages = []
@@ -212,6 +212,12 @@ def check_supersession_links(records: Iterable[Mapping[str, Any]]) -> list[str]:
         new_id = relations.get("superseded_by")
         if new_id is None:
             continue
+        if record["record_status"] == "active":
+            messages.append(
+                f"{record_id} names {new_id} in relations.superseded_by but is still active: "
+                f"set {record_id}'s record_status to superseded, then run "
+                "`knowledge-automata views`."
+            )
         new = by_id.get(new_id)
         if new is None:
             messages.append(f"{record_id} is superseded by {new_id}, but {new_id} does not exist.")

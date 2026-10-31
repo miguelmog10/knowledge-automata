@@ -170,6 +170,9 @@ def _shortlist(
             f"Embed returned {len(documents.vectors)} and {len(queried.vectors)} vectors "
             f"for {len(texts)} records and 1 draft"
         )
+    lengths = sorted({len(vector) for vector in [*documents.vectors, queried.vectors[0]]})
+    if len(lengths) != 1:
+        raise LLMResponseError(f"Embed returned vectors of different lengths: {lengths}")
     vectors = dict(zip(texts, documents.vectors, strict=True))
     shortlist = top_k(queried.vectors[0], vectors, settings.top_k)
     top_n = min(settings.top_n, len(shortlist))

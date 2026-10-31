@@ -117,6 +117,39 @@ def test_an_update_that_fills_nothing_still_adds_sources_and_a_revision():
     assert_next_revision(old, record)
 
 
+def test_an_empty_target_field_counts_as_absent_and_is_filled():
+    old = target(
+        title="One status ladder for every batch",
+        statement="Every batch of plants moves through one status ladder.",
+        rationale="",
+        alternatives=[],
+    )
+    record, filled, ignored = apply_update(DECISION_LOG, old, DRAFT, **CONTEXT)
+    assert filled == ["rationale", "alternatives"]
+    assert ignored == ["title", "statement"]
+    assert record["content"]["rationale"] == "Growers learn the screen once."
+    assert record["content"]["alternatives"] == ["Separate statuses per crop type"]
+    assert record["history"][-1]["fields"] == ["rationale", "alternatives"]
+    assert_next_revision(old, record)
+
+
+def test_an_empty_draft_field_fills_nothing_and_is_not_ignored():
+    old = target(
+        title="One status ladder for every batch",
+        statement="Every batch of plants moves through one status ladder.",
+        context="Two crops share the greenhouse.",
+    )
+    draft = {
+        "content": {**old["content"], "context": "", "rationale": "", "decided_by": []},
+        "evidence": ["one status ladder for every batch"],
+    }
+    record, filled, ignored = apply_update(DECISION_LOG, old, draft, **CONTEXT)
+    assert filled == [] and ignored == []
+    assert record["content"] == old["content"]
+    assert record["history"][-1]["fields"] == []
+    assert_next_revision(old, record)
+
+
 # Reaffirmation
 
 
@@ -224,4 +257,13 @@ def test_dangling_and_mismatched_links_are_reported():
         "DEC-0002 is superseded by DEC-0003, but DEC-0003 does not supersede DEC-0002.",
         "DEC-0004 supersedes DEC-0002, but DEC-0002 is superseded and names 'DEC-0003' as "
         "its replacement.",
+    ]
+
+
+def test_an_active_record_that_names_a_replacement_is_reported():
+    new, gone = apply_supersession(DECISION_LOG, target(), "DEC-0003", DRAFT, **CONTEXT)
+    still_active = {**gone, "record_status": "active"}
+    assert check_supersession_links([still_active, new]) == [
+        "DEC-0002 names DEC-0003 in relations.superseded_by but is still active: set "
+        "DEC-0002's record_status to superseded, then run `knowledge-automata views`."
     ]

@@ -8,6 +8,8 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from knowledge_automata.core.records import has_value
+
 COMPARED_FIELDS = ("title", "statement", "context")
 
 
@@ -16,7 +18,7 @@ def comparison_text(content: Mapping[str, Any]) -> str:
 
     Only what was decided is compared; rationale, alternatives and impacts are left out.
     """
-    return "\n".join(str(content[field]) for field in COMPARED_FIELDS if content.get(field))
+    return "\n".join(str(content[field]) for field in COMPARED_FIELDS if has_value(content, field))
 
 
 def cosine(a: Sequence[float], b: Sequence[float]) -> float:

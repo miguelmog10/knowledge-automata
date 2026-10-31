@@ -345,6 +345,21 @@ def test_a_wrong_number_of_vectors_is_a_response_error():
         run(ShortEmbed([answer()]))
 
 
+@pytest.mark.parametrize(
+    ("changed", "vector", "lengths"),
+    [
+        (comparison_text(FLUTTER["content"]), [1.0, 0.0], r"\[2, 3\]"),
+        (DRAFT_TEXT, [1.0, 0.0, 0.0, 0.0], r"\[3, 4\]"),
+    ],
+)
+def test_vectors_of_different_lengths_are_a_response_error(changed, vector, lengths):
+    fake = SearchLLM([answer()])
+    fake.vectors[changed] = vector
+    with pytest.raises(LLMResponseError, match=f"vectors of different lengths: {lengths}"):
+        run(fake)
+    assert [call.operation for call in fake.calls] == ["embed", "embed"]
+
+
 def test_events_carry_the_comparator_agent():
     fake = SearchLLM([answer()])
     sink = MemorySink()

@@ -33,6 +33,7 @@ from knowledge_automata.agents.registrar import (
 from knowledge_automata.core import ledger
 from knowledge_automata.core.prompts import load_prompt
 from knowledge_automata.core.records import new_record
+from knowledge_automata.core.validation import revision_errors, validate_record
 from knowledge_automata.core.write_rules import (
     apply_reaffirmation,
     apply_supersession,
@@ -49,7 +50,7 @@ from knowledge_automata.llm import LanguageModel, LLMConfigError, LLMError, LLMS
 from knowledge_automata.llm.settings import Thinking
 from knowledge_automata.storage import artifact_files
 from knowledge_automata.storage.ledger_store import ARTIFACT_ID, LedgerStore
-from knowledge_automata.storage.record_store import RecordStore
+from knowledge_automata.storage.record_store import RecordStore, RecordStoreError
 from knowledge_automata.views.markdown import (
     VIEWS_FOLDER,
     ViewDifferences,
@@ -489,6 +490,17 @@ def _apply_write_rule(
         record, superseded = apply_supersession(
             DECISION_LOG, target, store.next_id(DECISION_LOG), draft.draft, **provenance
         )
+        # Check the old record's revision before writing the new one, so a refusal by
+        # save_revision cannot leave a half-done supersession behind.
+        errors = [
+            *validate_record(superseded, DECISION_LOG).errors,
+            *revision_errors(target, superseded),
+        ]
+        if errors:
+            raise RecordStoreError(
+                f"{target['id']} cannot be marked superseded, so nothing was written:\n"
+                + "\n".join(f"- {error}" for error in errors)
+            )
         path = store.save_new(record, DECISION_LOG)
         store.save_revision(target, superseded, DECISION_LOG)
         related_id = target["id"]
