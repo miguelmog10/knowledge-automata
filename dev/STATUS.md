@@ -2,11 +2,11 @@
 
 ## Last updated
 
-2026-10-28
+2026-10-31
 
 ## Current phase
 
-Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the PR #5 credits and status (PR #6) and the README pass (PR #7). Architecture diagrams and a visual guide are in progress on `docs/architecture-diagrams`. Next is the Comparator (reconciliation).
+Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the PR #5 credits and status (PR #6), the README pass (PR #7), the architecture diagrams and visual guide (PR #9) and the guide preview in the README (PR #10). Handoff 006, the Comparator (reconciliation), is implemented on `feat/comparator`, reviewed and approved by Claude with four small fixes, and its diagrams are refreshed. The real run is done and committed: ART-0002 to ART-0005 were recorded with the expected classifications, after a restart with Command A+ thinking enabled (handoff 006, Addendum A). The branch is ready for Miguel to open the pull request.
 
 ## Done
 
@@ -55,20 +55,47 @@ Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the
   - `examples/sample-project/ledger/ART-0001.json`, backfilled once through the Ledger code from the committed blob; the sample record and views are unchanged.
   - Deviations, approved in the pull request: rejected drafts also carry `error_type` when the last response was unusable (approved); the backfill commit came before the Ledger-driven views (approved); copies go through `storage/artifact_files.py` (approved); the Sensor stays free of file access and the pipeline does the I/O, because agents never import storage.
   - No real Cohere call was made. The optional smoke rerun (7 calls) to see `finish_reason` on real events was not done.
+- Architecture diagrams and visual guide merged as PR #9 (Miguel and Claude, 2026-10-28):
+  - Four Mermaid diagrams in `docs/diagrams/`, one source each: system context, containers, the closed loop and the ART-0001 to DEC-0001 run. Flowcharts that follow C4 conventions, because Mermaid's native C4 has no dashed lines or legend. Built versus planned is shown by line style, with a legend.
+  - Copies between `diagram` markers in `README.md` (closed loop) and `docs/architecture.md` (context, containers, closed loop).
+  - `docs/guide/index.html`: the visual guide in direction B ("The pass"), with a click-through walkthrough; `docs/guide/README.md` holds the refresh steps.
+  - `.github/workflows/pages.yml` and ADR-0016 (proposed): publish the guide and the diagram sources with GitHub Pages.
+- The guide's preview at the top of the README, in light and dark, merged as PR #10.
 
 ## In progress
 
-- Architecture diagrams and visual guide on `docs/architecture-diagrams` (Miguel and Claude, 2026-10-28), waiting for Miguel's commit:
-  - Four Mermaid diagrams in `docs/diagrams/`, one source each: system context, containers, the closed loop and the ART-0001 to DEC-0001 run. Flowcharts that follow C4 conventions, because Mermaid's native C4 has no dashed lines or legend. Built versus planned is shown by line style, with a legend.
-  - Copies between `diagram` markers in `README.md` (closed loop) and `docs/architecture.md` (context, containers, closed loop).
-  - `docs/guide/index.html`: the visual guide in direction B ("The pass"), with a click-through walkthrough. It renders the diagrams from `docs/diagrams/` in its own light and dark style. `docs/guide/README.md` holds the refresh steps.
-  - `.github/workflows/pages.yml` and ADR-0016 (proposed): publish the guide and the diagram sources with GitHub Pages. Pages must be enabled in the repository settings.
-  - A mise-en-place v0.2 brief (screen theme, Mermaid font fix, sequence diagram pattern) runs in its own chat; the guide moves to those tokens when it ships.
+- Handoff 006, the Comparator (reconciliation), designed by Miguel and Claude in voice sessions from 2026-10-28 to 2026-10-30 (`dev/handoffs/006-comparator.md`, on `feat/comparator`). Main decisions: the Registrar drafts first and the Comparator compares the checked draft (the intended order, ADR-0017); Embed then Rerank over the active records, with the top 10 and top 3 as settings; one retry, then reject; a crash-consistent write order for supersession; rerunning an artifact that recorded nothing; four new sample artifacts, one per classification, and one real run of about 20 to 30 calls on the branch before the merge.
+- Implemented by Copilot on 2026-10-30 in seven commits (plan approved by Miguel), 718 tests passing offline:
+  - Ledger entry schema 1.1 (`change`, `related_id` and `comparison` on produced items; `stage` and `run_id` on rejected items; a history `reason`) and the rerun transitions. Decided by Miguel at plan approval and written into ADR-0015: `processed` to `failed` only when nothing was produced, a `failed` entry keeps rejected drafts only from an earlier `processed` step, and a transition raises `schema_version` to the current minor of the same major (another major is refused).
+  - `RecordStore.save_revision` (lost-update check, revision plus one, history and sources append-only, no `superseded` back to `active`) and `load_active`.
+  - `core/write_rules.py`: update, reaffirmation, supersession and `check_supersession_links`. Deviation: each rule takes the register spec as its first argument (to load the content schema and refuse the risk register), which the handoff's signatures did not have. `new_record` gained `change` and `supersedes`, with a byte-for-byte test against the sample `DEC-0001`.
+  - `core/retrieval.py`, `agents/comparator.py` (`ComparatorSettings`, `KA_COMPARATOR_TOP_K` and `KA_COMPARATOR_TOP_N`), and the prompts `decision-comparator.v1` and `comparator-retry.v1`. Embed and Rerank errors mark the artifact `failed` with no retry, and so does a Rerank call that returns no results (an `LLMResponseError`).
+  - `pipeline.record_decision` and the CLI: draft, compare, write rule, views, Ledger; the printed lines (draft, candidates with scores, classification and reason, the change, billing per stage) and the `ledger` suffixes. The billing line format and the wording of the change lines were Copilot's choice where the handoff left them open.
+  - Views: sources grouped by artifact and a Details column in the history table; the sample view regenerated (its record unchanged).
+  - Docs: ADR-0017; ADR-0004, ADR-0013 and ADR-0015 amended; architecture text, README, backlog, tool feedback and principles. The sample project README waits for the real run.
+  - No real Cohere call was made.
+- Claude's code review (2026-10-31) approved the implementation with four fixes, made by Copilot in one commit, 726 tests passing offline: a supersession checks the old record's revision (valid, and `revision_errors` empty) before writing the new record, so a refusal writes nothing; `check_supersession_links` also reports an `active` record that has `relations.superseded_by`; an update treats an empty string or list as absent on both sides, like `comparison_text`; and Embed vectors of different lengths raise an `LLMResponseError`, so the artifact is marked `failed`. Claude refreshed the diagrams on the branch.
+- The real run (handoff 7.3), with Miguel's go on 2026-10-31, after a small commit that words the supersession link heading for both kinds of problem. The four inbox files matched their SHA-256; ingest accepted ART-0002 to ART-0005 (no calls).
+  - ART-0002: `new`, `DEC-0002` (run `620095ee-ccda-41af-964e-4efdd5640040`, thinking disabled), 7 calls: the draft and the comparison each needed the retry. Candidate `DEC-0001` (0.02). Billed: draft 1,295 input and 2,516 output tokens; comparison 2,227 and 211; Embed 165 input tokens; Rerank 162 input tokens (printed then as "search units not reported").
+  - ART-0003: both draft attempts rejected, "The chat response is not valid JSON (line 1, column 1)", `finish_reason` COMPLETE, 1,364 and 2,736 output tokens (run `bab2ba3b-fe45-4495-b631-8577f9cc51f1`, exit 1, billed 1,165 input and 4,100 output tokens). The run stopped there, as section 7.3 requires. Its Ledger entry became `processed` with no records and one rejected draft.
+  - Diagnosis (handoff 006, Addendum A): Claude's throwaway script, run by Miguel on ART-0003 (4 calls, outside the event log), showed that with thinking disabled Command A+ writes its reasoning as prose before the JSON (0 of 2 valid), and with thinking enabled it returns a thinking block and a JSON-only text block (2 of 2 valid, about 1,100 reasoning tokens).
+  - Decision (proposed by Claude, confirmed by Miguel): thinking enabled by default for the Registrars and the Comparator, sent explicitly (`CHAT_THINKING_DEFAULT`, `pipeline.record_decision_settings`), `KA_CHAT_THINKING` still overrides; the adapter stays strict (no JSON extraction from prose); no token budget yet (backlog); the billing line prints the units each provider reports, for example `rerank (input tokens 162)`. ADR-0014 amended. Copilot renamed `decision_registrar_settings` to `record_decision_settings` along with the constant, since it now covers both agents.
+  - Two test fixes before the run commit, each its own commit: the sample project test derives each artifact copy's name with `sensor.copy_name` (the old check held only for ART-0001), and the byte-for-byte rebuild of `DEC-0001` uses a fixture of its first revision, since the reaffirmation moves the sample record to revision 2.
+  - Resumed with thinking enabled (Addendum A.4), every draft and comparison passed on the first attempt:
+    - ART-0003 rerun (run `312c8736-68a7-46ef-ba81-4014a469f5c8`): `reaffirmation` of `DEC-0001`, revision 2, three sources added. Candidates `DEC-0001` (0.61), `DEC-0002` (0.00). Billed: draft 553 and 1,595; comparison 1,202 and 324; Embed 213; Rerank 256 input tokens. 5 calls.
+    - ART-0004 (run `e9a931d1-56c7-4aba-b3bc-bb27400a538a`): `update` of `DEC-0002`, revision 2, no field filled. Candidates `DEC-0002` (0.31), `DEC-0001` (0.01). Billed: draft 595 and 1,519; comparison 1,252 and 1,149; Embed 224; Rerank 274 input tokens. 5 calls. The CLI then crashed while printing the Comparator's reason: it contained U+2011 (a non-breaking hyphen) and Windows Python encodes piped stdout as cp1252. The records, views and Ledger entry were already written (`views --check` passed), so it was not rerun. This summary was rebuilt from the Ledger entry and the event log; the Comparator's reason is lost, since reasons are printed, not stored, by design. Fixed in its own commit: the CLI writes stdout and stderr as UTF-8.
+    - ART-0005 (run `8bd8beb3-0e9c-421f-b8fc-2a9ad7c841d3`): `supersession`, `DEC-0003` supersedes `DEC-0002` (now `superseded`, revision 3). Candidates `DEC-0002` (0.29), `DEC-0001` (0.01). Billed: draft 659 and 1,670; comparison 1,252 and 192; Embed 210; Rerank 248 input tokens. 5 calls.
+  - Against the expected table: every classification and target matched. ART-0004 filled nothing because ART-0002's draft had already filled the rationale and alternatives (the table says "if they were empty"). Notes for the evaluation set: `DEC-0002` lists the four people present in `decided_by` while `DEC-0003` names "board" (the known prompt v2 candidate), and `DEC-0003` has no alternatives.
+  - Calls used: 28 of the 40 allowed (24 in the event log, 4 diagnostic). Rerank billed input tokens on every call, never search units. With thinking enabled, the Registrar used 1,519 to 1,670 output tokens per draft and the Comparator 192 to 1,149.
+  - `views --check` and the full suite (733 tests) pass with the outputs committed. Tool feedback: piped output on Windows, raw versus billed input tokens, thinking length.
 
 ## Next
 
-- Miguel commits the diagrams and the guide, opens the pull request and enables GitHub Pages.
-- Then the Comparator, the Governor (orchestrator), the Risk Registrar, the sample project as an evaluation set, and the v0.1.0 release (see `dev/backlog.md`).
+- Miguel opens the handoff 006 pull request from `feat/comparator` (draft description from Copilot), adds the credits row to `dev/costs.md` as the last commit, and merges after review.
+- Claude: the visual guide (`docs/guide/index.html`, lines 178 and 353) still says thinking is off or disabled; refresh it with the guide steps.
+- Enable GitHub Pages in the repository settings, if not done yet, and mark ADR-0016 accepted once the guide is online.
+- Then the Governor (orchestrator), the Risk Registrar, the sample project as an evaluation set, and the v0.1.0 release (see `dev/backlog.md`).
+- A mise-en-place v0.2 brief (screen theme, Mermaid font fix, sequence diagram pattern) runs in its own chat; the guide moves to those tokens when it ships.
 
 ## Blockers
 
@@ -77,7 +104,7 @@ None.
 ## Notes for the next session
 
 - Refresh the guide and the diagrams when a handoff lands (steps in `docs/guide/README.md`): every "built" label must match `main`.
-- The sample record is evidence: never rerun the real call to get a nicer `DEC-0001`. Prompt changes are new version files (`decision-registrar.v2`) judged on the evaluation set.
+- The sample records are evidence: never rerun a real call to get a nicer record. Prompt changes are new version files (`decision-registrar.v2`) judged on the evaluation set.
 - Line endings: `core.autocrlf` is on for this clone, so committed text may be CRLF in the working tree. The record store and views always write LF, `views --check` ignores CRLF versus LF, `record-decision` normalizes the stored copy's line endings before the evidence check, and the Sensor's content hash ignores them too (ADR-0015). A Windows checkout may hold an artifact copy with CRLF, so its size differs from the Ledger's `size_bytes` (the original bytes); never compare the two. Keeping copies byte-identical (`.gitattributes`) is an open question in the backlog.
 - Local checks: `uv sync --all-extras` (a plain `uv sync` removes ruff and pytest), then `uv run ruff check`, `uv run ruff format --check`, `uv run pytest`, and `uv run knowledge-automata views --memory examples/sample-project --check`.
 - Python 3.15: the Cohere SDK pulls in PyYAML, which has no 3.15 wheel yet and builds from source. If a dependency fails to install on 3.15 in CI, stop and report it; do not drop 3.15 without Miguel's approval.
@@ -87,3 +114,4 @@ None.
 - When squash merging, copy the `Co-authored-by:` trailers from the code block in `AGENTS.md` (Commit conventions). In PR #4 they were indented, and in PR #5 the Claude address became a Markdown link and the Copilot line was missing, so GitHub may not credit the co-authors on those two commits.
 - Local setup: `uv sync --all-extras`, then `uv run pytest`. Keep the clone outside cloud-synced folders (see README).
 - Before trying `ingest` locally, clear any `runtime/memory` made before handoff 005: records there without Ledger entries make `record-decision` stop with "the Ledger is behind the records".
+- An interrupted supersession (a new record whose target is still active) stops `record-decision` and `views` with the fix to make by hand: mark the old record superseded by the new one through a revision. There is no repair command yet (backlog).

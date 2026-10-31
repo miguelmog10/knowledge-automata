@@ -188,3 +188,32 @@ Suggested improvement (Claude): copy binary files unchanged, or say when a file 
 Note: `msedge --headless=new --screenshot` follows the Windows color setting, so on a computer in dark mode the "light" preview came out dark. `--force-dark-mode` forces dark, but nothing forces light by default.
 Suggested improvement: document how headless mode picks the color scheme. For us: `--blink-settings=preferredColorScheme=1` forces light and `=0` forces dark (steps in `docs/guide/README.md`).
 
+### 2026-10-30: Claude file writing and JSON escape sequences (confusing)
+
+Note: in handoff 006 as first committed, the JSON escape `\u003c` appeared as a literal `<` in all three places, so the rule read "every `<` escaped as `<`", which says nothing. The escape was decoded somewhere between Claude's draft and the file on disk. Copilot noticed it while planning, from the contradiction in the text, and Claude fixed it in a follow-up commit before any code was written. Cause, found by Claude on 2026-10-30: its own file-writing tool decodes `\u003c` in the content it is given, and it happened again the same day in another document. Claude now writes text that contains escape sequences through a script and checks the file afterwards.
+Suggested improvement (Claude): write escape sequences in file content literally, or warn when text that looks like an escape is decoded. For us: when a handoff quotes an escape sequence, read it back from the committed file; Copilot's plan review is the second check.
+
+### 2026-10-31: Cohere Command A+ structured output with thinking disabled (confusing)
+
+Note: with `thinking` disabled and a JSON schema in `response_format`, `command-a-plus-05-2026` often returned one text block that starts with its reasoning in prose ("We need to draft a decision record...") and ends with the JSON object, with `finish_reason` COMPLETE. Five of six first attempts in the handoff 006 real run failed this way, at 1,100 to 2,700 output tokens each. With thinking enabled, the reasoning went to a `thinking` block and the text block was the JSON object only (two of two). The smoke check of 2026-10-25 had seen two clean thinking-off replies on a different artifact, so the problem was not visible then.
+Suggested improvement: enforce the schema from the first token whatever the thinking setting, or document that structured outputs on reasoning models need thinking enabled.
+
+### 2026-10-31: GitHub Copilot chat in VS Code, copy button (missing)
+
+Note: the copy button on a Copilot answer copies the model's reasoning together with the answer, so Miguel removes the reasoning by hand before pasting a report into the Claude chat. It is not certain whether this behavior is new. It mirrors the Command A+ finding of the same day: reasoning and answer are kept apart inside the tool, then merged at a boundary, and whatever takes the text next has to clean it up.
+Suggested improvement: offer copy with and without the reasoning.
+
+### 2026-10-31: Python on Windows, piped output (confusing)
+
+Note: when its output is piped (captured by a terminal tool or redirected), Python on Windows encodes `sys.stdout` as cp1252, not UTF-8; only an interactive console gets UTF-8. In the handoff 006 real run, `record-decision ART-0004` crashed with `UnicodeEncodeError` while printing the Comparator's reason, which contained U+2011 (a non-breaking hyphen), a character the console shows fine. The records and the Ledger had already been written, but the rest of the output was lost, including the reason, which is not stored anywhere. The CLI now reconfigures stdout and stderr to UTF-8 at start.
+Suggested improvement: Python's UTF-8 mode avoids it; PEP 686 makes it the default from Python 3.15, and earlier versions need `PYTHONUTF8=1` (this run used 3.12). For us, any CLI that prints model output sets its streams to UTF-8 itself.
+
+### 2026-10-31: Cohere Chat API raw versus billed input tokens (open observation)
+
+Note: in the handoff 006 real run, raw input tokens (`meta.tokens.input_tokens`) minus billed input tokens was the same for every call of a prompt, whatever the artifact or attempt: 473 for each Decision Registrar call with thinking disabled and 472 with it enabled (seven calls), and 253 and 252 for the Comparator (five calls). So the unbilled part looks like a fixed overhead per request shape (perhaps the template around the messages, or the `response_format` schema, which is larger for the Registrar), not something that grows with the content. The docs still do not say what the difference is (see the 2026-10-25 entry).
+Suggested improvement: document what raw tokens count that billed tokens do not.
+
+### 2026-10-31: Cohere Command A+ thinking length (open observation)
+
+Note: with thinking enabled, Comparator replies used 192, 324 and 1,149 output tokens for inputs of about the same size (1,202 to 1,252 billed input tokens). The long one was ART-0004, an update: the same decision restated with more detail, the hardest of the three to tell apart from a reaffirmation. The Decision Registrar used 1,519 to 1,670 output tokens per draft with thinking, against 311 for the one accepted draft without it. Thinking seems to scale with how hard the call is, which a fixed `token_budget` would cut first on the hard cases.
+Suggested improvement: none for Cohere after all. Its responses already report reasoning tokens separately (`usage.tokens.reasoning_tokens`, for example 1,046 of 1,238 output tokens in the Addendum A diagnostic); our adapter and event log do not record them yet, which is a backlog item (Claude, 2026-10-31).

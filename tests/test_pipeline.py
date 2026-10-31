@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 import pytest
 
 from knowledge_automata import pipeline
+from knowledge_automata.agents.comparator import ComparatorSettings
 from knowledge_automata.llm import LLMConfigError, LLMSettings, MemorySink, ObservedLLM
 from knowledge_automata.llm.fake import FakeLLM
 from knowledge_automata.storage.ledger_store import LedgerStore
@@ -18,10 +19,11 @@ def test_decision_registrar_uses_the_v1_prompts():
     assert registrar.retry_version == "decision-registrar.v1+registrar-retry.v1"
 
 
-def test_thinking_defaults_to_disabled_unless_set():
-    assert pipeline.decision_registrar_settings(LLMSettings()).chat_thinking == "disabled"
-    enabled = LLMSettings(chat_thinking="enabled")
-    assert pipeline.decision_registrar_settings(enabled).chat_thinking == "enabled"
+def test_thinking_defaults_to_enabled_unless_set():
+    assert pipeline.CHAT_THINKING_DEFAULT == "enabled"
+    assert pipeline.record_decision_settings(LLMSettings()).chat_thinking == "enabled"
+    disabled = LLMSettings(chat_thinking="disabled")
+    assert pipeline.record_decision_settings(disabled).chat_thinking == "disabled"
 
 
 def ingest(memory, tmp_path, name, raw, **extra):
@@ -77,7 +79,13 @@ def test_record_decision_needs_a_run_id_before_any_call(tmp_path, decision_draft
     ingest(memory, tmp_path, "a.md", b"Line one\n")
     fake = FakeLLM([decision_draft])
     with pytest.raises(ValueError, match="run_id"):
-        pipeline.record_decision(artifact_id="ART-0001", memory=memory, llm=fake, now=NOW)
+        pipeline.record_decision(
+            artifact_id="ART-0001",
+            memory=memory,
+            llm=fake,
+            now=NOW,
+            comparator_settings=ComparatorSettings(),
+        )
     assert fake.calls == []
     assert LedgerStore(memory).load("ART-0001")["status"] == "accepted"
 
@@ -87,5 +95,11 @@ def test_a_configuration_error_leaves_the_status_unchanged(tmp_path):
     ingest(memory, tmp_path, "a.md", b"Line one\n")
     llm = ObservedLLM(FakeLLM([LLMConfigError("No model")]), provider="fake", sink=MemorySink())
     with pytest.raises(LLMConfigError):
-        pipeline.record_decision(artifact_id="ART-0001", memory=memory, llm=llm, now=NOW)
+        pipeline.record_decision(
+            artifact_id="ART-0001",
+            memory=memory,
+            llm=llm,
+            now=NOW,
+            comparator_settings=ComparatorSettings(),
+        )
     assert LedgerStore(memory).load("ART-0001")["status"] == "accepted"

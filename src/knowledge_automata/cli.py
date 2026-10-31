@@ -1,9 +1,10 @@
 """The ``knowledge-automata`` command line.
 
-Exit codes: 0 success; 1 record rejected, artifact quarantined or rejected, release refused,
-or views differ under ``--check``; 2 usage, configuration or file problem; 3 provider error.
-Output never includes the settings, the API key, prompts or artifact text (the title
-excepted).
+Exit codes: 0 success; 1 draft or comparison rejected, artifact quarantined or rejected,
+release refused, or views differ under ``--check``; 2 usage, configuration or file problem;
+3 provider error. Output never includes the settings, the API key, prompts or artifact text
+(the title excepted). ``record-decision`` prints the Comparator's reason, which is model
+output, so the reader sees why a draft was classified as it was. Output is UTF-8.
 """
 
 import argparse
@@ -15,9 +16,10 @@ from typing import Any, TextIO
 
 from knowledge_automata import pipeline
 from knowledge_automata.agents import sensor
+from knowledge_automata.agents.comparator import ComparatorConfigError, ComparatorSettings
 from knowledge_automata.core.ledger import LedgerError
 from knowledge_automata.llm import (
-    ChatModel,
+    LanguageModel,
     LLMConfigError,
     LLMError,
     LLMRateLimitError,
@@ -44,11 +46,24 @@ _USAGE_ERRORS = (
     sensor.SensorInputError,
     sensor.SensorConfigError,
     LLMConfigError,
+    ComparatorConfigError,
 )
 
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def _write_utf8() -> None:
+    """Write output as UTF-8, like every other file the project writes.
+
+    On Windows, Python encodes piped output as cp1252, so printing model output (the
+    Comparator's reason) could crash after a run had already written its records.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -77,9 +92,10 @@ def _parser() -> argparse.ArgumentParser:
         "record-decision",
         help="Record the most significant decision in one artifact.",
         description=(
-            "Draft one decision record from an accepted artifact with the Decision "
-            "Registrar, validate it, store it, regenerate the decision log views and update "
-            "the artifact's Ledger entry."
+            "Draft one decision from an accepted artifact with the Decision Registrar, "
+            "compare it with the active decisions (Comparator), apply the change (new, "
+            "update, reaffirmation or supersession), regenerate the decision log views and "
+            "update the artifact's Ledger entry."
         ),
     )
     record.add_argument("artifact_id", metavar="ARTIFACT_ID", help="for example ART-0001")
@@ -131,9 +147,10 @@ def _memory_argument(parser: argparse.ArgumentParser) -> None:
 def main(
     argv: Sequence[str] | None = None,
     *,
-    build: Callable[[LLMSettings], ChatModel] = build_llm,
+    build: Callable[[LLMSettings], LanguageModel] = build_llm,
     clock: Callable[[], datetime] = utc_now,
 ) -> int:
+    _write_utf8()
     try:
         args = _parser().parse_args(argv)
     except SystemExit as exit_:
@@ -183,17 +200,25 @@ def _ingest(args: argparse.Namespace, clock: Callable[[], datetime]) -> int:
 
 def _record_decision(
     args: argparse.Namespace,
-    build: Callable[[LLMSettings], ChatModel],
+    build: Callable[[LLMSettings], LanguageModel],
     clock: Callable[[], datetime],
 ) -> int:
     artifact_id: str = args.artifact_id
-    # Checked before building the LLM, so a refused artifact never needs an API key.
-    pipeline.recordable_entry(artifact_id, args.memory)
-    settings = pipeline.decision_registrar_settings(LLMSettings.from_env())
+    # Checked before building the LLM, so a refused artifact or a bad setting never needs an
+    # API key and never costs a call.
+    entry = pipeline.recordable_entry(artifact_id, args.memory)
+    comparator_settings = ComparatorSettings.from_env()
+    settings = pipeline.record_decision_settings(LLMSettings.from_env())
+    if entry["status"] == "processed":
+        print(f"Rerunning {artifact_id}: its earlier run recorded nothing.")
     llm = build(settings)
     try:
         result = pipeline.record_decision(
-            artifact_id=artifact_id, memory=args.memory, llm=llm, now=clock()
+            artifact_id=artifact_id,
+            memory=args.memory,
+            llm=llm,
+            now=clock(),
+            comparator_settings=comparator_settings,
         )
     except LLMError as error:
         if not isinstance(error, LLMConfigError):
@@ -201,12 +226,11 @@ def _record_decision(
             _print(f"{artifact_id} is now failed in the Ledger; run it again to retry.", sys.stderr)
         raise
     draft = result.draft
-    attempts = f"{draft.attempts} attempt{'s' if draft.attempts != 1 else ''}"
     print(f"Run ID: {result.run_id}")
 
-    if not result.accepted:
+    if not draft.accepted:
         _print(
-            f"Rejected the draft from {artifact_id} after {attempts} "
+            f"Rejected the draft from {artifact_id} after {_attempts(draft.attempts)} "
             f"(prompt {draft.prompt_version}, thinking {settings.chat_thinking}); "
             "no record was written and the Ledger lists the rejected draft. "
             "Errors of the last attempt:",
@@ -214,18 +238,77 @@ def _record_decision(
         )
         for error in draft.errors:
             _print(f"- {error}", sys.stderr)
-        print(_billed(draft.usage))
+        print(_billed(result))
         return EXIT_REJECTED
 
     print(
-        f"Recorded {result.record_id} from {artifact_id} in {attempts} "
+        f"Drafted a decision from {artifact_id} in {_attempts(draft.attempts)} "
         f"(model {draft.model}, prompt {draft.prompt_version}, "
         f"thinking {settings.chat_thinking})"
     )
-    print(_billed(draft.usage))
+    comparison = result.comparison
+    if not comparison.compared:
+        print("No active decisions to compare with: recorded as new without a comparison.")
+    else:
+        candidates = ", ".join(
+            f"{candidate.record_id} ({candidate.score:.2f})" for candidate in comparison.candidates
+        )
+        print(
+            f"Compared with {_count(result.active_records, 'active decision')}; "
+            f"candidates: {candidates}"
+        )
+        if not comparison.accepted:
+            _print(
+                f"Rejected the comparison for {artifact_id} after "
+                f"{_attempts(comparison.attempts)} (prompt {comparison.prompt_version}); "
+                "no record was written and the Ledger lists the rejected draft. "
+                "Errors of the last attempt:",
+                sys.stderr,
+            )
+            for error in comparison.errors:
+                _print(f"- {error}", sys.stderr)
+            print(_billed(result))
+            return EXIT_REJECTED
+        target = f" of {comparison.target_id}" if comparison.target_id else ""
+        print(
+            f"Classified as {comparison.classification}{target} in "
+            f"{_attempts(comparison.attempts)} (prompt {comparison.prompt_version}): "
+            + " ".join(comparison.reason.split())
+        )
+
+    for line in _change_lines(result):
+        print(line)
+    print(_billed(result))
     print(f"Record: {result.record_path.as_posix()}")
     print(f"Index: {result.index_path.as_posix()}")
     return EXIT_OK
+
+
+def _change_lines(result: pipeline.RecordOutcome) -> list[str]:
+    record_id = result.record_id
+    if result.change == "new":
+        return [f"Recorded {record_id} as a new decision"]
+    if result.change == "supersession":
+        return [f"Recorded {record_id}, superseding {result.related_id} (now superseded)"]
+    if result.change == "reaffirmation":
+        added = _count(result.sources_added, "source")
+        return [f"Reaffirmed {record_id} (revision {result.revision}): added {added}"]
+    filled = f"filled {', '.join(result.filled)}" if result.filled else "no empty fields filled"
+    lines = [f"Updated {record_id} to revision {result.revision}: {filled}"]
+    if result.ignored:
+        lines.append(
+            f"Kept the existing {', '.join(result.ignored)} in {record_id} (the draft's "
+            "wording differs; a change of substance would be a supersession)"
+        )
+    return lines
+
+
+def _attempts(count: int) -> str:
+    return _count(count, "attempt")
+
+
+def _count(count: int, noun: str) -> str:
+    return f"{count} {noun}{'s' if count != 1 else ''}"
 
 
 def _release(args: argparse.Namespace, clock: Callable[[], datetime]) -> int:
@@ -261,13 +344,30 @@ def _ledger_line(entry: Mapping[str, Any]) -> str:
         last.get("error_type"),
     ]
     line = f"{entry['id']}  {entry['status']:<11}  {entry['title']}"
-    return line + "".join(f"  ({detail})" for detail in details if detail)
+    return line + "".join(f"  ({detail})" for detail in details + _changes(entry) if detail)
+
+
+def _changes(entry: Mapping[str, Any]) -> list[str]:
+    """One detail per produced record, for example ``update DEC-0002``."""
+    changes = []
+    for item in entry.get("produced", []):
+        change = f"{item.get('change', 'new')} {item['record_id']}"
+        if "related_id" in item:
+            change += f", superseding {item['related_id']}"
+        changes.append(change)
+    return changes
 
 
 def _views(args: argparse.Namespace) -> int:
     memory: Path = args.memory
     if not memory.is_dir():
         return _fail(f"Memory folder not found: {memory}", EXIT_USAGE)
+    problems = pipeline.supersession_link_problems(memory)
+    if problems:
+        _print("The decision log has an inconsistent supersession link:", sys.stderr)
+        for problem in problems:
+            _print(f"- {problem}", sys.stderr)
+        return _fail("No view was written or checked.", EXIT_USAGE)
     views_dir = (memory / VIEWS_FOLDER).as_posix()
     if args.check:
         differences = pipeline.check_decision_log_views(memory)
@@ -299,12 +399,50 @@ def _print_differences(
             _print(f"- {label}: {path}", stream)
 
 
-def _billed(usage: Sequence[Usage]) -> str:
-    def total(name: str) -> str:
-        values = [getattr(item, name) for item in usage if getattr(item, name) is not None]
-        return f"{sum(values):,}" if values else "not reported"
+def _billed(result: pipeline.RecordOutcome) -> str:
+    """Billed units per stage that ran; "not reported" when the provider reports none."""
 
-    return f"Billed tokens: {total('input_tokens')} input, {total('output_tokens')} output"
+    def total(usage: Sequence[Usage], name: str, label: str) -> str:
+        values = [getattr(item, name) for item in usage if getattr(item, name) is not None]
+        return f"{label} {sum(values):,}" if values else f"{label} not reported"
+
+    def reported(usage: Sequence[Usage], units: Sequence[tuple[str, str]]) -> str:
+        """Only the units the provider reports: Rerank v5 bills input tokens, older
+        models search units (tool feedback, 2026-10-25)."""
+        present = [
+            total(usage, name, label)
+            for name, label in units
+            if any(getattr(item, name) is not None for item in usage)
+        ]
+        return ", ".join(present) or "not reported"
+
+    stages = [
+        (
+            "draft",
+            total(result.draft.usage, "input_tokens", "input tokens")
+            + ", "
+            + total(result.draft.usage, "output_tokens", "output tokens"),
+        )
+    ]
+    comparison = result.comparison
+    if comparison is not None and comparison.compared:
+        stages += [
+            (
+                "comparison",
+                total(comparison.chat_usage, "input_tokens", "input tokens")
+                + ", "
+                + total(comparison.chat_usage, "output_tokens", "output tokens"),
+            ),
+            ("embed", total(comparison.embed_usage, "input_tokens", "input tokens")),
+            (
+                "rerank",
+                reported(
+                    comparison.rerank_usage,
+                    [("input_tokens", "input tokens"), ("search_units", "search units")],
+                ),
+            ),
+        ]
+    return "Billed: " + "; ".join(f"{stage} ({units})" for stage, units in stages)
 
 
 def _describe_os_error(error: OSError) -> str:

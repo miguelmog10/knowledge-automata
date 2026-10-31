@@ -5,3 +5,5 @@ Generated from the JSON records in `registers/decision-log/`. Do not edit this f
 | ID | Decision | Decided on | Status |
 |---|---|---|---|
 | [DEC-0001](decision-log/DEC-0001.md) | Build one Flutter app for iOS and Android | 2026-02-03 | active |
+| [DEC-0002](decision-log/DEC-0002.md) | Define batch status workflow | 2026-03-03 | superseded by [DEC-0003](decision-log/DEC-0003.md) |
+| [DEC-0003](decision-log/DEC-0003.md) | Replace single status ladder with crop-specific paths | 2026-04-28 | active |

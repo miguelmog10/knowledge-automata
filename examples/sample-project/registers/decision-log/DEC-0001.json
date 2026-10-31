@@ -3,9 +3,9 @@
   "register": "decision-log",
   "schema_version": "1.0",
   "record_status": "active",
-  "revision": 1,
+  "revision": 2,
   "created_at": "2026-10-26T11:32:48Z",
-  "updated_at": "2026-10-26T11:32:48Z",
+  "updated_at": "2026-10-31T15:25:42Z",
   "content": {
     "title": "Build one Flutter app for iOS and Android",
     "statement": "The board chose to build one Flutter app for iOS and Android, because a single codebase lets two developers ship the walkthrough count to both platforms at the same time.",
@@ -41,6 +41,24 @@
       "artifact_date": "2026-02-03",
       "excerpt": "Separate native apps were rejected for version 1.",
       "added_at": "2026-10-26T11:32:48Z"
+    },
+    {
+      "artifact_id": "ART-0003",
+      "artifact_date": "2026-03-17",
+      "excerpt": "Decision: the platform decision stands, and Tallyleaf stays one Flutter app for iOS and Android.",
+      "added_at": "2026-10-31T15:25:42Z"
+    },
+    {
+      "artifact_id": "ART-0003",
+      "artifact_date": "2026-03-17",
+      "excerpt": "Marc explained that the board chose one Flutter app for iOS and Android in February, and that nothing has changed since then.",
+      "added_at": "2026-10-31T15:25:42Z"
+    },
+    {
+      "artifact_id": "ART-0003",
+      "artifact_date": "2026-03-17",
+      "excerpt": "Sofia asked whether the team should write the iOS version natively in Swift, since she has more experience with it than with Flutter.",
+      "added_at": "2026-10-31T15:25:42Z"
     }
   ],
   "history": [
@@ -61,6 +79,14 @@
       ],
       "model": "command-a-plus-05-2026",
       "prompt_version": "decision-registrar.v1+registrar-retry.v1"
+    },
+    {
+      "revision": 2,
+      "at": "2026-10-31T15:25:42Z",
+      "change": "reaffirmation",
+      "artifact_id": "ART-0003",
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v1"
     }
   ]
 }

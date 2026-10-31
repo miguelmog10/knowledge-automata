@@ -9,8 +9,7 @@
   - Standard relative Markdown links only, no double-bracket wiki links: supersession linked both ways, each record linked to its source artifacts, and the index linked to each record, so the registers browse like a wiki.
   - A test renders fixture records against expected output, and a CI check fails if committed views differ from the generator's output (done for the decision log).
 - Governor (orchestrator and router): classification and work orders.
-- Comparator (reconciliation) using Embed and Rerank.
-- Risk Registrar, and the Decision Registrar's remaining write rules (update, reaffirmation, supersession).
+- Risk Registrar.
 - Fictional sample project in `examples/`, doubling as a small evaluation set with expected records.
 - CLI entry point to run the pipeline over a folder.
 - Release workflow that generates a CycloneDX SBOM and attaches it to the v0.1.0 tag.
@@ -30,8 +29,14 @@
 - Document versions: treat an artifact as a new version of an earlier one and process only what changed.
 - Format converters (PDF, Word) as a step before the Sensor; the Ledger hashes the original file and stores the extracted text that evidence is checked against.
 - Artifact Ledger Markdown view.
-- Reprocessing `processed` artifacts after a prompt change, with the Comparator.
-- Rerunning an artifact whose draft was rejected: it becomes `processed`, which is final, and the duplicate check blocks ingesting the same file again, so it stays stuck until reprocessing exists. A rerun is safe without the Comparator when nothing was produced (review of handoff 005).
+- Reprocessing an artifact that produced records, after a prompt change: needs a `correction` change that replaces content and keeps history (update, reaffirmation and supersession all misdescribe it), a way out of `processed`, and reruns in artifact date order.
+- Rerunning an artifact whose draft was rejected: done for artifacts that recorded nothing (handoff 006). `record-decision` runs them again from `processed` or `failed`, keeping the earlier rejected drafts.
+- Tune `KA_COMPARATOR_TOP_K` and `KA_COMPARATOR_TOP_N` on the evaluation set, and consider a minimum Rerank score below which candidates are dropped and the draft is classified as new without a Command call (saves calls, but a wrong threshold lets duplicates in).
+- Skip Embed when the register has no more active records than K (Rerank can read them all).
+- A cheap pre-check that skips drafting for obvious repeats, if reaffirmation drafts become a visible cost in the event log.
+- A git-ignored embedding cache next to the records, if the register grows large.
+- Automatic repair of an interrupted supersession.
+- Supersession of more than one record at once (`relations.supersedes` already allows a list).
 - Repair for a Ledger left behind its records by an interrupted run (today the pipeline detects it and stops).
 - Sensor relevance check and prompt-injection detection.
 - Oracle insight feedback loop: Operator-confirmed conclusions from Oracle conversations are saved as new raw artifacts ("insight notes") and re-enter through the Sensor, so there is still one write path.
@@ -58,15 +63,19 @@
 - Store the envelope version in each record before the first envelope change.
 - Probability-impact heat map in the risk register view.
 - Links across registers, for example a risk mitigated by a decision (a minor schema change).
-- Opt-in debug capture of prompts and responses to a git-ignored folder, for prompt tuning (never in the event log).
+- Opt-in debug capture of prompts and responses to a git-ignored folder, for prompt tuning (never in the event log). A throwaway version (`runtime/diagnostics/inspect_chat_reply.py`, handoff 006 Addendum A) found the thinking problem with four calls.
 - Plain-text `chat` in the service layer, when an agent needs it (for example the Oracle).
 - Budget guard: stop a run before it exceeds a call or cost limit (trial keys are capped).
 - Event log rotation or archiving, if the file grows large.
 - A small report that sums calls, units and cost per run, per agent and per artifact from the event log.
-- Thinking on versus off for the Registrars, measured on the evaluation set.
+- Record reasoning tokens in LLM events: Cohere reports them in `usage.tokens.reasoning_tokens` (seen in the handoff 006 Addendum A diagnostic), but the adapter and the event log do not keep them yet. Needed to measure a thinking token budget.
+- Thinking token budget (`token_budget`) for the Registrars and the Comparator, measured on the evaluation set. A smaller budget lowers cost (in the handoff 006 diagnostic, about 1,100 of 1,300 output tokens were reasoning), but if the model runs out of budget mid-reasoning the output may change: the reasoning could spill into the answer again and break the JSON, or the decisions could get worse. Test several budgets over several artifacts, checking that the JSON stays clean and the records stay correct, before lowering the default. This tests how reliable the answers are under different conditions, not only what they cost.
+- Retest thinking disabled after each model or SDK upgrade, with several artifacts and the real prompts (a spike, not one call). If the schema is enforced from the first token with thinking disabled, an accepted call could cost about a quarter of today's output tokens; `KA_CHAT_THINKING` switches it without a code change (ADR-0014).
 - Prompt v2 candidates for the Decision Registrar, judged on the evaluation set, not on one artifact:
   - `decided_by` listed everyone present instead of the group named in the decision ("the board").
   - `impacts` was a generic summary not supported by the artifact, although the prompt says to omit unsupported fields.
+  - Unsupported fields also block updates (handoff 006 real run): the `DEC-0002` draft from ART-0002 filled `rationale` and `alternatives` with content the meeting notes do not state, so when ART-0004 gave the real rationale and the alternative that was set aside, the update had no empty field to fill and kept the invented ones. ART-0004's quotes are in the sources, not in the content.
+  - One data point to test, not a conclusion: `DEC-0002` was drafted with thinking disabled and invented both fields; `DEC-0003`, drafted with thinking enabled, left out the alternatives the artifact does not give and named "the board" as `decided_by`. Compare invented fields with thinking on and off on the evaluation set.
 
 ### When collaborators join
 
@@ -87,9 +96,10 @@
 - Record finish_reason and the adapter's error message in LLM events: done, event schema 1.1 ([ADR-0012](../docs/decisions/0012-llm-service-layer-observation-and-cost.md), amended).
 - Keep artifact copies byte-identical on every checkout, for example a .gitattributes rule marking examples/*/artifacts/** as -text, so stored_path holds the original bytes and size_bytes matches the file.
 - Cohere's trial monthly cap: the docs give no exact wording for the 429 it returns, so the adapter marks a 429 as the monthly cap only when the message mentions "month" (`llm/cohere_adapter.py`). Confirm the wording the first time it happens.
-- Chat thinking default for the Registrars: decided for the Decision Registrar, thinking disabled unless `KA_CHAT_THINKING` is set ([ADR-0014](../docs/decisions/0014-registrar-drafting-loop.md)); revisited with the evaluation set (see *Later*).
+- Chat thinking default for the Registrars and the Comparator: decided, thinking enabled unless `KA_CHAT_THINKING` is set (amended 2026-10-31 after the handoff 006 real run, [ADR-0014](../docs/decisions/0014-registrar-drafting-loop.md)); the token budget is measured with the evaluation set (see *Later*).
 - Prices: Cohere's pricing page lists no per-token or per-search-unit prices for the configured models, so `prices.toml` has no model entries and events carry no `cost_usd`. Fill the table when prices are published, or record an official source.
 - Python 3.15: PyYAML (pulled in by the Cohere SDK through `tokenizers` and `huggingface-hub`) has no 3.15 wheel yet and builds from source. CI shows whether that works on Ubuntu; on Windows it needs a C compiler.
+- Embed input types for comparing records with records: the Comparator embeds records as documents and the draft as a query (the usual search setup); whether a symmetric input type compares decisions better is untested.
 
 ## Technical debt
 

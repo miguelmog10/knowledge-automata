@@ -77,7 +77,7 @@ def test_new_entry_matches_the_handoff_example_in_schema_key_order():
         "rejected",
         "history",
     ]
-    assert entry["schema_version"] == "1.0"
+    assert entry["schema_version"] == "1.1"
     assert entry["source"] == {"type": "file", "name": "pilot-review.md"}
     assert entry["created_at"] == "2026-10-28T14:00:00Z"
     assert entry["updated_at"] == "2026-10-28T14:00:20Z"
@@ -157,8 +157,8 @@ def test_transition_returns_a_new_entry_and_never_changes_the_input():
         ([("quarantined", "sensor"), ("accepted", "sensor")], "allowed: operator"),
         ([("accepted", "sensor"), ("processed", "sensor")], "allowed: governor, pipeline"),
         (
-            [("accepted", "sensor"), ("processed", "pipeline"), ("failed", "pipeline")],
-            "'processed' to 'failed'",
+            [("accepted", "sensor"), ("processed", "pipeline"), ("accepted", "operator")],
+            "'processed' to 'accepted'",
         ),
     ],
 )
@@ -176,6 +176,8 @@ def test_transitions_outside_the_table_or_by_the_wrong_owner_are_refused(steps, 
         [("accepted", "sensor"), ("failed", "pipeline"), ("failed", "governor")],
         [("accepted", "sensor"), ("failed", "pipeline"), ("processed", "pipeline")],
         [("quarantined", "sensor"), ("accepted", "operator"), ("processed", "pipeline")],
+        [("accepted", "sensor"), ("processed", "pipeline"), ("processed", "pipeline")],
+        [("accepted", "sensor"), ("processed", "pipeline"), ("failed", "pipeline")],
     ],
 )
 def test_every_allowed_path_is_accepted(path):
@@ -183,6 +185,45 @@ def test_every_allowed_path_is_accepted(path):
     for status, by in path:
         entry = transition(entry, to=status, by=by, at=NOW)
     assert entry["status"] == path[-1][0]
+
+
+@pytest.mark.parametrize("to", ["processed", "failed"])
+def test_a_processed_entry_that_lists_records_cannot_run_again(to):
+    with pytest.raises(LedgerError, match="already lists records"):
+        transition(processed(), to=to, by="pipeline", at=LATER, run_id=RUN_ID, error_type="X")
+
+
+def test_a_rerun_of_a_processed_entry_that_recorded_nothing_is_valid():
+    first = transition(accepted(), to="processed", by="pipeline", at=NOW, run_id=RUN_ID)
+    first = ledger.with_results(first, [], [{**REJECTED, "run_id": RUN_ID}])
+    second_run = "2c0f9b3d-5a4e-4d7c-8b2f-3e8a6f9d4c21"
+    rerun = transition(
+        first, to="processed", by="pipeline", at=LATER, run_id=second_run, reason="Rerun"
+    )
+    rerun = ledger.with_results(
+        rerun, [PRODUCED], [*first["rejected"], {**REJECTED, "run_id": second_run}]
+    )
+    assert errors_of(rerun) == ()
+    failed = transition(
+        first, to="failed", by="pipeline", at=LATER, run_id=second_run, error_type="X"
+    )
+    assert failed["rejected"] == first["rejected"]
+    assert errors_of(failed) == ()
+
+
+def test_a_transition_raises_the_schema_version_within_the_same_major():
+    entry = accepted()
+    entry["schema_version"] = "1.0"
+    assert errors_of(entry) == ()
+    assert (
+        transition(entry, to="failed", by="pipeline", at=LATER, run_id=RUN_ID, error_type="X")[
+            "schema_version"
+        ]
+        == ledger.SCHEMA_VERSION
+    )
+    entry["schema_version"] = "2.0"
+    with pytest.raises(LedgerError, match="is not a 1.x version"):
+        transition(entry, to="processed", by="pipeline", at=LATER, run_id=RUN_ID)
 
 
 def test_a_transition_cannot_go_back_in_time():
@@ -362,8 +403,149 @@ def test_results_are_empty_unless_processed():
     entry = ledger.with_results(accepted(), [PRODUCED], [REJECTED])
     assert errors_of(entry) == (
         "$.produced: must be empty unless the status is 'processed'",
-        "$.rejected: must be empty unless the status is 'processed'",
+        "$.rejected: must be empty unless the status is 'processed', or 'failed' after an "
+        "earlier 'processed' step",
     )
+    failed = transition(
+        accepted(), to="failed", by="pipeline", at=LATER, run_id=RUN_ID, error_type="X"
+    )
+    assert "$.rejected: must be empty" in "\n".join(
+        errors_of(ledger.with_results(failed, [], [REJECTED]))
+    )
+
+
+@pytest.mark.parametrize(
+    ("version", "message"),
+    [
+        ("1.0", None),
+        ("1.9", "$.schema_version: '1.9' is newer than this code's"),
+        ("2.0", "$.schema_version: '2.0' is not a 1.x version"),
+        ("0.9", "$.schema_version: '0.9' is not a 1.x version"),
+    ],
+)
+def test_the_schema_version_must_be_a_known_1x_version(version, message):
+    entry = accepted()
+    entry["schema_version"] = version
+    errors = errors_of(entry)
+    assert errors == () if message is None else message in "\n".join(errors)
+
+
+def comparison(*candidates):
+    return {
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-comparator.v1",
+        "attempts": 1,
+        "candidates": [{"record_id": record_id, "score": 0.9} for record_id in candidates],
+    }
+
+
+def with_produced(*items):
+    entry = transition(accepted(), to="processed", by="pipeline", at=LATER, run_id=RUN_ID)
+    return ledger.with_results(entry, list(items), [])
+
+
+def test_produced_items_with_a_change_code_and_comparison_are_valid_and_ordered():
+    items = [
+        {**PRODUCED, "change": "new"},
+        {**PRODUCED, "change": "update", "comparison": comparison("DEC-0002", "DEC-0001")},
+        {**PRODUCED, "record_id": "DEC-0001", "change": "reaffirmation"},
+        {
+            **PRODUCED,
+            "comparison": comparison("DEC-0001"),
+            "record_id": "DEC-0003",
+            "related_id": "DEC-0001",
+            "change": "supersession",
+        },
+    ]
+    entry = with_produced(*items)
+    assert errors_of(entry) == ()
+    assert list(entry["produced"][3]) == [
+        "register",
+        "record_id",
+        "change",
+        "related_id",
+        "model",
+        "prompt_version",
+        "schema_version",
+        "comparison",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("item", "message"),
+    [
+        (
+            {**PRODUCED, "change": "supersession"},
+            "$.produced[0]: a 'supersession' needs the related_id it superseded",
+        ),
+        (
+            {**PRODUCED, "change": "update", "related_id": "DEC-0001"},
+            "$.produced[0].related_id: only a 'supersession' has one",
+        ),
+        (
+            {**PRODUCED, "related_id": "DEC-0001"},
+            "$.produced[0].related_id: only a 'supersession' has one",
+        ),
+        (
+            {**PRODUCED, "change": "supersession", "related_id": "DEC-0002"},
+            "$.produced[0].related_id: a record cannot supersede itself",
+        ),
+        (
+            {**PRODUCED, "change": "update", "comparison": comparison("DEC-0001")},
+            "$.produced[0].comparison.candidates: the 'update' target 'DEC-0002' was not",
+        ),
+        (
+            {**PRODUCED, "change": "reaffirmation", "comparison": comparison("DEC-0001")},
+            "the 'reaffirmation' target 'DEC-0002' was not a candidate",
+        ),
+        (
+            {
+                **PRODUCED,
+                "record_id": "DEC-0003",
+                "change": "supersession",
+                "related_id": "DEC-0001",
+                "comparison": comparison("DEC-0002"),
+            },
+            "the 'supersession' target 'DEC-0001' was not a candidate",
+        ),
+    ],
+)
+def test_produced_items_must_name_a_consistent_target(item, message):
+    assert message in "\n".join(errors_of(with_produced(item)))
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        {**PRODUCED, "change": "merge"},
+        {**PRODUCED, "related_id": "DEC-1"},
+        {**PRODUCED, "comparison": {**comparison("DEC-0002"), "candidates": []}},
+        {**PRODUCED, "comparison": {**comparison("DEC-0002"), "attempts": 0}},
+        {**PRODUCED, "comparison": {**comparison("DEC-0002"), "scores": []}},
+    ],
+)
+def test_schema_rejects_bad_produced_items(item):
+    assert errors_of(with_produced(item))
+
+
+def test_a_rejected_item_names_its_stage_and_a_processed_run():
+    entry = transition(accepted(), to="processed", by="pipeline", at=LATER, run_id=RUN_ID)
+    item = {**REJECTED, "stage": "comparison", "run_id": RUN_ID}
+    stored = ledger.with_results(entry, [], [item])
+    assert errors_of(stored) == ()
+    assert list(stored["rejected"][0]) == [
+        "register",
+        "stage",
+        "attempts",
+        "prompt_version",
+        "error_paths",
+        "run_id",
+    ]
+    other = {**item, "run_id": "2c0f9b3d-5a4e-4d7c-8b2f-3e8a6f9d4c21"}
+    assert errors_of(ledger.with_results(entry, [], [other])) == (
+        "$.rejected[0].run_id: not the run_id of a 'processed' history entry",
+    )
+    assert errors_of(ledger.with_results(entry, [], [{**item, "stage": "review"}]))
 
 
 def test_same_name_as_lists_earlier_ids_in_ascending_order():

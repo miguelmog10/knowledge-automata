@@ -46,7 +46,7 @@ flowchart TB
   classDef planned fill:#e9e5de,stroke:#57524b,stroke-width:1.5px,stroke-dasharray:6 4,color:#57524b
   classDef focus fill:#e9e5de,stroke:#9c4426,stroke-width:3px,color:#22201d
   accTitle: Knowledge Automata system context
-  accDescr: A group writes artifacts. Its Operator runs Knowledge Automata, which turns the artifacts into validated records using Cohere Command and publishes Markdown views. Retrieval with Embed and Rerank and question answering are planned.
+  accDescr: A group writes artifacts. Its Operator runs Knowledge Automata, which turns the artifacts into validated records using Cohere Command, finds the related records with Embed and Rerank, and publishes Markdown views. Question answering is planned.
 
   subgraph group["The group, for example a project team"]
     members["Group members<br/>[Person]<br/>meet, chat, write documents,<br/>read the records"]:::built
@@ -60,7 +60,7 @@ flowchart TB
   artifacts -- "ingested from files" --> ka
   operator -- "runs ingest, record-decision, release" --> ka
   ka -- "drafts records with Command" --> cohere
-  ka -. "finds related records with Embed and Rerank" .-> cohere
+  ka -- "finds related records with Embed and Rerank" --> cohere
   ka -- "Markdown views" --> members
   ka -. "answers with citations" .-> members
 

@@ -131,20 +131,14 @@ def _render_page(record: Mapping[str, Any], artifact_links: Mapping[str, str]) -
     if related:
         section("Related decisions", "\n".join(related))
 
-    sources = []
-    for source in record["sources"]:
-        sources.append(blockquote(source["excerpt"]))
-        sources.append("")
-        sources.append(_source_line(view, source, artifact_links))
-        sources.append("")
-    lines.extend(["## Sources", "", *sources])
+    lines.extend(["## Sources", "", *_render_sources(view, record["sources"], artifact_links)])
 
     lines.extend(
         [
             "## History",
             "",
-            table_row(["Revision", "Date", "Change", "Artifact", "Model", "Prompt"]),
-            table_row(["---"] * 6).replace(" ", ""),
+            table_row(["Revision", "Date", "Change", "Details", "Artifact", "Model", "Prompt"]),
+            table_row(["---"] * 7).replace(" ", ""),
         ]
     )
     for entry in record["history"]:
@@ -154,6 +148,7 @@ def _render_page(record: Mapping[str, Any], artifact_links: Mapping[str, str]) -
                     str(entry["revision"]),
                     entry["at"],
                     entry["change"],
+                    _details(view, entry),
                     entry["artifact_id"],
                     inline(entry.get("model", "")),
                     inline(entry.get("prompt_version", "")),
@@ -163,12 +158,42 @@ def _render_page(record: Mapping[str, Any], artifact_links: Mapping[str, str]) -
     return "\n".join(lines) + "\n"
 
 
-def _source_line(view: str, source: Mapping[str, Any], artifact_links: Mapping[str, str]) -> str:
-    artifact_id = source["artifact_id"]
+def _render_sources(
+    view: str, sources: Sequence[Mapping[str, Any]], artifact_links: Mapping[str, str]
+) -> list[str]:
+    """One heading per artifact, in order of first appearance, then its quotes."""
+    groups: dict[str, list[Mapping[str, Any]]] = {}
+    for source in sources:
+        groups.setdefault(source["artifact_id"], []).append(source)
+    lines = []
+    for artifact_id, group in groups.items():
+        lines.extend([_source_heading(view, artifact_id, group, artifact_links), ""])
+        for source in group:
+            lines.extend([blockquote(source["excerpt"]), ""])
+    return lines
+
+
+def _source_heading(
+    view: str,
+    artifact_id: str,
+    group: Sequence[Mapping[str, Any]],
+    artifact_links: Mapping[str, str],
+) -> str:
     label = artifact_id
     if artifact_id in artifact_links:
         target = relative_link(f"{VIEWS_FOLDER}/{view}", artifact_links[artifact_id])
         label = f"[{artifact_id}]({target})"
-    if "artifact_date" in source:
-        return f"From {label}, {source['artifact_date']}."
-    return f"From {label}."
+    date = next((source["artifact_date"] for source in group if "artifact_date" in source), None)
+    return f"### {label}, {date}" if date else f"### {label}"
+
+
+def _details(view: str, entry: Mapping[str, Any]) -> str:
+    change = entry["change"]
+    if change == "update":
+        fields = entry.get("fields", [])
+        return f"Filled: {', '.join(fields)}" if fields else "No empty fields filled"
+    if change == "supersession" and "related_id" in entry:
+        return f"Supersedes {_page_link(view, entry['related_id'])}"
+    if change == "superseded" and "related_id" in entry:
+        return f"Superseded by {_page_link(view, entry['related_id'])}"
+    return ""

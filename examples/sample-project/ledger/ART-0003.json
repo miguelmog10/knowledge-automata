@@ -1,0 +1,80 @@
+{
+  "schema_version": "1.1",
+  "id": "ART-0003",
+  "title": "Tallyleaf tech sync",
+  "source": {
+    "type": "file",
+    "name": "tech-sync-2026-03-17.md"
+  },
+  "artifact_date": "2026-03-17",
+  "media_type": "text/markdown",
+  "size_bytes": 763,
+  "content_hash": "sha256:7098a5e4d00f97f7d162ae22a7f4abf3a32f13ab08cce110bd68c54da1b3787f",
+  "stored_path": "artifacts/ART-0003-tech-sync-2026-03-17.md",
+  "status": "processed",
+  "created_at": "2026-10-31T14:17:27Z",
+  "updated_at": "2026-10-31T15:25:42Z",
+  "produced": [
+    {
+      "register": "decision-log",
+      "record_id": "DEC-0001",
+      "change": "reaffirmation",
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v1",
+      "schema_version": "1.0",
+      "comparison": {
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-comparator.v1",
+        "attempts": 1,
+        "candidates": [
+          {
+            "record_id": "DEC-0001",
+            "score": 0.60708016
+          },
+          {
+            "record_id": "DEC-0002",
+            "score": 0.0017492998
+          }
+        ]
+      }
+    }
+  ],
+  "rejected": [
+    {
+      "register": "decision-log",
+      "stage": "draft",
+      "attempts": 2,
+      "prompt_version": "decision-registrar.v1+registrar-retry.v1",
+      "error_paths": [
+        "$"
+      ],
+      "error_type": "LLMResponseError",
+      "run_id": "bab2ba3b-fe45-4495-b631-8577f9cc51f1"
+    }
+  ],
+  "history": [
+    {
+      "at": "2026-10-31T14:17:27Z",
+      "status": "received",
+      "by": "sensor"
+    },
+    {
+      "at": "2026-10-31T14:17:27Z",
+      "status": "accepted",
+      "by": "sensor"
+    },
+    {
+      "at": "2026-10-31T14:18:39Z",
+      "status": "processed",
+      "by": "pipeline",
+      "run_id": "bab2ba3b-fe45-4495-b631-8577f9cc51f1"
+    },
+    {
+      "at": "2026-10-31T15:25:42Z",
+      "status": "processed",
+      "by": "pipeline",
+      "reason": "Rerun: the earlier run recorded nothing",
+      "run_id": "312c8736-68a7-46ef-ba81-4014a469f5c8"
+    }
+  ]
+}

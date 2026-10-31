@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:knowledge-automata:schema:core:ledger-entry:v1",
-  "x-version": "1.0",
+  "x-version": "1.1",
   "title": "Artifact Ledger entry",
   "description": "One artifact in the Artifact Ledger: what arrived, where its copy is, its status and an append-only history of every status change (ADR-0006, ADR-0015). Code owns every field. Never sent to an LLM provider.",
   "type": "object",
@@ -9,7 +9,7 @@
     "schema_version": {
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+$",
-      "description": "Version (MAJOR.MINOR) of this Ledger entry schema."
+      "description": "Version (MAJOR.MINOR) of this Ledger entry schema. A status change raises it to the current minor version of the same major."
     },
     "id": { "$ref": "#/$defs/artifact_id" },
     "title": {
@@ -74,12 +74,12 @@
     "produced": {
       "type": "array",
       "items": { "$ref": "#/$defs/produced_record" },
-      "description": "Records written from this artifact. Empty unless the status is processed."
+      "description": "Records written or revised from this artifact. Empty unless the status is processed."
     },
     "rejected": {
       "type": "array",
       "items": { "$ref": "#/$defs/rejected_draft" },
-      "description": "Drafts that failed validation. Empty unless the status is processed."
+      "description": "Drafts that failed validation or comparison, kept across reruns. Empty unless the status is processed, or failed after an earlier processed step."
     },
     "history": {
       "type": "array",
@@ -119,23 +119,68 @@
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
       "description": "UTC, YYYY-MM-DDTHH:MM:SSZ, as in records."
     },
+    "record_id": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}-[0-9]{4,}$"
+    },
     "produced_record": {
       "type": "object",
+      "description": "One record this artifact created or revised. model and prompt_version are the Registrar's draft.",
       "properties": {
         "register": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-        "record_id": { "type": "string", "pattern": "^[A-Z]{3}-[0-9]{4,}$" },
+        "record_id": {
+          "$ref": "#/$defs/record_id",
+          "description": "The record written: the new record for new and supersession, the revised record for update and reaffirmation."
+        },
+        "change": {
+          "enum": ["new", "update", "reaffirmation", "supersession"],
+          "description": "The change code applied. Absent in entries written before version 1.1, where it means new."
+        },
+        "related_id": {
+          "$ref": "#/$defs/record_id",
+          "description": "The record superseded. Present only for supersession."
+        },
         "model": { "type": "string", "minLength": 1 },
         "prompt_version": { "type": "string", "minLength": 1 },
-        "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" }
+        "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+        "comparison": {
+          "type": "object",
+          "description": "The Comparator (reconciliation) run that classified the draft. Absent when the register had no active record to compare with.",
+          "properties": {
+            "model": { "type": "string", "minLength": 1 },
+            "prompt_version": { "type": "string", "minLength": 1 },
+            "attempts": { "type": "integer", "minimum": 1 },
+            "candidates": {
+              "type": "array",
+              "minItems": 1,
+              "description": "The records the Comparator was shown, in Rerank order, with their Rerank relevance scores.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "record_id": { "$ref": "#/$defs/record_id" },
+                  "score": { "type": "number" }
+                },
+                "required": ["record_id", "score"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["model", "prompt_version", "attempts", "candidates"],
+          "additionalProperties": false
+        }
       },
       "required": ["register", "record_id", "model", "prompt_version", "schema_version"],
       "additionalProperties": false
     },
     "rejected_draft": {
       "type": "object",
-      "description": "A draft that failed validation, listed without its error messages: evidence errors quote the model's draft, which is unvalidated model text.",
+      "description": "A draft that failed validation or comparison, listed without its error messages: evidence errors quote the model's draft, which is unvalidated model text.",
       "properties": {
         "register": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "stage": {
+          "enum": ["draft", "comparison"],
+          "description": "Where the draft was rejected: by the Registrar's checks or by the Comparator's. Absent means draft."
+        },
         "attempts": { "type": "integer", "minimum": 1 },
         "prompt_version": { "type": "string", "minLength": 1 },
         "error_paths": {
@@ -150,6 +195,11 @@
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
           "maxLength": 100,
           "description": "Project exception class name, present when the last response was unusable, for example LLMResponseError."
+        },
+        "run_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "The run that rejected the draft; the run_id of a processed history entry."
         }
       },
       "required": ["register", "attempts", "prompt_version", "error_paths"],

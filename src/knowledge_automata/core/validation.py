@@ -16,6 +16,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from knowledge_automata.core.evidence import QuoteCheck, check_evidence
 from knowledge_automata.core.ledger import CHECK_OUTCOMES, STORED_COPY_STATUSES, TRANSITIONS
+from knowledge_automata.core.ledger import SCHEMA_VERSION as LEDGER_SCHEMA_VERSION
 from knowledge_automata.core.registers import RegisterSpec
 from knowledge_automata.core.schemas import (
     LEDGER_ENTRY_SCHEMA,
@@ -156,6 +157,49 @@ def validate_record(record: Any, spec: RegisterSpec) -> ValidationResult:
     return ValidationResult(tuple(errors))
 
 
+def revision_errors(old: Mapping[str, Any], new: Mapping[str, Any]) -> list[str]:
+    """Return why ``new`` is not the next revision of ``old`` (ADR-0013 amendment).
+
+    Both are assumed to be valid records. The next revision keeps the ID, register and
+    creation time, raises ``revision`` by one, appends exactly one history entry, keeps the
+    old sources as they are, and either stays ``active`` or goes from ``active`` to
+    ``superseded`` while gaining ``superseded_by``. ``relations.supersedes`` never changes.
+    """
+    errors = []
+    for field in ("id", "register", "created_at"):
+        if new.get(field) != old.get(field):
+            errors.append(f"$.{field}: a revision cannot change it")
+    if new.get("revision") != old["revision"] + 1:
+        errors.append(
+            f"$.revision: must be {old['revision'] + 1}, the next after {old['revision']}"
+        )
+    old_history, new_history = old["history"], new["history"]
+    if len(new_history) != len(old_history) + 1 or new_history[:-1] != old_history:
+        errors.append("$.history: must be the old history plus exactly one entry")
+    elif new["updated_at"] != new_history[-1]["at"]:
+        errors.append("$.updated_at: must match the new history entry's time")
+    if new["updated_at"] < old["updated_at"]:
+        errors.append("$.updated_at: earlier than the previous revision")
+    if new["sources"][: len(old["sources"])] != old["sources"]:
+        errors.append("$.sources: must start with the old sources unchanged")
+
+    old_status, new_status = old["record_status"], new["record_status"]
+    if old_status != "active":
+        errors.append(f"$.record_status: a {old_status!r} record cannot be revised")
+    elif new_status not in ("active", "superseded"):
+        errors.append(f"$.record_status: cannot go from 'active' to {new_status!r}")
+    old_relations, new_relations = old.get("relations", {}), new.get("relations", {})
+    if new_relations.get("supersedes") != old_relations.get("supersedes"):
+        errors.append("$.relations.supersedes: a revision cannot change it")
+    gained = "superseded_by" in new_relations and "superseded_by" not in old_relations
+    if gained != (old_status == "active" and new_status == "superseded"):
+        errors.append(
+            "$.relations.superseded_by: added only when the record goes from 'active' "
+            "to 'superseded'"
+        )
+    return errors
+
+
 def _evidence_errors(
     quotes: Iterable[tuple[int, str]], artifact_text: str
 ) -> tuple[list[str], tuple[QuoteCheck, ...]]:
@@ -281,6 +325,42 @@ def _sequence(artifact_id: str) -> int:
     return int(artifact_id.split("-", 1)[1])
 
 
+def _schema_version_errors(version: str) -> list[str]:
+    current = LEDGER_SCHEMA_VERSION
+    if major_version(version) != major_version(current):
+        return [f"$.schema_version: {version!r} is not a {major_version(current)}.x version"]
+    if int(version.split(".")[1]) > int(current.split(".")[1]):
+        return [f"$.schema_version: {version!r} is newer than this code's {current!r}"]
+    return []
+
+
+def _produced_errors(produced: list[dict[str, Any]]) -> list[str]:
+    errors = []
+    for index, item in enumerate(produced):
+        path = f"$.produced[{index}]"
+        change = item.get("change", "new")
+        related_id = item.get("related_id")
+        if change == "supersession" and related_id is None:
+            errors.append(f"{path}: a 'supersession' needs the related_id it superseded")
+        elif change != "supersession" and related_id is not None:
+            errors.append(f"{path}.related_id: only a 'supersession' has one")
+        if related_id is not None and related_id == item["record_id"]:
+            errors.append(f"{path}.related_id: a record cannot supersede itself")
+        comparison = item.get("comparison")
+        if comparison is None:
+            continue
+        shown = [candidate["record_id"] for candidate in comparison["candidates"]]
+        target = {"update": item["record_id"], "reaffirmation": item["record_id"]}.get(
+            change, related_id
+        )
+        if change != "new" and target is not None and target not in shown:
+            errors.append(
+                f"{path}.comparison.candidates: the {change!r} target {target!r} "
+                "was not a candidate"
+            )
+    return errors
+
+
 def validate_ledger_entry(entry: Any) -> ValidationResult:
     """Validate a stored Artifact Ledger entry: schema, history path and status rules (ADR-0015).
 
@@ -316,9 +396,22 @@ def validate_ledger_entry(entry: Any) -> ValidationResult:
         errors.append("$: media_type is required unless the format is unsupported")
 
     if status != "processed":
-        for field in ("produced", "rejected"):
-            if entry[field]:
-                errors.append(f"$.{field}: must be empty unless the status is 'processed'")
+        if entry["produced"]:
+            errors.append("$.produced: must be empty unless the status is 'processed'")
+        ran_before = any(step["status"] == "processed" for step in history[:-1])
+        if entry["rejected"] and not (status == "failed" and ran_before):
+            errors.append(
+                "$.rejected: must be empty unless the status is 'processed', or 'failed' "
+                "after an earlier 'processed' step"
+            )
+    errors.extend(_schema_version_errors(entry["schema_version"]))
+    errors.extend(_produced_errors(entry["produced"]))
+    run_ids = {step["run_id"] for step in history if step["status"] == "processed"}
+    for index, item in enumerate(entry["rejected"]):
+        if "run_id" in item and item["run_id"] not in run_ids:
+            errors.append(
+                f"$.rejected[{index}].run_id: not the run_id of a 'processed' history entry"
+            )
 
     same_name_as = entry.get("same_name_as")
     if same_name_as is not None:

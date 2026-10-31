@@ -9,13 +9,12 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from knowledge_automata.core.prompts import Prompt
+from knowledge_automata.core.prompts import ERRORS_PLACEHOLDER, Prompt, retry_system_text
 from knowledge_automata.core.registers import RegisterSpec
 from knowledge_automata.core.schemas import draft_schema
 from knowledge_automata.core.validation import validate_draft
 from knowledge_automata.llm import CallContext, ChatModel, LLMResponseError, Usage
 
-ERRORS_PLACEHOLDER = "{errors}"
 CLOSING_TAG = re.compile(r"</artifact", re.IGNORECASE)
 
 
@@ -64,10 +63,7 @@ def user_message(artifact_text: str) -> str:
 
 def retry_system_message(registrar: Registrar, errors: tuple[str, ...]) -> str:
     """The Registrar prompt, a blank line, then the retry prompt listing the errors."""
-    listed = "\n".join(f"- {error}" for error in errors)
-    # str.replace, not str.format: error messages contain braces.
-    retry = registrar.retry_prompt.text.replace(ERRORS_PLACEHOLDER, listed)
-    return registrar.prompt.text.rstrip("\n") + "\n\n" + retry
+    return retry_system_text(registrar.prompt, registrar.retry_prompt, errors)
 
 
 def check_artifact(artifact_text: str) -> None:

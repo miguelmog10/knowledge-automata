@@ -12,6 +12,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from knowledge_automata.core.ledger import SCHEMA_VERSION
+from knowledge_automata.core.schemas import major_version
 from knowledge_automata.core.validation import validate_ledger_entry
 from knowledge_automata.storage.json_files import write_json_atomic
 
@@ -111,8 +113,10 @@ class LedgerStore:
     def save_transition(self, old: dict[str, Any], new: dict[str, Any]) -> Path:
         """Replace ``old`` with ``new``, a later state of the same entry.
 
-        Refused unless the stored file still equals ``old`` (no lost update), ``new`` keeps
-        ``old``'s history unchanged and adds to it, and only status fields change.
+        Refused unless the stored file still equals ``old`` (no lost update), ``old`` lists
+        no records yet, ``new`` keeps ``old``'s history and rejected drafts unchanged and adds
+        to the history, and only status fields change. ``schema_version`` may change only to
+        the current version of the same major.
         """
         result = validate_ledger_entry(new)
         if not result.ok:
@@ -131,11 +135,23 @@ class LedgerStore:
             raise LedgerStoreError(
                 f"{artifact_id}: the new history must keep the old one unchanged and add to it"
             )
+        if old["status"] == "processed" and old["produced"]:
+            raise LedgerStoreError(
+                f"{artifact_id} already lists records; reprocessing it is not supported"
+            )
+        if new["rejected"][: len(old["rejected"])] != old["rejected"]:
+            raise LedgerStoreError(
+                f"{artifact_id}: the new rejected list must keep the old one unchanged"
+            )
         changed = {
             key
             for key in old.keys() | new.keys()
             if key not in _CHANGING_FIELDS and old.get(key) != new.get(key)
         }
+        if new["schema_version"] == SCHEMA_VERSION and major_version(
+            old["schema_version"]
+        ) == major_version(SCHEMA_VERSION):
+            changed.discard("schema_version")
         if changed:
             raise LedgerStoreError(
                 f"{artifact_id}: a status change cannot change {', '.join(sorted(changed))}"

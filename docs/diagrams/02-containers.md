@@ -46,7 +46,7 @@ flowchart LR
   classDef planned fill:#e9e5de,stroke:#57524b,stroke-width:1.5px,stroke-dasharray:6 4,color:#57524b
   classDef focus fill:#e9e5de,stroke:#9c4426,stroke-width:3px,color:#22201d
   accTitle: Knowledge Automata containers
-  accDescr: Knowledge Automata is one Python command-line app plus two file stores. Inside the app, a pipeline stand-in for the Governor runs the Sensor and the Decision Registrar and does every file write to the memory folder. Every model call goes through the LLM service layer to Cohere and is logged to the event log. The Governor, Comparator, Risk Registrar, Observer and Oracle are planned.
+  accDescr: Knowledge Automata is one Python command-line app plus two file stores. Inside the app, a pipeline stand-in for the Governor runs the Sensor, the Decision Registrar and the Comparator, and does every file write to the memory folder. Every model call goes through the LLM service layer to Cohere and is logged to the event log. The Governor, Risk Registrar, Observer and Oracle are planned.
 
   operator["Operator<br/>(human in the loop)<br/>[Person]"]:::built
 
@@ -57,7 +57,7 @@ flowchart LR
       decision["Decision Registrar<br/>(specialist record keeper)"]:::built
       risk["Risk Registrar<br/>(specialist record keeper)"]:::planned
       governor["Governor<br/>(orchestrator)"]:::planned
-      comparator["Comparator<br/>(reconciliation)"]:::planned
+      comparator["Comparator<br/>(reconciliation)"]:::built
       observer["Observer (quality control)<br/>Oracle (query interface)"]:::planned
     end
     subgraph llm["LLM service layer [Component]"]
@@ -79,12 +79,14 @@ flowchart LR
   operator -- "commands" --> pipeline
   pipeline -- "checks bytes" --> sensor
   pipeline -- "drafts" --> decision
+  pipeline -- "compares the draft" --> comparator
   pipeline -- "writes" --> memory
-  governor -. "work orders" .-> comparator
+  governor -. "work orders" .-> decision
   decision --> command
   risk -.-> command
-  comparator -.-> embed
-  comparator -.-> rerank
+  comparator --> embed
+  comparator --> rerank
+  comparator --> command
 
   comparator ~~~ observer
   llm -- "API calls" --> cohere

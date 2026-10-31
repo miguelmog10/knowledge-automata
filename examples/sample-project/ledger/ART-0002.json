@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.1",
+  "id": "ART-0002",
+  "title": "Tallyleaf greenhouse inventory app: project board meeting",
+  "source": {
+    "type": "file",
+    "name": "project-board-2026-03-03.md"
+  },
+  "artifact_date": "2026-03-03",
+  "media_type": "text/markdown",
+  "size_bytes": 1033,
+  "content_hash": "sha256:0019767adaf19de2820ee74fbe2db6fa9a52d1df6c6565f851d5c5085f96d4cd",
+  "stored_path": "artifacts/ART-0002-project-board-2026-03-03.md",
+  "status": "processed",
+  "created_at": "2026-10-31T14:17:26Z",
+  "updated_at": "2026-10-31T14:17:36Z",
+  "produced": [
+    {
+      "register": "decision-log",
+      "record_id": "DEC-0002",
+      "change": "new",
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v1+registrar-retry.v1",
+      "schema_version": "1.0",
+      "comparison": {
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-comparator.v1+comparator-retry.v1",
+        "attempts": 2,
+        "candidates": [
+          {
+            "record_id": "DEC-0001",
+            "score": 0.021867545
+          }
+        ]
+      }
+    }
+  ],
+  "rejected": [],
+  "history": [
+    {
+      "at": "2026-10-31T14:17:26Z",
+      "status": "received",
+      "by": "sensor"
+    },
+    {
+      "at": "2026-10-31T14:17:26Z",
+      "status": "accepted",
+      "by": "sensor"
+    },
+    {
+      "at": "2026-10-31T14:17:36Z",
+      "status": "processed",
+      "by": "pipeline",
+      "run_id": "620095ee-ccda-41af-964e-4efdd5640040"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "id": "DEC-0001",
+  "register": "decision-log",
+  "schema_version": "1.0",
+  "record_status": "superseded",
+  "revision": 2,
+  "created_at": "2026-10-26T14:03:12Z",
+  "updated_at": "2026-10-27T09:15:00Z",
+  "content": {
+    "title": "Pilot at Paul’s greenhouse",
+    "statement": "Use Paul’s greenhouse for the pilot.",
+    "alternatives": [
+      "Use the city greenhouse"
+    ]
+  },
+  "sources": [
+    {
+      "artifact_id": "ART-0007",
+      "artifact_date": "2026-02-03",
+      "excerpt": "the pilot runs at Paul’s greenhouse",
+      "added_at": "2026-10-26T14:03:12Z"
+    }
+  ],
+  "relations": {
+    "superseded_by": "DEC-0002"
+  },
+  "history": [
+    {
+      "revision": 1,
+      "at": "2026-10-26T14:03:12Z",
+      "change": "new",
+      "artifact_id": "ART-0007",
+      "fields": [
+        "title",
+        "statement",
+        "alternatives"
+      ],
+      "model": "fake-chat",
+      "prompt_version": "decision-registrar.v1"
+    },
+    {
+      "revision": 2,
+      "at": "2026-10-27T09:15:00Z",
+      "change": "superseded",
+      "artifact_id": "ART-0008",
+      "related_id": "DEC-0002"
+    }
+  ]
+}

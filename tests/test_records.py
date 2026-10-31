@@ -1,13 +1,22 @@
+import json
 from datetime import UTC, datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 
-from knowledge_automata.core.records import format_timestamp, new_record
+from knowledge_automata.core.records import (
+    format_timestamp,
+    history_entry,
+    new_record,
+    new_sources,
+)
 from knowledge_automata.core.schemas import RECORD_SCHEMA, load_schema
 from knowledge_automata.core.validation import validate_record
 from knowledge_automata.domains.project_management.registers import DECISION_LOG
+from knowledge_automata.storage.json_files import format_json
 
 NOW = datetime(2026, 10, 26, 14, 3, 12, 987654, tzinfo=UTC)
+SAMPLE = Path(__file__).parent.parent / "examples" / "sample-project"
 
 
 def build(decision_draft, **overrides):
@@ -105,3 +114,86 @@ def test_new_record_does_not_modify_the_draft(decision_draft):
     original = {"statement": "S", "title": "T"}
     build({"content": original, "evidence": ["q"]})
     assert list(original) == ["statement", "title"]
+
+
+def test_the_sample_decision_is_rebuilt_byte_for_byte():
+    # DEC-0001 as the handoff 004 real run wrote it. Later runs revise the sample record
+    # (handoff 006 reaffirmed it), so its first revision is kept as a fixture.
+    path = Path(__file__).parent / "fixtures" / "sample-DEC-0001.revision-1.json"
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    entry = stored["history"][0]
+    rebuilt = new_record(
+        spec=DECISION_LOG,
+        record_id=stored["id"],
+        content=stored["content"],
+        quotes=[source["excerpt"] for source in stored["sources"]],
+        artifact_id=entry["artifact_id"],
+        artifact_date=stored["sources"][0]["artifact_date"],
+        model=entry["model"],
+        prompt_version=entry["prompt_version"],
+        now=datetime.fromisoformat(stored["created_at"]),
+    )
+    expected = path.read_bytes().replace(b"\r\n", b"\n")
+    assert format_json(rebuilt).encode("utf-8") == expected
+
+
+def test_the_sample_decision_keeps_its_first_revision():
+    first = json.loads(
+        (Path(__file__).parent / "fixtures" / "sample-DEC-0001.revision-1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    path = SAMPLE / "registers" / "decision-log" / "DEC-0001.json"
+    current = json.loads(path.read_text(encoding="utf-8"))
+    assert current["created_at"] == first["created_at"]
+    assert current["history"][0] == first["history"][0]
+    assert current["sources"][: len(first["sources"])] == first["sources"]
+
+
+def test_a_superseding_record_links_to_its_target(decision_draft):
+    record = build(
+        decision_draft, record_id="DEC-0003", change="supersession", supersedes="DEC-0002"
+    )
+    assert record["relations"] == {"supersedes": ["DEC-0002"]}
+    assert list(record)[-2:] == ["relations", "history"]
+    assert record["history"][0]["change"] == "supersession"
+    assert list(record["history"][0]) == [
+        "revision",
+        "at",
+        "change",
+        "artifact_id",
+        "fields",
+        "related_id",
+        "model",
+        "prompt_version",
+    ]
+    assert record["history"][0]["related_id"] == "DEC-0002"
+    assert validate_record(record, DECISION_LOG).ok
+
+
+def test_history_entry_leaves_out_what_is_not_given():
+    assert history_entry(
+        revision=2,
+        timestamp="2026-10-27T09:15:00Z",
+        change="superseded",
+        artifact_id="ART-0002",
+        related_id="DEC-0003",
+    ) == {
+        "revision": 2,
+        "at": "2026-10-27T09:15:00Z",
+        "change": "superseded",
+        "artifact_id": "ART-0002",
+        "related_id": "DEC-0003",
+    }
+    entry = history_entry(
+        revision=2, timestamp="t", change="update", artifact_id="ART-0002", fields=[]
+    )
+    assert entry["fields"] == []
+
+
+def test_new_sources_follow_the_schema_order():
+    sources = new_sources(["a", "b"], artifact_id="ART-0002", artifact_date=None, timestamp="t")
+    assert sources == [
+        {"artifact_id": "ART-0002", "excerpt": "a", "added_at": "t"},
+        {"artifact_id": "ART-0002", "excerpt": "b", "added_at": "t"},
+    ]

@@ -206,3 +206,38 @@ Evidence: `tests/test_registrar.py` (`test_agents_do_not_touch_storage_or_the_pr
 
 Before choosing a diagram format, Claude rendered the drafts on GitHub's light and dark backgrounds and checked the mise-en-place diagram on github.com. Native Mermaid C4 was ruled out on evidence (no dashed lines, no legend, unreadable labels in dark mode), and the check found that the style guide's Mermaid font setting was silently ignored. Both findings went to the style guide brief instead of into the diagrams as workarounds.
 Evidence: `docs/diagrams/README.md`, `dev/tool-feedback.md`.
+
+### 2026-10-30: P3 Plan continuously, adapt relentlessly (product)
+
+The architecture had the Comparator (reconciliation) compare a summary from the Governor (orchestrator) before the Registrar (specialist record keeper) drafted. While designing handoff 006, Miguel and Claude reversed the order: the Registrar drafts, code checks the evidence quotes, and only then does the Comparator compare. It is recorded as the intended design, not a workaround for the missing Governor, because the Comparator should only judge content already grounded in the artifact. The cost, an extra draft whenever a meeting only restates a decision, was accepted on purpose and is measurable from the event log.
+Evidence: `dev/handoffs/006-comparator.md` (section 1, decision 2), ADR-0017.
+
+### 2026-10-30: P10 Distrust the happy path (product)
+
+A supersession changes two record files, and there is no transaction across files. The handoff orders the writes so that a crash leaves a state that is safe and easy to spot: the new record is written first, pointing back to the old one, and only then is the old record marked superseded. A stop in between leaves a new record whose target is still active, which code detects before any model call; the reverse order would leave a link to a record that does not exist. During the design Miguel called this atomic; Claude corrected the term: each write is atomic, the pair is not, and the order is what makes it crash consistent.
+Evidence: `dev/handoffs/006-comparator.md` (section 3.5).
+
+### 2026-10-30: P11 Build evidence, not just confidence (teamwork)
+
+Claude proposed sending the top 3 Rerank candidates to Command. Miguel asked what makes 3 the right number, for example when five candidates score about the same. Nothing did: it was a starting value. It became two settings instead of constants, the candidates' Rerank scores are now recorded in the Artifact Ledger, and tuning both numbers (and perhaps a minimum score) on the evaluation set went to the backlog.
+Evidence: `dev/handoffs/006-comparator.md` (section 1, decision 4; section 8.6).
+
+### 2026-10-30: P10 Distrust the happy path (product)
+
+Handoff 006 allowed a rerun from `processed` to `processed`, but planning against the existing Ledger rules found two cases the handoff did not cover: a rerun that hits a provider error (`processed` to `failed`), and the rejected drafts of the earlier run, which a `failed` entry could not hold. Miguel decided both before any code was written: `processed` to `failed` is allowed only when nothing was produced, and a failed entry keeps rejected drafts only from an earlier `processed` step. The tests cover the full path from a rejected draft, through a failed rerun, to success, with the first rejection still listed at the end.
+Evidence: `src/knowledge_automata/core/ledger.py` (`TRANSITIONS`), `tests/test_record_decision.py` (`test_rejected_drafts_accumulate_and_survive_a_failed_rerun`), ADR-0015 (amended 2026-10-30).
+
+### 2026-10-30: P16 Reuse what compounds, delete what doesn't (product)
+
+A supersession creates a new record exactly as a new decision does, plus one relation and a different history change. Instead of a second record builder, the existing `new_record` gained two optional arguments, and a test rebuilds the committed sample record `DEC-0001` and compares it byte for byte, so the refactor could not change what the first slice writes.
+Evidence: `src/knowledge_automata/core/records.py` (`new_record`), `tests/test_records.py` (`test_the_sample_decision_is_rebuilt_byte_for_byte`).
+
+### 2026-10-31: P11 Build evidence, not just confidence (product)
+
+ADR-0014 disabled thinking to save output tokens, based on one smoke-check artifact. The first real run with several artifacts disproved it: most first attempts failed as invalid JSON after about as many tokens as thinking uses. The run stopped as its rules said, instead of retrying into the budget, and one throwaway diagnostic that printed the raw reply structure (four calls, nothing logged or committed) showed the cause: with thinking off, the model reasons in the visible answer. The default changed on that evidence, and the failed partial run stays committed as part of the record.
+Evidence: `dev/handoffs/006-comparator.md` (Addendum A), ADR-0014 (amended 2026-10-31), `dev/tool-feedback.md`.
+
+### 2026-10-31: P11 Build evidence, not just confidence (teamwork)
+
+Talking the thinking failure through by voice, Miguel noted that working alone he would have spiked the provider's behavior first: small throwaway scripts, outside the project, that try thinking on and off and look at the raw replies. The team had done a spike (the handoff 003 smoke check), but with one artifact and a one-line prompt, and moving fast it treated one clean result as settled. The lesson for the next provider behavior a design depends on: spike it with several inputs and the real prompts before building on it. The throwaway diagnostic from handoff 006 Addendum A is the template.
+Evidence: `scripts/cohere_smoke.py`, `dev/handoffs/006-comparator.md` (Addendum A), `dev/tool-feedback.md` (2026-10-31).

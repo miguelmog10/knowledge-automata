@@ -14,7 +14,8 @@ from knowledge_automata.core.records import format_timestamp, order_like_schema
 from knowledge_automata.core.schemas import LEDGER_ENTRY_SCHEMA, load_schema
 
 STATUSES = ("received", "accepted", "quarantined", "rejected", "processed", "failed")
-FINAL_STATUSES = frozenset({"rejected", "processed"})
+# rejected is always final; processed is final once it lists a record (ADR-0015).
+FINAL_STATUSES = frozenset({"rejected"})
 STORED_COPY_STATUSES = frozenset({"accepted", "quarantined", "processed", "failed"})
 ACTORS = ("sensor", "operator", "pipeline", "governor")
 # Copies live in <memory>/artifacts/; stored_path is relative to the memory folder.
@@ -33,6 +34,9 @@ TRANSITIONS: dict[tuple[str | None, str], frozenset[str]] = {
     ("accepted", "failed"): _PIPELINE,
     ("failed", "processed"): _PIPELINE,
     ("failed", "failed"): _PIPELINE,
+    # A rerun of an artifact whose earlier run recorded nothing (refused once it produced).
+    ("processed", "processed"): _PIPELINE,
+    ("processed", "failed"): _PIPELINE,
 }
 
 # Each Sensor check decides one outcome.
@@ -49,6 +53,10 @@ SCHEMA_VERSION = load_schema(LEDGER_ENTRY_SCHEMA)["x-version"]
 
 class LedgerError(Exception):
     """A status change that the transition rules do not allow."""
+
+
+def _major(version: str) -> str:
+    return version.split(".", 1)[0]
 
 
 def _schema() -> dict[str, Any]:
@@ -132,8 +140,10 @@ def transition(
 ) -> dict[str, Any]:
     """Return a copy of ``entry`` with one history entry appended and the status updated.
 
+    The copy's ``schema_version`` is raised to the current minor version of the same major.
     Raises ``LedgerError`` for a change that is not in the transition table, the wrong
-    owner, or a time earlier than the last history entry.
+    owner, a rerun of a ``processed`` entry that already lists records, an entry of another
+    major schema version, or a time earlier than the last history entry.
     """
     current = entry["status"]
     owners = TRANSITIONS.get((current, to))
@@ -144,11 +154,23 @@ def transition(
             f"{entry['id']}: {by!r} cannot change status from {current!r} to {to!r} "
             f"(allowed: {', '.join(sorted(owners))})"
         )
+    if current == "processed" and entry["produced"]:
+        raise LedgerError(
+            f"{entry['id']}: cannot change status from 'processed' to {to!r}: it already "
+            "lists records, and reprocessing an artifact that produced records is not "
+            "supported"
+        )
+    if _major(entry["schema_version"]) != _major(SCHEMA_VERSION):
+        raise LedgerError(
+            f"{entry['id']}: schema version {entry['schema_version']!r} is not a "
+            f"{_major(SCHEMA_VERSION)}.x version"
+        )
     timestamp = format_timestamp(at)
     if timestamp < entry["history"][-1]["at"]:
         raise LedgerError(f"{entry['id']}: {timestamp} is earlier than the last history entry")
 
     updated = copy.deepcopy(dict(entry))
+    updated["schema_version"] = SCHEMA_VERSION
     updated["history"].append(
         _history_entry(
             at=timestamp,
@@ -172,7 +194,8 @@ def with_results(
 ) -> dict[str, Any]:
     """Return a copy of ``entry`` with ``produced`` and ``rejected`` set, keys in schema order.
 
-    Used together with the ``processed`` transition.
+    Used together with the ``processed`` transition. On a rerun the caller passes the
+    earlier rejected drafts too, so they are never lost.
     """
     updated = copy.deepcopy(dict(entry))
     updated["produced"] = [

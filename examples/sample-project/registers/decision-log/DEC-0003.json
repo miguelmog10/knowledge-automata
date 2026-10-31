@@ -1,0 +1,71 @@
+{
+  "id": "DEC-0003",
+  "register": "decision-log",
+  "schema_version": "1.0",
+  "record_status": "active",
+  "revision": 1,
+  "created_at": "2026-10-31T15:40:42Z",
+  "updated_at": "2026-10-31T15:40:42Z",
+  "content": {
+    "title": "Replace single status ladder with crop-specific paths",
+    "statement": "The board replaced the single status ladder with one status path per crop type.",
+    "context": "The existing status ladder did not fit growers' workflow, causing unnecessary steps and incorrect batch statuses.",
+    "rationale": "To match each crop type’s actual process: seed-grown crops keep the full ladder, rooted cuttings start at growing, and bought-in finished plants start at ready, while discarded remains available at any step.",
+    "decided_by": [
+      "board"
+    ],
+    "decided_on": "2026-04-28",
+    "impacts": "Requires Aisha to redesign the status picker and Marc to add a crop type field and migrate existing batches; improves accuracy and reduces unnecessary steps for growers."
+  },
+  "sources": [
+    {
+      "artifact_id": "ART-0005",
+      "artifact_date": "2026-04-28",
+      "excerpt": "Decision: the board replaced the single status ladder with one status path per crop type.",
+      "added_at": "2026-10-31T15:40:42Z"
+    },
+    {
+      "artifact_id": "ART-0005",
+      "artifact_date": "2026-04-28",
+      "excerpt": "Growers had to tap through statuses that never happened, and Paul found 41 batches with the wrong status after the first two weeks.",
+      "added_at": "2026-10-31T15:40:42Z"
+    },
+    {
+      "artifact_id": "ART-0005",
+      "artifact_date": "2026-04-28",
+      "excerpt": "Seed-grown crops keep the full ladder, rooted cuttings start at growing, and bought-in finished plants start at ready.",
+      "added_at": "2026-10-31T15:40:42Z"
+    },
+    {
+      "artifact_id": "ART-0005",
+      "artifact_date": "2026-04-28",
+      "excerpt": "Discarded stays available at any step.",
+      "added_at": "2026-10-31T15:40:42Z"
+    }
+  ],
+  "relations": {
+    "supersedes": [
+      "DEC-0002"
+    ]
+  },
+  "history": [
+    {
+      "revision": 1,
+      "at": "2026-10-31T15:40:42Z",
+      "change": "supersession",
+      "artifact_id": "ART-0005",
+      "fields": [
+        "title",
+        "statement",
+        "context",
+        "rationale",
+        "decided_by",
+        "decided_on",
+        "impacts"
+      ],
+      "related_id": "DEC-0002",
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v1"
+    }
+  ]
+}

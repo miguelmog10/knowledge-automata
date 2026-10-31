@@ -119,3 +119,8 @@ class RerankModel(Protocol):
     def rerank(
         self, query: str, documents: Sequence[str], *, top_n: int, context: CallContext
     ) -> RerankResult: ...
+
+
+@runtime_checkable
+class LanguageModel(ChatModel, EmbeddingModel, RerankModel, Protocol):
+    """Chat, embeddings and reranking together, as the Comparator (reconciliation) needs."""

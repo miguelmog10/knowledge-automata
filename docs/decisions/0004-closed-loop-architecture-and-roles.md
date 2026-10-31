@@ -1,6 +1,6 @@
 # 0004. Closed-loop architecture and role names
 
-- **Status:** Accepted
+- **Status:** Accepted (amended 2026-10-30: the Comparator reconciles checked drafts, ADR-0017)
 - **Date:** 2026-10-24
 
 ## Context
@@ -23,4 +23,4 @@ Adopt the roles described in [docs/architecture.md](../architecture.md), themed 
 
 - Names are systems-oriented and general purpose, not tied to one domain.
 - Every themed name is paired with its plain role in docs and docstrings, so readers do not need to learn the theme first.
-- The Comparator gives Registrars context of existing records before anything is written, which prevents duplicates by design.
+- The Comparator reconciles each checked draft with existing records before anything is written, which prevents duplicates by design ([ADR-0017](0017-comparator-reconciliation.md)).
