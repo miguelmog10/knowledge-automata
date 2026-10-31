@@ -4,7 +4,7 @@ Exit codes: 0 success; 1 draft or comparison rejected, artifact quarantined or r
 release refused, or views differ under ``--check``; 2 usage, configuration or file problem;
 3 provider error. Output never includes the settings, the API key, prompts or artifact text
 (the title excepted). ``record-decision`` prints the Comparator's reason, which is model
-output, so the reader sees why a draft was classified as it was.
+output, so the reader sees why a draft was classified as it was. Output is UTF-8.
 """
 
 import argparse
@@ -52,6 +52,18 @@ _USAGE_ERRORS = (
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def _write_utf8() -> None:
+    """Write output as UTF-8, like every other file the project writes.
+
+    On Windows, Python encodes piped output as cp1252, so printing model output (the
+    Comparator's reason) could crash after a run had already written its records.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -138,6 +150,7 @@ def main(
     build: Callable[[LLMSettings], LanguageModel] = build_llm,
     clock: Callable[[], datetime] = utc_now,
 ) -> int:
+    _write_utf8()
     try:
         args = _parser().parse_args(argv)
     except SystemExit as exit_:

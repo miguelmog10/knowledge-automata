@@ -1,8 +1,10 @@
 """record-decision with the Comparator (reconciliation), end to end in a temporary folder."""
 
 import dataclasses
+import io
 import itertools
 import json
+import sys
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -586,6 +588,22 @@ def test_the_billing_line_shows_the_units_rerank_reports(memory, clock, capsys, 
         line for line in capsys.readouterr().out.splitlines() if line.startswith("Billed")
     )
     assert billed.endswith(expected)
+
+
+def test_a_reason_cp1252_cannot_encode_prints_as_utf8(memory, clock, monkeypatch):
+    assert record(FakeBuild(FLUTTER), clock, memory, "ART-0001") == 0
+    out = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+    err = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+    monkeypatch.setattr(sys, "stdout", out)
+    monkeypatch.setattr(sys, "stderr", err)
+    reason = "A non\u2011breaking hyphen and \u2192 an arrow."
+    build = FakeBuild(LADDER, answer("new", reason=reason))
+    assert record(build, clock, memory, "ART-0002") == 0
+    out.flush()
+    printed = out.buffer.getvalue().decode("utf-8")
+    assert f"(prompt decision-comparator.v1): {reason}" in printed
+    assert "Recorded DEC-0002 as a new decision" in printed
+    assert out.encoding == err.encoding == "utf-8"
 
 
 class MixedDimensions(ScoredLLM):

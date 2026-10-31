@@ -202,3 +202,8 @@ Suggested improvement: enforce the schema from the first token whatever the thin
 
 Note: the copy button on a Copilot answer copies the model's reasoning together with the answer, so Miguel removes the reasoning by hand before pasting a report into the Claude chat. It is not certain whether this behavior is new. It mirrors the Command A+ finding of the same day: reasoning and answer are kept apart inside the tool, then merged at a boundary, and whatever takes the text next has to clean it up.
 Suggested improvement: offer copy with and without the reasoning.
+
+### 2026-10-31: Python on Windows, piped output (confusing)
+
+Note: when its output is piped (captured by a terminal tool or redirected), Python on Windows encodes `sys.stdout` as cp1252, not UTF-8; only an interactive console gets UTF-8. In the handoff 006 real run, `record-decision ART-0004` crashed with `UnicodeEncodeError` while printing the Comparator's reason, which contained U+2011 (a non-breaking hyphen), a character the console shows fine. The records and the Ledger had already been written, but the rest of the output was lost, including the reason, which is not stored anywhere. The CLI now reconfigures stdout and stderr to UTF-8 at start.
+Suggested improvement: Python's UTF-8 mode avoids it; PEP 686 makes it the default from Python 3.15, and earlier versions need `PYTHONUTF8=1` (this run used 3.12). For us, any CLI that prints model output sets its streams to UTF-8 itself.
