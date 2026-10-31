@@ -196,7 +196,7 @@ Understanding an artifact, drafting a record and judging how it relates to exist
 |---|---|---|---|
 | Sensor | Intake and input guardrail | Validates, hashes, normalizes and logs incoming artifacts in the Artifact Ledger; quarantines invalid or suspicious input | Yes (deterministic checks only) |
 | Governor | Orchestrator and router | Analyzes an accepted artifact and issues work orders to the relevant Registrars; marks artifacts processed or failed | Yes |
-| Comparator | Reconciliation | Before anything is written, retrieves related existing records (Embed + Rerank) and classifies the input as new, update, reaffirmation or supersession | Yes |
+| Comparator | Reconciliation | Compares each validated draft with related active records (Embed, then Rerank) and classifies it as new, update, reaffirmation or supersession; code checks the proposal before anything is written | Yes (built for the decision log) |
 | Registrars | Specialist record keepers | One per register; drafts structured records that code validates, assigns IDs to and stores | Decision and Risk |
 | Observer | Quality control | Periodic health and cross-register consistency checks | Later |
 | Oracle | Query interface | Answers questions over the registers with citations to records and source artifacts | Stretch |
@@ -206,11 +206,11 @@ Understanding an artifact, drafting a record and judging how it relates to exist
 
 1. **Sensor (intake):** the artifact arrives. The Sensor checks it, hashes it and records it in the Artifact Ledger as accepted, quarantined or rejected. If accepted, it normalizes the text and adds metadata. Its checks are deterministic (format, empty, encoding, size, delimiter), and accepted and quarantined artifacts are kept as read-only copies ([ADR-0015](decisions/0015-artifact-ledger-storage-and-sensor-checks.md)).
 2. **Governor (orchestrator):** reads the artifact, identifies its content (for example two decisions and one risk) and sends work orders to the Decision and Risk Registrars.
-3. **Comparator (reconciliation):** for each work order, retrieves related existing records and proposes a classification (new, update, reaffirmation or supersession) and a target record. Code checks the proposal before anything is written.
-4. **Registrars (specialist record keepers):** draft records as structured data, with evidence quotes from the artifact. Code checks the evidence quotes, validates the draft against the schema, assigns the ID and stores the record. A rejected draft affects only that record. Independent Registrars can run in parallel. All Registrars share one drafting loop: an invalid draft gets one retry with its validation errors, and if the retry fails too, the record is rejected and nothing is written ([ADR-0014](decisions/0014-registrar-drafting-loop.md)).
+3. **Registrars (specialist record keepers):** for each work order, draft records as structured data, with evidence quotes from the artifact. Code checks the evidence quotes and validates the draft against the schema. A rejected draft affects only that record. Independent Registrars can run in parallel. All Registrars share one drafting loop: an invalid draft gets one retry with its validation errors, and if the retry fails too, the record is rejected and nothing is written ([ADR-0014](decisions/0014-registrar-drafting-loop.md)).
+4. **Comparator (reconciliation):** for each checked draft, retrieves related active records in the same register (Embed ranks them, Rerank reorders the closest) and proposes a classification (new, update, reaffirmation or supersession) and a target record. Code checks the proposal, with one retry as in the drafting loop, then assigns the ID of any new record and applies the write rule. This order is deliberate: the Comparator only judges content that code has already grounded in the artifact ([ADR-0017](decisions/0017-comparator-reconciliation.md)).
 5. **Governor:** marks the artifact as processed in the Ledger, listing the records it produced.
 
-The Sensor and the Artifact Ledger run since handoff 005: `knowledge-automata ingest` is step 1, and `knowledge-automata record-decision` runs step 4 for the decision log on an accepted artifact. Steps 2 and 3 are still skipped, so every record is `new` until the Comparator exists, and a pipeline stand-in for the Governor sets `processed` and `failed`. The Sensor decides from bytes alone; the stand-in writes the artifact copies and Ledger entries, because agents never touch storage. A quarantined artifact waits for the Operator's `knowledge-automata release`.
+The Sensor and the Artifact Ledger run since handoff 005: `knowledge-automata ingest` is step 1. `knowledge-automata record-decision` runs steps 3 to 5 for the decision log on an accepted artifact, with a pipeline stand-in for the Governor that skips step 2 and sets `processed` and `failed`. An artifact whose run recorded nothing (its draft or comparison was rejected, or a provider error stopped it) can be run again. The Sensor decides from bytes alone; the stand-in writes the artifact copies, records and Ledger entries, because agents never touch storage. A quarantined artifact waits for the Operator's `knowledge-automata release`.
 
 Around this loop: the Observer (quality control) checks register health, the Oracle (query interface) answers questions from stored records, and the Operator (human in the loop) approves sensitive changes.
 
@@ -318,11 +318,13 @@ Raw artifacts are read-only. Every record links back to its source artifacts, an
 | Classification | Decision log | Risk register |
 |---|---|---|
 | new | Create the record. | Create the record. |
-| update | Fills only fields that are empty in the existing record. Values for fields that are already filled are ignored and the differences logged as warnings (a real change of substance is a supersession). | Fields present in the draft overwrite existing values; fields absent from the draft are kept (the LLM cannot remove a field in v0.1). |
+| update | Fills only fields that are empty in the existing record and adds the verified quotes as new sources. Values for fields that are already filled are ignored and the differences reported (a real change of substance is a supersession). | Fields present in the draft overwrite existing values; fields absent from the draft are kept (the LLM cannot remove a field in v0.1). |
 | reaffirmation | Adds the verified quotes as new sources and a history entry. Draft content is ignored. | Same as decision log. |
 | supersession | Creates a new record with `relations.supersedes`; the old record becomes `superseded` with `relations.superseded_by` and a `superseded` history entry. A reversal is a new decision that supersedes the old one. | Not allowed in v0.1 (the Comparator should return update). |
 
 Every change increments `revision` and appends a history entry. Only `active` records can be the target of update, reaffirmation or supersession.
+
+An existing record changes only through a revision ([ADR-0017](decisions/0017-comparator-reconciliation.md)): the store replaces the file only if it still holds the revision the change was based on (no lost update), the revision goes up by one, and earlier history entries and sources stay unchanged. A supersession changes two files with no transaction, so code writes the new record (with `relations.supersedes`) before it marks the old one superseded. An interruption between the two writes leaves a new record whose target is still active: `record-decision` and `views` detect it and stop before any call, and in v0.1 it is repaired by hand.
 
 ## Storage and views
 
@@ -338,8 +340,8 @@ Records live in a **memory folder**: the stored institutional memory of one grou
 ```
 
 - **The Ledger tracks every artifact.** Each entry is one JSON file in the same deterministic format as records, validated before every write, with the current status and an append-only history of transitions. Only a valid status change may overwrite it ([ADR-0015](decisions/0015-artifact-ledger-storage-and-sensor-checks.md)). Writes go record, views, then Ledger, so an interrupted run leaves the Ledger behind the records, and the next run detects it.
-- **JSON records are the source of truth.** Each record is one file, validated (envelope and content) before it is written, written to a temporary file and moved into place, and never overwritten by a new record. Files are deterministic (UTF-8, LF line endings, two-space indentation, fixed key order), so diffs show only real changes.
-- **Views are generated.** Code renders the Markdown views from the records with standard relative links (index to pages, pages to their source artifacts, supersession both ways), so the registers browse like a wiki on GitHub. Nobody edits them by hand: `knowledge-automata views` regenerates them, and CI runs `knowledge-automata views --check` on the sample project, which fails when the committed views differ from the generator's output.
+- **JSON records are the source of truth.** Each record is one file, validated (envelope and content) before it is written, written to a temporary file and moved into place. A new record never overwrites an existing file; records can be revised (see Write rules) but are never deleted. Files are deterministic (UTF-8, LF line endings, two-space indentation, fixed key order), so diffs show only real changes.
+- **Views are generated.** Code renders the Markdown views from the records with standard relative links (index to pages, pages to their source artifacts, supersession both ways), so the registers browse like a wiki on GitHub. Each decision page groups its quotes under one heading per source artifact, and its history table has a Details column naming the fields an update filled and the decision a supersession replaced or was replaced by. Nobody edits them by hand: `knowledge-automata views` regenerates them, and CI runs `knowledge-automata views --check` on the sample project, which fails when the committed views differ from the generator's output.
 
 ## Domains and applications
 
@@ -356,7 +358,7 @@ All model calls go through `knowledge_automata.llm` (ADR-0003, [ADR-0012](decisi
 | Overall system | Multi-agent system, orchestrator-workers pattern |
 | Governor | Orchestrator, routing |
 | Registrars working simultaneously | Parallelization |
-| Comparator | Retrieval-augmented generation (RAG) for entity resolution |
+| Comparator | Retrieve-then-rerank, retrieval-augmented generation (RAG) for entity resolution |
 | Oracle | Retrieval-augmented generation (RAG) with citations |
 | Schema validation with retry | Evaluator-optimizer loop |
 | Evidence quote check | Grounding check (attribution to source text) |

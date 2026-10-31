@@ -221,3 +221,13 @@ Evidence: `dev/handoffs/006-comparator.md` (section 3.5).
 
 Claude proposed sending the top 3 Rerank candidates to Command. Miguel asked what makes 3 the right number, for example when five candidates score about the same. Nothing did: it was a starting value. It became two settings instead of constants, the candidates' Rerank scores are now recorded in the Artifact Ledger, and tuning both numbers (and perhaps a minimum score) on the evaluation set went to the backlog.
 Evidence: `dev/handoffs/006-comparator.md` (section 1, decision 4; section 8.6).
+
+### 2026-10-30: P10 Distrust the happy path (product)
+
+Handoff 006 allowed a rerun from `processed` to `processed`, but planning against the existing Ledger rules found two cases the handoff did not cover: a rerun that hits a provider error (`processed` to `failed`), and the rejected drafts of the earlier run, which a `failed` entry could not hold. Miguel decided both before any code was written: `processed` to `failed` is allowed only when nothing was produced, and a failed entry keeps rejected drafts only from an earlier `processed` step. The tests cover the full path from a rejected draft, through a failed rerun, to success, with the first rejection still listed at the end.
+Evidence: `src/knowledge_automata/core/ledger.py` (`TRANSITIONS`), `tests/test_record_decision.py` (`test_rejected_drafts_accumulate_and_survive_a_failed_rerun`), ADR-0015 (amended 2026-10-30).
+
+### 2026-10-30: P16 Reuse what compounds, delete what doesn't (product)
+
+A supersession creates a new record exactly as a new decision does, plus one relation and a different history change. Instead of a second record builder, the existing `new_record` gained two optional arguments, and a test rebuilds the committed sample record `DEC-0001` and compares it byte for byte, so the refactor could not change what the first slice writes.
+Evidence: `src/knowledge_automata/core/records.py` (`new_record`), `tests/test_records.py` (`test_the_sample_decision_is_rebuilt_byte_for_byte`).

@@ -9,8 +9,7 @@
   - Standard relative Markdown links only, no double-bracket wiki links: supersession linked both ways, each record linked to its source artifacts, and the index linked to each record, so the registers browse like a wiki.
   - A test renders fixture records against expected output, and a CI check fails if committed views differ from the generator's output (done for the decision log).
 - Governor (orchestrator and router): classification and work orders.
-- Comparator (reconciliation) using Embed and Rerank.
-- Risk Registrar, and the Decision Registrar's remaining write rules (update, reaffirmation, supersession).
+- Risk Registrar.
 - Fictional sample project in `examples/`, doubling as a small evaluation set with expected records.
 - CLI entry point to run the pipeline over a folder.
 - Release workflow that generates a CycloneDX SBOM and attaches it to the v0.1.0 tag.
@@ -30,8 +29,15 @@
 - Document versions: treat an artifact as a new version of an earlier one and process only what changed.
 - Format converters (PDF, Word) as a step before the Sensor; the Ledger hashes the original file and stores the extracted text that evidence is checked against.
 - Artifact Ledger Markdown view.
-- Reprocessing `processed` artifacts after a prompt change, with the Comparator.
-- Rerunning an artifact whose draft was rejected: it becomes `processed`, which is final, and the duplicate check blocks ingesting the same file again, so it stays stuck until reprocessing exists. A rerun is safe without the Comparator when nothing was produced (review of handoff 005).
+- Reprocessing an artifact that produced records, after a prompt change: needs a `correction` change that replaces content and keeps history (update, reaffirmation and supersession all misdescribe it), a way out of `processed`, and reruns in artifact date order.
+- Rerunning an artifact whose draft was rejected: done for artifacts that recorded nothing (handoff 006). `record-decision` runs them again from `processed` or `failed`, keeping the earlier rejected drafts.
+- Tune `KA_COMPARATOR_TOP_K` and `KA_COMPARATOR_TOP_N` on the evaluation set, and consider a minimum Rerank score below which candidates are dropped and the draft is classified as new without a Command call (saves calls, but a wrong threshold lets duplicates in).
+- Skip Embed when the register has no more active records than K (Rerank can read them all).
+- A cheap pre-check that skips drafting for obvious repeats, if reaffirmation drafts become a visible cost in the event log.
+- A git-ignored embedding cache next to the records, if the register grows large.
+- Automatic repair of an interrupted supersession.
+- Thinking on versus off for the Comparator, measured on the evaluation set.
+- Supersession of more than one record at once (`relations.supersedes` already allows a list).
 - Repair for a Ledger left behind its records by an interrupted run (today the pipeline detects it and stops).
 - Sensor relevance check and prompt-injection detection.
 - Oracle insight feedback loop: Operator-confirmed conclusions from Oracle conversations are saved as new raw artifacts ("insight notes") and re-enter through the Sensor, so there is still one write path.
@@ -90,6 +96,7 @@
 - Chat thinking default for the Registrars: decided for the Decision Registrar, thinking disabled unless `KA_CHAT_THINKING` is set ([ADR-0014](../docs/decisions/0014-registrar-drafting-loop.md)); revisited with the evaluation set (see *Later*).
 - Prices: Cohere's pricing page lists no per-token or per-search-unit prices for the configured models, so `prices.toml` has no model entries and events carry no `cost_usd`. Fill the table when prices are published, or record an official source.
 - Python 3.15: PyYAML (pulled in by the Cohere SDK through `tokenizers` and `huggingface-hub`) has no 3.15 wheel yet and builds from source. CI shows whether that works on Ubuntu; on Windows it needs a C compiler.
+- Embed input types for comparing records with records: the Comparator embeds records as documents and the draft as a query (the usual search setup); whether a symmetric input type compares decisions better is untested.
 
 ## Technical debt
 

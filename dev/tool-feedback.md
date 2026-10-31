@@ -188,3 +188,7 @@ Suggested improvement (Claude): copy binary files unchanged, or say when a file 
 Note: `msedge --headless=new --screenshot` follows the Windows color setting, so on a computer in dark mode the "light" preview came out dark. `--force-dark-mode` forces dark, but nothing forces light by default.
 Suggested improvement: document how headless mode picks the color scheme. For us: `--blink-settings=preferredColorScheme=1` forces light and `=0` forces dark (steps in `docs/guide/README.md`).
 
+### 2026-10-30: Claude file writing and JSON escape sequences (confusing)
+
+Note: in handoff 006 as first committed, the JSON escape `\u003c` appeared as a literal `<` in all three places, so the rule read "every `<` escaped as `<`", which says nothing. The escape was decoded somewhere between Claude's draft and the file on disk. Copilot noticed it while planning, from the contradiction in the text, and Claude fixed it in a follow-up commit before any code was written.
+Suggested improvement (Claude): write escape sequences in file content literally, or warn when text that looks like an escape is decoded. For us: when a handoff quotes an escape sequence, read it back from the committed file; Copilot's plan review is the second check.

@@ -27,8 +27,9 @@ v0.1 in progress. Works today:
 - An LLM service layer on Cohere's SDK: Command, Embed and Rerank behind provider-neutral interfaces, with a metadata-only log of billed units, latency and request IDs.
 - The first end-to-end slice: one artifact goes through the Decision Registrar (specialist record keeper) on real Command calls and becomes one validated decision record, with generated Markdown views.
 - The Sensor (intake and input guardrail) and the Artifact Ledger: deterministic intake checks, duplicates found by content hash, suspicious files quarantined for the Operator (human in the loop), and one Ledger entry per artifact that lists the records it produced.
+- The Comparator (reconciliation): each new decision is compared with the existing ones (Embed, then Rerank, then Command) and recorded as new, a reaffirmation, an update or a supersession. Code checks the classification and applies the write rule, so a decision restated in a later meeting adds sources to its record instead of becoming a duplicate.
 
-Next: the Comparator (reconciliation), the Governor (orchestrator), the Risk Registrar and an evaluation set. Details in [dev/STATUS.md](dev/STATUS.md).
+Next: the Governor (orchestrator), the Risk Registrar and an evaluation set. Details in [dev/STATUS.md](dev/STATUS.md).
 
 ## Why
 
@@ -42,7 +43,7 @@ Project management is the first application. Formal registers such as a decision
 
 - **The model proposes, code checks.** The LLM is used only where judgment is needed. Code assigns IDs, checks every evidence quote word for word against the source artifact, validates each record against its JSON Schema and stores it. An invalid draft gets one retry with its errors; if the retry fails, the record is rejected and nothing is written ([ADR-0014](docs/decisions/0014-registrar-drafting-loop.md)).
 - **Measured, not assumed.** Every model call logs its billed units, latency and request ID ([ADR-0012](docs/decisions/0012-llm-service-layer-observation-and-cost.md)). Choices follow the numbers: in the smoke check, Command A+ with thinking enabled used about 6x the output tokens for the same validated draft, so thinking is disabled for the Decision Registrar until the evaluation set says otherwise.
-- **Engineered like a product, scaled to a prototype.** More than 600 tests run offline with the network blocked. CI runs on Python 3.11 and 3.15 with a dependency audit and checks that the committed views match the records. Significant choices are recorded as short [architecture decision records](docs/decisions/) (15 so far), at a level set for a prototype ([ADR-0008](docs/decisions/0008-light-engineering-standard-for-v0-1.md)).
+- **Engineered like a product, scaled to a prototype.** More than 700 tests run offline with the network blocked. CI runs on Python 3.11 and 3.15 with a dependency audit and checks that the committed views match the records. Significant choices are recorded as short [architecture decision records](docs/decisions/) (17 so far), at a level set for a prototype ([ADR-0008](docs/decisions/0008-light-engineering-standard-for-v0-1.md)).
 
 ## How it works
 
@@ -50,11 +51,11 @@ The system works as a closed loop:
 
 1. **Sensor (intake), built:** checks, hashes and logs each incoming artifact in the Artifact Ledger, quarantining invalid or suspicious input.
 2. **Governor (orchestrator), planned:** identifies what the artifact contains and sends work orders to the relevant Registrars.
-3. **Comparator (reconciliation), planned:** retrieves related existing records and classifies the input as new, an update, a reaffirmation or a supersession. Embed and Rerank are already wired into the service layer and smoke-tested.
+3. **Comparator (reconciliation), built for the decision log:** compares each checked draft with related active records (Embed, then Rerank) and classifies it as new, an update, a reaffirmation or a supersession; code checks the classification and applies the write rule. It runs after the Registrar's draft has been validated, so it only judges content grounded in the artifact ([ADR-0017](docs/decisions/0017-comparator-reconciliation.md)).
 4. **Registrars (specialist record keepers), Decision Registrar built, Risk Registrar planned:** draft structured records; code validates them against a schema, assigns IDs and stores them.
 5. **Governor, planned:** marks the artifact as processed in the Ledger, listing the records it produced. A simple stand-in does this today.
 
-Today steps 1 and 4 run for the decision log. See [docs/architecture.md](docs/architecture.md) for roles, data flow and design rules.
+Today steps 1, 3 and 4 run for the decision log. See [docs/architecture.md](docs/architecture.md) for roles, data flow and design rules.
 
 <!-- diagram: closed-loop. Copy of docs/diagrams/03-closed-loop.md; edit that file first. -->
 ```mermaid
@@ -168,14 +169,14 @@ Keep the clone outside cloud-synced folders such as OneDrive or Dropbox: sync to
 
 ## Try it
 
-To add your own artifact to the memory folder (by default `runtime/memory`, git-ignored; choose another with `--memory`), then record its most significant decision (one real Command call, two if the first draft fails validation):
+To add your own artifact to the memory folder (by default `runtime/memory`, git-ignored; choose another with `--memory`), then record its most significant decision (one real Command call for the draft, two if it fails validation; once the decision log has records, also two Embed calls, one Rerank call and one or two Command calls to compare it with them):
 
 ```powershell
 uv run knowledge-automata ingest notes.md --artifact-date 2026-02-03
 uv run --env-file .env knowledge-automata record-decision ART-0001
 ```
 
-`ingest` runs the Sensor's checks, keeps a read-only copy of the file and gives it an ID in the Artifact Ledger, which tracks every artifact: accepted, quarantined or rejected, and later the records it produced. The same content is never added twice, and `record-decision` refuses an artifact that was already processed, without a call. The record is validated before it is stored as JSON, and the Markdown views are regenerated next to it, linking each record to its artifact. `knowledge-automata ledger` lists the artifacts, and `knowledge-automata release ART-0002 --reason "..."` lets you accept a quarantined file that is only too long. To regenerate the views, or check that they match the records, without any call:
+`ingest` runs the Sensor's checks, keeps a read-only copy of the file and gives it an ID in the Artifact Ledger, which tracks every artifact: accepted, quarantined or rejected, and later the records it produced. The same content is never added twice. `record-decision` compares each new decision with the existing ones and records it as new, or as a reaffirmation, an update or a supersession of one of them, printing the Comparator's reason. It refuses an artifact that already produced a record, without a call; an artifact whose run recorded nothing can be run again. Every record is validated before it is stored as JSON, and the Markdown views are regenerated next to it, linking each record to its artifacts. `knowledge-automata ledger` lists the artifacts, and `knowledge-automata release ART-0002 --reason "..."` lets you accept a quarantined file that is only too long. To regenerate the views, or check that they match the records, without any call:
 
 ```powershell
 uv run knowledge-automata views --memory examples/sample-project --check
