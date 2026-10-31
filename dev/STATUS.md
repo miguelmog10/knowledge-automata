@@ -6,7 +6,7 @@
 
 ## Current phase
 
-Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the PR #5 credits and status (PR #6), the README pass (PR #7), the architecture diagrams and visual guide (PR #9) and the guide preview in the README (PR #10). Handoff 006, the Comparator (reconciliation), is designed and waiting for Copilot's plan on `feat/comparator`.
+Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the PR #5 credits and status (PR #6), the README pass (PR #7), the architecture diagrams and visual guide (PR #9) and the guide preview in the README (PR #10). Handoff 006, the Comparator (reconciliation), is implemented on `feat/comparator` and waiting for Claude's code review; the real run comes after it, with Miguel's go.
 
 ## Done
 
@@ -64,11 +64,20 @@ Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the
 
 ## In progress
 
-- Handoff 006, the Comparator (reconciliation), designed by Miguel and Claude in voice sessions from 2026-10-28 to 2026-10-30 (`dev/handoffs/006-comparator.md`, on `feat/comparator`). Main decisions: the Registrar drafts first and the Comparator compares the checked draft (the intended order, ADR-0017 to come); Embed then Rerank over the active records, with the top 10 and top 3 as settings; one retry, then reject; a crash-consistent write order for supersession; rerunning an artifact that recorded nothing; four new sample artifacts, one per classification, and one real run of about 20 to 30 calls on the branch before the merge.
+- Handoff 006, the Comparator (reconciliation), designed by Miguel and Claude in voice sessions from 2026-10-28 to 2026-10-30 (`dev/handoffs/006-comparator.md`, on `feat/comparator`). Main decisions: the Registrar drafts first and the Comparator compares the checked draft (the intended order, ADR-0017); Embed then Rerank over the active records, with the top 10 and top 3 as settings; one retry, then reject; a crash-consistent write order for supersession; rerunning an artifact that recorded nothing; four new sample artifacts, one per classification, and one real run of about 20 to 30 calls on the branch before the merge.
+- Implemented by Copilot on 2026-10-30 in seven commits (plan approved by Miguel), 718 tests passing offline:
+  - Ledger entry schema 1.1 (`change`, `related_id` and `comparison` on produced items; `stage` and `run_id` on rejected items; a history `reason`) and the rerun transitions. Decided by Miguel at plan approval and written into ADR-0015: `processed` to `failed` only when nothing was produced, a `failed` entry keeps rejected drafts only from an earlier `processed` step, and a transition raises `schema_version` to the current minor of the same major (another major is refused).
+  - `RecordStore.save_revision` (lost-update check, revision plus one, history and sources append-only, no `superseded` back to `active`) and `load_active`.
+  - `core/write_rules.py`: update, reaffirmation, supersession and `check_supersession_links`. Deviation: each rule takes the register spec as its first argument (to load the content schema and refuse the risk register), which the handoff's signatures did not have. `new_record` gained `change` and `supersedes`, with a byte-for-byte test against the sample `DEC-0001`.
+  - `core/retrieval.py`, `agents/comparator.py` (`ComparatorSettings`, `KA_COMPARATOR_TOP_K` and `KA_COMPARATOR_TOP_N`), and the prompts `decision-comparator.v1` and `comparator-retry.v1`. Embed and Rerank errors mark the artifact `failed` with no retry, and so does a Rerank call that returns no results (an `LLMResponseError`).
+  - `pipeline.record_decision` and the CLI: draft, compare, write rule, views, Ledger; the printed lines (draft, candidates with scores, classification and reason, the change, billing per stage) and the `ledger` suffixes. The billing line format and the wording of the change lines were Copilot's choice where the handoff left them open.
+  - Views: sources grouped by artifact and a Details column in the history table; the sample view regenerated (its record unchanged).
+  - Docs: ADR-0017; ADR-0004, ADR-0013 and ADR-0015 amended; architecture text, README, backlog, tool feedback and principles. The sample project README waits for the real run.
+  - No real Cohere call was made.
 
 ## Next
 
-- Copilot plans handoff 006; Miguel approves the plan; Copilot implements; Claude reviews the code on the computer, refreshes the diagrams and the guide on the branch, and then the real run, with Miguel's go.
+- Claude reviews the handoff 006 code on the computer and refreshes the diagrams and the guide on the branch (the Comparator is now built, and data flow steps 3 and 4 swapped in the text). Then, with Miguel's go, Copilot does the real run (handoff 7.3: inbox files with LF line endings, ART-0002 to ART-0005 in date order, stop at 35 calls), commits it unedited with the sample project README, and updates this file.
 - Enable GitHub Pages in the repository settings, if not done yet, and mark ADR-0016 accepted once the guide is online.
 - Then the Governor (orchestrator), the Risk Registrar, the sample project as an evaluation set, and the v0.1.0 release (see `dev/backlog.md`).
 - A mise-en-place v0.2 brief (screen theme, Mermaid font fix, sequence diagram pattern) runs in its own chat; the guide moves to those tokens when it ships.
@@ -90,3 +99,4 @@ None.
 - When squash merging, copy the `Co-authored-by:` trailers from the code block in `AGENTS.md` (Commit conventions). In PR #4 they were indented, and in PR #5 the Claude address became a Markdown link and the Copilot line was missing, so GitHub may not credit the co-authors on those two commits.
 - Local setup: `uv sync --all-extras`, then `uv run pytest`. Keep the clone outside cloud-synced folders (see README).
 - Before trying `ingest` locally, clear any `runtime/memory` made before handoff 005: records there without Ledger entries make `record-decision` stop with "the Ledger is behind the records".
+- An interrupted supersession (a new record whose target is still active) stops `record-decision` and `views` with the fix to make by hand: mark the old record superseded by the new one through a revision. There is no repair command yet (backlog).
