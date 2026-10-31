@@ -47,6 +47,8 @@ def clean_env(monkeypatch, tmp_path):
         "KA_CHAT_MODEL",
         "KA_EVENT_LOG",
         "KA_SENSOR_MAX_BYTES",
+        "KA_COMPARATOR_TOP_K",
+        "KA_COMPARATOR_TOP_N",
     ]:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.chdir(tmp_path)
@@ -199,10 +201,12 @@ def test_record_decision_stores_the_record_the_views_and_the_ledger(
     assert err == ""
     assert f"Run ID: {RUN_ID}" in out
     assert (
-        "Recorded DEC-0001 from ART-0001 in 1 attempt "
+        "Drafted a decision from ART-0001 in 1 attempt "
         "(model fake-chat, prompt decision-registrar.v1, thinking disabled)"
     ) in out
-    assert "Billed tokens: " in out and " input, " in out
+    assert "No active decisions to compare with: recorded as new without a comparison." in out
+    assert "Recorded DEC-0001 as a new decision" in out
+    assert "Billed: draft (input tokens " in out
     assert "memory/registers/decision-log/DEC-0001.json" in out
     assert "memory/views/decision-log.md" in out
 
@@ -231,6 +235,7 @@ def test_record_decision_stores_the_record_the_views_and_the_ledger(
         {
             "register": "decision-log",
             "record_id": "DEC-0001",
+            "change": "new",
             "model": "fake-chat",
             "prompt_version": "decision-registrar.v1",
             "schema_version": stored["schema_version"],
@@ -281,7 +286,7 @@ def test_a_rejected_draft_exits_1_and_is_listed_in_the_ledger(
     assert "Rejected the draft from ART-0001 after 2 attempts" in err
     assert "no record was written" in err
     assert "- $.evidence[0]: " in err
-    assert "Billed tokens: " in out
+    assert "Billed: draft (input tokens " in out
     assert len(build.fake.calls) == 2
     assert not (memory / "registers").exists()
     assert not (memory / "views").exists()
@@ -292,6 +297,8 @@ def test_a_rejected_draft_exits_1_and_is_listed_in_the_ledger(
     assert processed["rejected"] == [
         {
             "register": "decision-log",
+            "stage": "draft",
+            "run_id": RUN_ID,
             "attempts": 2,
             "prompt_version": RETRY_VERSION,
             "error_paths": ["$.evidence[0]"],
@@ -307,6 +314,8 @@ def test_unusable_responses_are_listed_with_their_error_type(ingested, memory, c
     assert entry(memory)["rejected"] == [
         {
             "register": "decision-log",
+            "stage": "draft",
+            "run_id": RUN_ID,
             "attempts": 2,
             "prompt_version": RETRY_VERSION,
             "error_paths": ["$"],
