@@ -680,3 +680,52 @@ No network anywhere (the autouse fixture stays). Use `FakeLLM` with scripted cha
 ## 12. Out of scope
 
 The Governor's classification and work orders; the Risk Registrar and the risk register's write rules; reprocessing artifacts that produced records, and a `correction` change; automatic repair of an interrupted supersession; an embedding cache; a relevance threshold; skipping Embed for small registers; supersession of several records at once; prompt changes for the Decision Registrar; `.gitattributes` for artifact copies; the diagrams in `docs/diagrams/`, their copies in `README.md` and `docs/architecture.md`, and the guide (Claude refreshes them during review).
+
+---
+
+## Addendum A (2026-10-31): Command A+ runs with thinking enabled
+
+### A.1 What the real run found
+
+The real run stopped at ART-0003 (section 7.3 rules). ART-0002 went through as expected (`new`, `DEC-0002`), but both its draft and its comparison needed the retry, and both draft attempts for ART-0003 were rejected. Every failure had the same shape: `finish_reason` COMPLETE, "The chat response is not valid JSON (line 1, column 1)", and 1,100 to 2,700 output tokens, against about 320 for an accepted reply. Five of six first attempts failed this way, in both the Registrar and the Comparator; the handoff 004 run's first attempt (2,390 output tokens) most likely did too.
+
+Claude wrote a throwaway diagnostic (`runtime/diagnostics/inspect_chat_reply.py`, git-ignored, not committed) that sends the Registrar's exact first-attempt request and prints the raw reply structure. Miguel ran it on ART-0003 (4 calls, outside the event log):
+
+| Thinking | Content blocks | Text block | Output tokens | Valid JSON |
+|---|---|---|---|---|
+| disabled | 1 text | prose reasoning ("We need to draft a decision record. Identify the most significant decision...") followed by the JSON object | 1,130 and 1,332 | 0 of 2 |
+| enabled | 1 thinking, 1 text | the JSON object only | 1,234 and 1,370 (about 1,100 of them reasoning) | 2 of 2 |
+
+Command A+ is a reasoning model. With thinking disabled it still reasons, but in the visible answer, and the JSON schema in `response_format` does not stop prose before the object. The retry usually passes because its prompt says the previous answer was not valid JSON. The token saving that led to "thinking disabled" (ADR-0014, measured on one smoke-check artifact) was not real: a failed reply costs about as many output tokens as thinking does, plus a second call.
+
+### A.2 Decision (proposed by Claude, confirmed by Miguel before the fix)
+
+1. **Thinking enabled by default** for every chat call of the Decision Registrar and the Comparator. Send it explicitly (`thinking: {"type": "enabled"}`) rather than relying on the provider default. `KA_CHAT_THINKING` still overrides. Rename `DECISION_REGISTRAR_THINKING` to a name that says it covers both agents, for example `CHAT_THINKING_DEFAULT`, and update the docstrings and comments that give the old reason.
+2. **The adapter stays strict.** No parsing of a JSON object out of surrounding prose: it would hide the problem and still pay for the prose on every call.
+3. **No token budget yet.** Measuring `token_budget` on the evaluation set goes to the backlog.
+4. **Billing line:** Rerank reports billed input tokens, not search units (tool feedback since 2026-10-25). Print the units the provider reports, for example `rerank (input tokens 162)`, and "not reported" only when none are.
+
+### A.3 Changes
+
+- `pipeline.py` and its tests: the default above.
+- `cli.py` and its tests: the billing line.
+- **ADR-0014:** change the thinking bullet to: "The Registrars and the Comparator run Command A+ with thinking enabled by default; `KA_CHAT_THINKING` overrides it. Thinking was disabled until 2026-10-31, to save output tokens; the handoff 006 real run showed that with thinking disabled the model writes its reasoning as prose before the JSON, so most first attempts were rejected after about as many output tokens as thinking uses (handoff 006, Addendum A)." In Consequences, replace "Thinking disabled may miss harder decisions; the evaluation set decides." with "Thinking costs about 1,000 reasoning tokens per call; a token budget is measured on the evaluation set." Mark it `Accepted (amended 2026-10-31)` in the index. ADR-0017 needs no change.
+- `docs/architecture.md`: wherever thinking is described as disabled, say enabled.
+- `dev/backlog.md`, **Later:** replace "Thinking on versus off for the Registrars, measured on the evaluation set." and "Thinking on versus off for the Comparator, measured on the evaluation set." with "Thinking token budget (`token_budget`) for the Registrars and the Comparator, measured on the evaluation set." Add to the debug-capture item: "A throwaway version (`runtime/diagnostics/inspect_chat_reply.py`, handoff 006 Addendum A) found the thinking problem with four calls."
+- `dev/STATUS.md`: the finding, the decision and the calls used so far.
+- Claude has already added the `dev/tool-feedback.md` and `dev/principles-in-practice.md` entries.
+
+Commit as `fix: run Command A+ with thinking enabled by default`, with tests, before resuming.
+
+### A.4 Resuming the run
+
+The partial run stays as it is and is committed with the rest: `DEC-0002` (from ART-0002, drafted with thinking disabled, in two attempts) and ART-0003's first rejected draft are evidence. After the fix commit, with Miguel's go:
+
+```powershell
+uv run --env-file .env knowledge-automata record-decision ART-0003 --memory examples/sample-project
+uv run --env-file .env knowledge-automata record-decision ART-0004 --memory examples/sample-project
+uv run --env-file .env knowledge-automata record-decision ART-0005 --memory examples/sample-project
+uv run knowledge-automata views --memory examples/sample-project --check
+```
+
+ART-0003 is a rerun the code allows (its earlier run recorded nothing). Expect about 5 calls per artifact. 13 calls are used so far (9 in the run, 4 diagnostic), so **the limit becomes 40 calls**: stop and report there. The other rules of section 7.3 still apply. The sample project README and the pull request description explain the restart: thinking disabled, then enabled, and why.

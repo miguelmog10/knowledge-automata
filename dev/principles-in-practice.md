@@ -231,3 +231,8 @@ Evidence: `src/knowledge_automata/core/ledger.py` (`TRANSITIONS`), `tests/test_r
 
 A supersession creates a new record exactly as a new decision does, plus one relation and a different history change. Instead of a second record builder, the existing `new_record` gained two optional arguments, and a test rebuilds the committed sample record `DEC-0001` and compares it byte for byte, so the refactor could not change what the first slice writes.
 Evidence: `src/knowledge_automata/core/records.py` (`new_record`), `tests/test_records.py` (`test_the_sample_decision_is_rebuilt_byte_for_byte`).
+
+### 2026-10-31: P11 Build evidence, not just confidence (product)
+
+ADR-0014 disabled thinking to save output tokens, based on one smoke-check artifact. The first real run with several artifacts disproved it: most first attempts failed as invalid JSON after about as many tokens as thinking uses. The run stopped as its rules said, instead of retrying into the budget, and one throwaway diagnostic that printed the raw reply structure (four calls, nothing logged or committed) showed the cause: with thinking off, the model reasons in the visible answer. The default changed on that evidence, and the failed partial run stays committed as part of the record.
+Evidence: `dev/handoffs/006-comparator.md` (Addendum A), ADR-0014 (amended 2026-10-31), `dev/tool-feedback.md`.
