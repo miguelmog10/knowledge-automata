@@ -55,7 +55,7 @@ flowchart TB
   classDef planned fill:#e9e5de,stroke:#57524b,stroke-width:1.5px,stroke-dasharray:6 4,color:#57524b
   classDef focus fill:#e9e5de,stroke:#9c4426,stroke-width:3px,color:#22201d
   accTitle: Knowledge Automata system context
-  accDescr: A group writes artifacts. Its Operator runs Knowledge Automata, which turns the artifacts into validated records using Cohere Command and publishes Markdown views. Retrieval with Embed and Rerank and question answering are planned.
+  accDescr: A group writes artifacts. Its Operator runs Knowledge Automata, which turns the artifacts into validated records using Cohere Command, finds the related records with Embed and Rerank, and publishes Markdown views. Question answering is planned.
 
   subgraph group["The group, for example a project team"]
     members["Group members<br/>[Person]<br/>meet, chat, write documents,<br/>read the records"]:::built
@@ -69,7 +69,7 @@ flowchart TB
   artifacts -- "ingested from files" --> ka
   operator -- "runs ingest, record-decision, release" --> ka
   ka -- "drafts records with Command" --> cohere
-  ka -. "finds related records with Embed and Rerank" .-> cohere
+  ka -- "finds related records with Embed and Rerank" --> cohere
   ka -- "Markdown views" --> members
   ka -. "answers with citations" .-> members
 
@@ -130,7 +130,7 @@ flowchart LR
   classDef planned fill:#e9e5de,stroke:#57524b,stroke-width:1.5px,stroke-dasharray:6 4,color:#57524b
   classDef focus fill:#e9e5de,stroke:#9c4426,stroke-width:3px,color:#22201d
   accTitle: Knowledge Automata containers
-  accDescr: Knowledge Automata is one Python command-line app plus two file stores. Inside the app, a pipeline stand-in for the Governor runs the Sensor and the Decision Registrar and does every file write to the memory folder. Every model call goes through the LLM service layer to Cohere and is logged to the event log. The Governor, Comparator, Risk Registrar, Observer and Oracle are planned.
+  accDescr: Knowledge Automata is one Python command-line app plus two file stores. Inside the app, a pipeline stand-in for the Governor runs the Sensor, the Decision Registrar and the Comparator, and does every file write to the memory folder. Every model call goes through the LLM service layer to Cohere and is logged to the event log. The Governor, Risk Registrar, Observer and Oracle are planned.
 
   operator["Operator<br/>(human in the loop)<br/>[Person]"]:::built
 
@@ -141,7 +141,7 @@ flowchart LR
       decision["Decision Registrar<br/>(specialist record keeper)"]:::built
       risk["Risk Registrar<br/>(specialist record keeper)"]:::planned
       governor["Governor<br/>(orchestrator)"]:::planned
-      comparator["Comparator<br/>(reconciliation)"]:::planned
+      comparator["Comparator<br/>(reconciliation)"]:::built
       observer["Observer (quality control)<br/>Oracle (query interface)"]:::planned
     end
     subgraph llm["LLM service layer [Component]"]
@@ -163,12 +163,14 @@ flowchart LR
   operator -- "commands" --> pipeline
   pipeline -- "checks bytes" --> sensor
   pipeline -- "drafts" --> decision
+  pipeline -- "compares the draft" --> comparator
   pipeline -- "writes" --> memory
-  governor -. "work orders" .-> comparator
+  governor -. "work orders" .-> decision
   decision --> command
   risk -.-> command
-  comparator -.-> embed
-  comparator -.-> rerank
+  comparator --> embed
+  comparator --> rerank
+  comparator --> command
 
   comparator ~~~ observer
   llm -- "API calls" --> cohere
@@ -259,17 +261,17 @@ flowchart TB
   classDef planned fill:#e9e5de,stroke:#57524b,stroke-width:1.5px,stroke-dasharray:6 4,color:#57524b
   classDef focus fill:#e9e5de,stroke:#9c4426,stroke-width:3px,color:#22201d
   accTitle: The closed loop for one artifact
-  accDescr: An artifact enters through the Sensor, which records it in the Artifact Ledger. The planned Governor sends work orders through the planned Comparator to the Registrars, which write validated records; the Governor then marks the artifact processed in the Ledger. Today the record-decision command sends an accepted artifact straight to the Decision Registrar and a pipeline stand-in marks it processed. The Operator releases quarantined files today; the Observer and Oracle are planned, and Oracle insight notes approved by the Operator will re-enter as new artifacts through the Sensor.
+  accDescr: An artifact enters through the Sensor, which records it in the Artifact Ledger. The planned Governor sends work orders to the Registrars, which draft records that code validates. The Comparator compares each validated draft with related records and code applies the write rule (new, update, reaffirmation or supersession); the Governor then marks the artifact processed in the Ledger. Today the record-decision command sends an accepted artifact straight to the Decision Registrar, then the Comparator, and a pipeline stand-in marks it processed. The Operator releases quarantined files today; the Observer and Oracle are planned, and Oracle insight notes approved by the Operator will re-enter as new artifacts through the Sensor.
 
   artifact["Artifact<br/>(file)"]:::built
   sensor["1. Sensor<br/>(intake)"]:::built
   ledger[("Artifact Ledger")]:::built
   governor["2. Governor<br/>(orchestrator)"]:::planned
-  comparator["3. Comparator<br/>(reconciliation)"]:::planned
-  subgraph registrars["4. Registrars (specialist record keepers)"]
+  subgraph registrars["3. Registrars (specialist record keepers)"]
     decision["Decision Registrar"]:::built
     risk["Risk Registrar"]:::planned
   end
+  comparator["4. Comparator<br/>(reconciliation)"]:::built
   registers[("Registers and views")]:::built
 
   operator["Operator<br/>(human in the loop)"]:::built
@@ -280,14 +282,13 @@ flowchart TB
   sensor -- "accepted, quarantined<br/>or rejected" --> ledger
   operator -- "releases quarantine" --> ledger
   ledger -.-> governor
-  governor -. "work orders" .-> comparator
-  comparator -. "new, update, reaffirmation<br/>or supersession" .-> registrars
+  governor -. "work orders" .-> registrars
   ledger -- "today: record-decision" --> decision
-  decision -- "validated record" --> registers
-  risk -.-> registers
-  registrars -. "5. Governor marks processed" .-> ledger
-  decision -- "today: stand-in<br/>marks processed" --> ledger
-  comparator -. "related records" .-> registers
+  decision -- "validated draft" --> comparator
+  risk -.-> comparator
+  comparator -- "new, update, reaffirmation<br/>or supersession" --> registers
+  comparator -. "5. Governor marks processed" .-> ledger
+  comparator -- "today: stand-in<br/>marks processed" --> ledger
   observer -. "checks health" .-> registers
   oracle -. "answers with citations" .-> registers
   operator -. "approves sensitive changes" .-> registers
