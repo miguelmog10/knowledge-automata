@@ -2,11 +2,11 @@
 
 ## Last updated
 
-2026-10-28
+2026-10-30
 
 ## Current phase
 
-Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the PR #5 credits and status (PR #6) and the README pass (PR #7). Architecture diagrams and a visual guide are in progress on `docs/architecture-diagrams`. Next is the Comparator (reconciliation).
+Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the PR #5 credits and status (PR #6), the README pass (PR #7), the architecture diagrams and visual guide (PR #9) and the guide preview in the README (PR #10). Handoff 006, the Comparator (reconciliation), is designed and waiting for Copilot's plan on `feat/comparator`.
 
 ## Done
 
@@ -55,20 +55,23 @@ Handoffs 001 to 005 merged (PR #1 to PR #5, and PR #8 for handoff 005), with the
   - `examples/sample-project/ledger/ART-0001.json`, backfilled once through the Ledger code from the committed blob; the sample record and views are unchanged.
   - Deviations, approved in the pull request: rejected drafts also carry `error_type` when the last response was unusable (approved); the backfill commit came before the Ledger-driven views (approved); copies go through `storage/artifact_files.py` (approved); the Sensor stays free of file access and the pipeline does the I/O, because agents never import storage.
   - No real Cohere call was made. The optional smoke rerun (7 calls) to see `finish_reason` on real events was not done.
+- Architecture diagrams and visual guide merged as PR #9 (Miguel and Claude, 2026-10-28):
+  - Four Mermaid diagrams in `docs/diagrams/`, one source each: system context, containers, the closed loop and the ART-0001 to DEC-0001 run. Flowcharts that follow C4 conventions, because Mermaid's native C4 has no dashed lines or legend. Built versus planned is shown by line style, with a legend.
+  - Copies between `diagram` markers in `README.md` (closed loop) and `docs/architecture.md` (context, containers, closed loop).
+  - `docs/guide/index.html`: the visual guide in direction B ("The pass"), with a click-through walkthrough; `docs/guide/README.md` holds the refresh steps.
+  - `.github/workflows/pages.yml` and ADR-0016 (proposed): publish the guide and the diagram sources with GitHub Pages.
+- The guide's preview at the top of the README, in light and dark, merged as PR #10.
 
 ## In progress
 
-- Architecture diagrams and visual guide on `docs/architecture-diagrams` (Miguel and Claude, 2026-10-28), waiting for Miguel's commit:
-  - Four Mermaid diagrams in `docs/diagrams/`, one source each: system context, containers, the closed loop and the ART-0001 to DEC-0001 run. Flowcharts that follow C4 conventions, because Mermaid's native C4 has no dashed lines or legend. Built versus planned is shown by line style, with a legend.
-  - Copies between `diagram` markers in `README.md` (closed loop) and `docs/architecture.md` (context, containers, closed loop).
-  - `docs/guide/index.html`: the visual guide in direction B ("The pass"), with a click-through walkthrough. It renders the diagrams from `docs/diagrams/` in its own light and dark style. `docs/guide/README.md` holds the refresh steps.
-  - `.github/workflows/pages.yml` and ADR-0016 (proposed): publish the guide and the diagram sources with GitHub Pages. Pages must be enabled in the repository settings.
-  - A mise-en-place v0.2 brief (screen theme, Mermaid font fix, sequence diagram pattern) runs in its own chat; the guide moves to those tokens when it ships.
+- Handoff 006, the Comparator (reconciliation), designed by Miguel and Claude in voice sessions from 2026-10-28 to 2026-10-30 (`dev/handoffs/006-comparator.md`, on `feat/comparator`). Main decisions: the Registrar drafts first and the Comparator compares the checked draft (the intended order, ADR-0017 to come); Embed then Rerank over the active records, with the top 10 and top 3 as settings; one retry, then reject; a crash-consistent write order for supersession; rerunning an artifact that recorded nothing; four new sample artifacts, one per classification, and one real run of about 20 to 30 calls on the branch before the merge.
 
 ## Next
 
-- Miguel commits the diagrams and the guide, opens the pull request and enables GitHub Pages.
-- Then the Comparator, the Governor (orchestrator), the Risk Registrar, the sample project as an evaluation set, and the v0.1.0 release (see `dev/backlog.md`).
+- Copilot plans handoff 006; Miguel approves the plan; Copilot implements; Claude reviews the code on the computer, refreshes the diagrams and the guide on the branch, and then the real run, with Miguel's go.
+- Enable GitHub Pages in the repository settings, if not done yet, and mark ADR-0016 accepted once the guide is online.
+- Then the Governor (orchestrator), the Risk Registrar, the sample project as an evaluation set, and the v0.1.0 release (see `dev/backlog.md`).
+- A mise-en-place v0.2 brief (screen theme, Mermaid font fix, sequence diagram pattern) runs in its own chat; the guide moves to those tokens when it ships.
 
 ## Blockers
 

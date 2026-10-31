@@ -206,3 +206,18 @@ Evidence: `tests/test_registrar.py` (`test_agents_do_not_touch_storage_or_the_pr
 
 Before choosing a diagram format, Claude rendered the drafts on GitHub's light and dark backgrounds and checked the mise-en-place diagram on github.com. Native Mermaid C4 was ruled out on evidence (no dashed lines, no legend, unreadable labels in dark mode), and the check found that the style guide's Mermaid font setting was silently ignored. Both findings went to the style guide brief instead of into the diagrams as workarounds.
 Evidence: `docs/diagrams/README.md`, `dev/tool-feedback.md`.
+
+### 2026-10-30: P3 Plan continuously, adapt relentlessly (product)
+
+The architecture had the Comparator (reconciliation) compare a summary from the Governor (orchestrator) before the Registrar (specialist record keeper) drafted. While designing handoff 006, Miguel and Claude reversed the order: the Registrar drafts, code checks the evidence quotes, and only then does the Comparator compare. It is recorded as the intended design, not a workaround for the missing Governor, because the Comparator should only judge content already grounded in the artifact. The cost, an extra draft whenever a meeting only restates a decision, was accepted on purpose and is measurable from the event log.
+Evidence: `dev/handoffs/006-comparator.md` (section 1, decision 2), ADR-0017.
+
+### 2026-10-30: P10 Distrust the happy path (product)
+
+A supersession changes two record files, and there is no transaction across files. The handoff orders the writes so that a crash leaves a state that is safe and easy to spot: the new record is written first, pointing back to the old one, and only then is the old record marked superseded. A stop in between leaves a new record whose target is still active, which code detects before any model call; the reverse order would leave a link to a record that does not exist. During the design Miguel called this atomic; Claude corrected the term: each write is atomic, the pair is not, and the order is what makes it crash consistent.
+Evidence: `dev/handoffs/006-comparator.md` (section 3.5).
+
+### 2026-10-30: P11 Build evidence, not just confidence (teamwork)
+
+Claude proposed sending the top 3 Rerank candidates to Command. Miguel asked what makes 3 the right number, for example when five candidates score about the same. Nothing did: it was a starting value. It became two settings instead of constants, the candidates' Rerank scores are now recorded in the Artifact Ledger, and tuning both numbers (and perhaps a minimum score) on the evaluation set went to the backlog.
+Evidence: `dev/handoffs/006-comparator.md` (section 1, decision 4; section 8.6).
