@@ -17,7 +17,7 @@ RUN_ID = "1b9e8a2c-4f3d-4c6b-9a1e-2d7f5e8c3b10"
 # Written by hand from the handoff's rules: schema key order, two-space indent, LF,
 # non-ASCII kept as is, trailing newline.
 EXPECTED_ART_0002 = """{
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "id": "ART-0002",
   "title": "Pilot review: café",
   "source": {
@@ -198,6 +198,75 @@ def test_save_transition_refuses_rewritten_history_or_changed_fields(tmp_path):
     with pytest.raises(LedgerStoreError, match="invalid and was not written"):
         store.save_transition(old, invalid)
     assert store.load("ART-0002") == old
+
+
+def test_save_transition_raises_a_1_0_entry_to_the_current_version_only(tmp_path):
+    store = LedgerStore(tmp_path)
+    old = entry()
+    old["schema_version"] = "1.0"
+    store.save_new(old)
+
+    sideways = processed(old)
+    sideways["schema_version"] = "1.0"
+    store.save_transition(old, sideways)
+    assert store.load("ART-0002")["schema_version"] == "1.0"
+
+    rerun = transition(sideways, to="processed", by="pipeline", at=LATER, run_id=RUN_ID)
+    assert rerun["schema_version"] == "1.1"
+    store.save_transition(sideways, rerun)
+    assert store.load("ART-0002")["schema_version"] == "1.1"
+
+    downgraded = transition(
+        rerun, to="failed", by="pipeline", at=LATER, run_id=RUN_ID, error_type="X"
+    )
+    downgraded["schema_version"] = "1.0"
+    with pytest.raises(LedgerStoreError, match="cannot change schema_version"):
+        store.save_transition(rerun, downgraded)
+
+
+def test_save_transition_refuses_to_rerun_an_entry_that_lists_records(tmp_path):
+    store = LedgerStore(tmp_path)
+    old = entry()
+    store.save_new(old)
+    produced = with_results(
+        transition(old, to="processed", by="pipeline", at=LATER, run_id=RUN_ID),
+        [
+            {
+                "register": "decision-log",
+                "record_id": "DEC-0002",
+                "model": "m",
+                "prompt_version": "p",
+                "schema_version": "1.0",
+            }
+        ],
+        [],
+    )
+    store.save_transition(old, produced)
+    rerun = dict(produced, history=[*produced["history"], produced["history"][-1]])
+    rerun["produced"] = []
+    with pytest.raises(LedgerStoreError, match="already lists records"):
+        store.save_transition(produced, rerun)
+
+
+def test_save_transition_keeps_earlier_rejected_drafts(tmp_path):
+    store = LedgerStore(tmp_path)
+    old = entry()
+    store.save_new(old)
+    item = {
+        "register": "decision-log",
+        "attempts": 2,
+        "prompt_version": "p",
+        "error_paths": ["$"],
+        "run_id": RUN_ID,
+    }
+    first = with_results(processed(old), [], [item])
+    store.save_transition(old, first)
+    second_run = "2c0f9b3d-5a4e-4d7c-8b2f-3e8a6f9d4c21"
+    rerun = transition(first, to="processed", by="pipeline", at=LATER, run_id=second_run)
+    with pytest.raises(LedgerStoreError, match="must keep the old one unchanged"):
+        store.save_transition(first, with_results(rerun, [], []))
+    store.save_transition(first, rerun)
+    assert store.load("ART-0002")["rejected"] == [item]
 
 
 def test_find_by_hash_ignores_rejected_entries(tmp_path):
