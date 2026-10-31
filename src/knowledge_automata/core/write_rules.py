@@ -181,7 +181,7 @@ def apply_supersession(
 
 
 def check_supersession_links(records: Iterable[Mapping[str, Any]]) -> list[str]:
-    """Return a message for every supersession link that does not point back.
+    """Return a message for every inconsistent supersession link.
 
     A record that supersedes another needs the other to exist, be ``superseded`` and name
     it in ``superseded_by``; a ``superseded_by`` needs a record that supersedes it, and a

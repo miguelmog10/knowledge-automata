@@ -191,7 +191,7 @@ def check_decision_log_views(memory: Path) -> ViewDifferences:
 
 
 def supersession_link_problems(memory: Path) -> list[str]:
-    """Messages for supersession links in the decision log that do not point back."""
+    """Messages for inconsistent supersession links in the decision log."""
     return check_supersession_links(RecordStore(memory).load_all(DECISION_LOG))
 
 
@@ -263,7 +263,7 @@ def recordable_entry(artifact_id: str, memory: Path) -> dict[str, Any]:
     problems = supersession_link_problems(memory)
     if problems:
         raise InputError(
-            "The decision log has a supersession link that does not point back; "
+            "The decision log has an inconsistent supersession link; "
             f"{nothing_sent}.\n" + "\n".join(f"- {problem}" for problem in problems)
         )
 

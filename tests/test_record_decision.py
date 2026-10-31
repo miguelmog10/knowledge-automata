@@ -527,11 +527,13 @@ def test_an_active_record_with_a_replacement_stops_record_decision_and_views(mem
     assert record(build, clock, memory, "ART-0003") == 2
     err = capsys.readouterr().err
     assert expected in err and "nothing was sent to the model" in err
+    assert "The decision log has an inconsistent supersession link" in err
     assert build.settings == []
     for extra in ([], ["--check"]):
         assert run(FakeBuild(), clock, "views", "--memory", str(memory), *extra) == 2
         err = capsys.readouterr().err
         assert expected in err and "No view was written or checked." in err
+        assert "The decision log has an inconsistent supersession link:" in err
 
 
 @pytest.mark.parametrize("stage", ["embed", "chat"])

@@ -351,7 +351,7 @@ def _views(args: argparse.Namespace) -> int:
         return _fail(f"Memory folder not found: {memory}", EXIT_USAGE)
     problems = pipeline.supersession_link_problems(memory)
     if problems:
-        _print("The decision log has a supersession link that does not point back:", sys.stderr)
+        _print("The decision log has an inconsistent supersession link:", sys.stderr)
         for problem in problems:
             _print(f"- {problem}", sys.stderr)
         return _fail("No view was written or checked.", EXIT_USAGE)
