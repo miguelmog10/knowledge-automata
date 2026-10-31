@@ -1,0 +1,3 @@
+A risk is an uncertain event or condition that, if it happens, would affect the group's objectives: for the worse (a threat) or for the better (an opportunity). It is about the future and may not happen. The artifact names the possible event, and usually its cause or its effect, for example "the supplier may deliver late, which would delay the pilot". A risk can come with an agreed response, an owner or warning signs; they belong to the same risk.
+
+Not risks: something that has already happened or is happening now (that is an issue), a general worry with no event named, and a decision the group made.

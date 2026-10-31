@@ -8,10 +8,10 @@
   - Each page starts with a short front matter block (ID, status, dates).
   - Standard relative Markdown links only, no double-bracket wiki links: supersession linked both ways, each record linked to its source artifacts, and the index linked to each record, so the registers browse like a wiki.
   - A test renders fixture records against expected output, and a CI check fails if committed views differ from the generator's output (done for the decision log).
-- Governor (orchestrator and router): classification and work orders.
-- Risk Registrar.
+- Governor (orchestrator and router): work orders, resumable runs, the `held` status and the `process` command (handoff 007, in progress; ADR-0018 proposed).
+- Risk Registrar. The Governor already finds risks (handoff 007) and keeps their work orders as not routed; whether the Risk Registrar drafts from those saved work orders or through reprocessing is decided in its handoff.
 - Fictional sample project in `examples/`, doubling as a small evaluation set with expected records.
-- CLI entry point to run the pipeline over a folder.
+- CLI entry point to run the pipeline over a folder (after handoff 007: `process` runs one artifact).
 - Release workflow that generates a CycloneDX SBOM and attaches it to the v0.1.0 tag.
 
 ## Stretch (v0.1)
@@ -24,6 +24,9 @@
 - Remaining registrars: issue log, assumption log, change log, lessons learned, stakeholder register; glossary as a minor register.
 - Project status summary: a generated Markdown view built from the registers (recent decisions, open risks, open issues, what changed since a given date), like the decision log views. No new register is needed; it is most useful once the risk register and the issue log exist (Miguel and Claude, 2026-10-31).
 - Project charter as a register maintained from artifacts: objectives, scope, key stakeholders, success criteria and constraints as records drafted from kickoff meetings and early documents, then updated or superseded as later meetings change them, each change traced to its meeting, so a project manager can ask when the scope changed and why. Agile teams revise the charter more often than waterfall teams, especially in software, so it is not written once and frozen (Miguel, 2026-10-31). Check it against the PMBOK Guide's project charter before designing.
+- Register configurator: let a group add a register, or extend one, without writing code, by giving its schema, its definition and its prompt as configuration. Registers mapped to the PMBOK Guide stay faithful to it; the others are labeled as extensions, as the decision log is. Handoff 007 prepares for it (each register's definition is a prompt file named by its spec, and the Governor's prompt is built from them); what is still code per register needs generic defaults: no semantic checks, a plain table view and a standard write rule (Miguel and Claude, 2026-10-31).
+- Semantic guardrails with escalation: the Governor (orchestrator) is the first step that reads meaning, so it raises a suspicion (an artifact unrelated to the group's work, for example notes from another team's meeting; an injection attempt; an unusual number of items) and hands the artifact to a separate checker with deterministic and semantic checks, which can hold it for review. The Governor stays simple and the checker grows on its own: a cheap first check that escalates to an expensive one only when needed. Builds on the `held` status (handoff 007); the Sensor's relevance and prompt-injection checks stay deterministic (Miguel and Claude, 2026-10-31).
+- Operator actions on held and quarantined artifacts beyond `release`: reject one, or ask the Governor to split a held artifact again (until then, by deleting its work orders file by hand).
 - Additional domains beyond project management (for example associations or research groups), each as its own set of Registrars and schemas.
 - Operator (human in the loop) approval workflow for sensitive changes.
 - Operator release workflow beyond the `release` command (review queue, reasons, notifications).
@@ -43,7 +46,7 @@
 - Sensor relevance check and prompt-injection detection.
 - Oracle insight feedback loop: Operator-confirmed conclusions from Oracle conversations are saved as new raw artifacts ("insight notes") and re-enter through the Sensor, so there is still one write path.
 - Enterprise connectors (Jira, Confluence, Microsoft Teams) as Sensor sources.
-- Alternative LLM providers behind the service layer.
+- Alternative LLM providers behind the service layer, for example OpenAI as a temporary fallback if the trial key's monthly cap is reached (Miguel, 2026-10-31). Cohere stays the default, and another provider's adapter needs its own schema reduction, like the Cohere one.
 - OpenTelemetry-compatible observability; analytics over the event log.
 - Threat model and security review; cybersecurity compliance considerations (for example the EU Cyber Resilience Act).
 - Role contracts documented so other platforms can implement roles (reference implementation vision).
@@ -73,7 +76,7 @@
 - Record reasoning tokens in LLM events: Cohere reports them in `usage.tokens.reasoning_tokens` (seen in the handoff 006 Addendum A diagnostic), but the adapter and the event log do not keep them yet. Needed to measure a thinking token budget.
 - Thinking token budget (`token_budget`) for the Registrars and the Comparator, measured on the evaluation set. A smaller budget lowers cost (in the handoff 006 diagnostic, about 1,100 of 1,300 output tokens were reasoning), but if the model runs out of budget mid-reasoning the output may change: the reasoning could spill into the answer again and break the JSON, or the decisions could get worse. Test several budgets over several artifacts, checking that the JSON stays clean and the records stay correct, before lowering the default. This tests how reliable the answers are under different conditions, not only what they cost.
 - Retest thinking disabled after each model or SDK upgrade, with several artifacts and the real prompts (a spike, not one call). If the schema is enforced from the first token with thinking disabled, an accepted call could cost about a quarter of today's output tokens; `KA_CHAT_THINKING` switches it without a code change (ADR-0014).
-- Prompt v2 candidates for the Decision Registrar, judged on the evaluation set, not on one artifact:
+- Prompt v2 candidates for the Decision Registrar, judged on the evaluation set, not on one artifact. All three are addressed in `decision-registrar.v2` (handoff 007); compare v1 and v2 on the same artifacts once the evaluation set exists:
   - `decided_by` listed everyone present instead of the group named in the decision ("the board").
   - `impacts` was a generic summary not supported by the artifact, although the prompt says to omit unsupported fields.
   - Unsupported fields also block updates (handoff 006 real run): the `DEC-0002` draft from ART-0002 filled `rationale` and `alternatives` with content the meeting notes do not state, so when ART-0004 gave the real rationale and the alternative that was set aside, the update had no empty field to fill and kept the invented ones. ART-0004's quotes are in the sources, not in the content.
@@ -92,7 +95,7 @@
 
 - Storage for records: decided, one JSON file per record ([ADR-0013](../docs/decisions/0013-record-storage-json-files.md)). The Artifact Ledger's storage: decided, one JSON file per artifact with an append-only history ([ADR-0015](../docs/decisions/0015-artifact-ledger-storage-and-sensor-checks.md)).
 - Artifact Ledger status when some of an artifact's records are rejected: decided, `processed` with a list of rejected drafts ([ADR-0015](../docs/decisions/0015-artifact-ledger-storage-and-sensor-checks.md)).
-- How a Registrar reports that an artifact has nothing to record. The draft schema always requires content; this is probably the Governor's job (it only sends work orders for items it found).
+- How a Registrar reports that an artifact has nothing to record: decided, it never has to. The Governor sends work orders only for items it found, and an artifact with none is `processed` with zero records (handoff 007, [ADR-0018](../docs/decisions/0018-governor-work-orders.md), proposed).
 - Persisting rejected drafts and their errors: decided, the Ledger lists each rejected draft by register, attempts, prompt version and error paths, plus the error type when the last response was unusable, never the full error messages, because evidence errors quote model output ([ADR-0015](../docs/decisions/0015-artifact-ledger-storage-and-sensor-checks.md)).
 - Sensor content hashes must ignore line endings (CRLF versus LF): decided, SHA-256 over the bytes without a leading BOM and with line endings as LF ([ADR-0015](../docs/decisions/0015-artifact-ledger-storage-and-sensor-checks.md)).
 - Record finish_reason and the adapter's error message in LLM events: done, event schema 1.1 ([ADR-0012](../docs/decisions/0012-llm-service-layer-observation-and-cost.md), amended).
