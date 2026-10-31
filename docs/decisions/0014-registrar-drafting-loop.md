@@ -15,6 +15,7 @@ ADR-0005 and ADR-0011 require every draft to be validated before it becomes a re
 - The record history stores the prompt version of the attempt that produced the stored draft, including the retry prompt when one was used (for example `decision-registrar.v1+registrar-retry.v1`).
 - Prompt files are immutable once a record cites them; a change is a new version file.
 - The Registrars and the Comparator run Command A+ with thinking enabled by default; `KA_CHAT_THINKING` overrides it. Thinking was disabled until 2026-10-31, to save output tokens; the handoff 006 real run showed that with thinking disabled the model writes its reasoning as prose before the JSON, so most first attempts were rejected after about as many output tokens as thinking uses (handoff 006, Addendum A).
+- The adapter parses the reply strictly: the text block must be one JSON object from its first character. Extracting a JSON object from surrounding prose was considered and rejected (2026-10-31): it is unreliable when the reasoning quotes the artifact, which can contain braces or JSON-like fragments; it still pays for the prose on every call; and it would let text echoed from an untrusted artifact reach the parser. Thinking enabled fixes the cause instead of hiding the symptom.
 
 ## Consequences
 
@@ -22,3 +23,4 @@ ADR-0005 and ADR-0011 require every draft to be validated before it becomes a re
 - The retry feedback includes quotes from the model's previous output; they go back to the same model for the same artifact.
 - A single retry will not fix a systematic prompt problem; rejection rates in evaluation runs will show it.
 - Thinking costs about 1,000 reasoning tokens per call; a token budget is measured on the evaluation set.
+- Thinking disabled can come back with the setting alone, without a code change, if a check with several artifacts shows clean JSON, for example after a model or SDK upgrade. One accepted call would then cost about a quarter of the output tokens.

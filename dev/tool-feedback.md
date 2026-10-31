@@ -197,3 +197,8 @@ Suggested improvement (Claude): write escape sequences in file content literally
 
 Note: with `thinking` disabled and a JSON schema in `response_format`, `command-a-plus-05-2026` often returned one text block that starts with its reasoning in prose ("We need to draft a decision record...") and ends with the JSON object, with `finish_reason` COMPLETE. Five of six first attempts in the handoff 006 real run failed this way, at 1,100 to 2,700 output tokens each. With thinking enabled, the reasoning went to a `thinking` block and the text block was the JSON object only (two of two). The smoke check of 2026-10-25 had seen two clean thinking-off replies on a different artifact, so the problem was not visible then.
 Suggested improvement: enforce the schema from the first token whatever the thinking setting, or document that structured outputs on reasoning models need thinking enabled.
+
+### 2026-10-31: GitHub Copilot chat in VS Code, copy button (missing)
+
+Note: the copy button on a Copilot answer copies the model's reasoning together with the answer, so Miguel removes the reasoning by hand before pasting a report into the Claude chat. It is not certain whether this behavior is new. It mirrors the Command A+ finding of the same day: reasoning and answer are kept apart inside the tool, then merged at a boundary, and whatever takes the text next has to clean it up.
+Suggested improvement: offer copy with and without the reasoning.

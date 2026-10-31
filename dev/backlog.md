@@ -68,7 +68,8 @@
 - Budget guard: stop a run before it exceeds a call or cost limit (trial keys are capped).
 - Event log rotation or archiving, if the file grows large.
 - A small report that sums calls, units and cost per run, per agent and per artifact from the event log.
-- Thinking token budget (`token_budget`) for the Registrars and the Comparator, measured on the evaluation set.
+- Thinking token budget (`token_budget`) for the Registrars and the Comparator, measured on the evaluation set. A smaller budget lowers cost (in the handoff 006 diagnostic, about 1,100 of 1,300 output tokens were reasoning), but if the model runs out of budget mid-reasoning the output may change: the reasoning could spill into the answer again and break the JSON, or the decisions could get worse. Test several budgets over several artifacts, checking that the JSON stays clean and the records stay correct, before lowering the default. This tests how reliable the answers are under different conditions, not only what they cost.
+- Retest thinking disabled after each model or SDK upgrade, with several artifacts and the real prompts (a spike, not one call). If the schema is enforced from the first token with thinking disabled, an accepted call could cost about a quarter of today's output tokens; `KA_CHAT_THINKING` switches it without a code change (ADR-0014).
 - Prompt v2 candidates for the Decision Registrar, judged on the evaluation set, not on one artifact:
   - `decided_by` listed everyone present instead of the group named in the decision ("the board").
   - `impacts` was a generic summary not supported by the artifact, although the prompt says to omit unsupported fields.

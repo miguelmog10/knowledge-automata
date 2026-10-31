@@ -236,3 +236,8 @@ Evidence: `src/knowledge_automata/core/records.py` (`new_record`), `tests/test_r
 
 ADR-0014 disabled thinking to save output tokens, based on one smoke-check artifact. The first real run with several artifacts disproved it: most first attempts failed as invalid JSON after about as many tokens as thinking uses. The run stopped as its rules said, instead of retrying into the budget, and one throwaway diagnostic that printed the raw reply structure (four calls, nothing logged or committed) showed the cause: with thinking off, the model reasons in the visible answer. The default changed on that evidence, and the failed partial run stays committed as part of the record.
 Evidence: `dev/handoffs/006-comparator.md` (Addendum A), ADR-0014 (amended 2026-10-31), `dev/tool-feedback.md`.
+
+### 2026-10-31: P11 Build evidence, not just confidence (teamwork)
+
+Talking the thinking failure through by voice, Miguel noted that working alone he would have spiked the provider's behavior first: small throwaway scripts, outside the project, that try thinking on and off and look at the raw replies. The team had done a spike (the handoff 003 smoke check), but with one artifact and a one-line prompt, and moving fast it treated one clean result as settled. The lesson for the next provider behavior a design depends on: spike it with several inputs and the real prompts before building on it. The throwaway diagnostic from handoff 006 Addendum A is the template.
+Evidence: `scripts/cohere_smoke.py`, `dev/handoffs/006-comparator.md` (Addendum A), `dev/tool-feedback.md` (2026-10-31).
