@@ -216,4 +216,4 @@ Suggested improvement: document what raw tokens count that billed tokens do not.
 ### 2026-10-31: Cohere Command A+ thinking length (open observation)
 
 Note: with thinking enabled, Comparator replies used 192, 324 and 1,149 output tokens for inputs of about the same size (1,202 to 1,252 billed input tokens). The long one was ART-0004, an update: the same decision restated with more detail, the hardest of the three to tell apart from a reaffirmation. The Decision Registrar used 1,519 to 1,670 output tokens per draft with thinking, against 311 for the one accepted draft without it. Thinking seems to scale with how hard the call is, which a fixed `token_budget` would cut first on the hard cases.
-Suggested improvement: report thinking tokens separately from answer tokens in `usage`, so a budget can be measured instead of guessed.
+Suggested improvement: none for Cohere after all. Its responses already report reasoning tokens separately (`usage.tokens.reasoning_tokens`, for example 1,046 of 1,238 output tokens in the Addendum A diagnostic); our adapter and event log do not record them yet, which is a backlog item (Claude, 2026-10-31).

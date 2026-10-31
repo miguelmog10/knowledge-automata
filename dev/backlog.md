@@ -68,11 +68,14 @@
 - Budget guard: stop a run before it exceeds a call or cost limit (trial keys are capped).
 - Event log rotation or archiving, if the file grows large.
 - A small report that sums calls, units and cost per run, per agent and per artifact from the event log.
+- Record reasoning tokens in LLM events: Cohere reports them in `usage.tokens.reasoning_tokens` (seen in the handoff 006 Addendum A diagnostic), but the adapter and the event log do not keep them yet. Needed to measure a thinking token budget.
 - Thinking token budget (`token_budget`) for the Registrars and the Comparator, measured on the evaluation set. A smaller budget lowers cost (in the handoff 006 diagnostic, about 1,100 of 1,300 output tokens were reasoning), but if the model runs out of budget mid-reasoning the output may change: the reasoning could spill into the answer again and break the JSON, or the decisions could get worse. Test several budgets over several artifacts, checking that the JSON stays clean and the records stay correct, before lowering the default. This tests how reliable the answers are under different conditions, not only what they cost.
 - Retest thinking disabled after each model or SDK upgrade, with several artifacts and the real prompts (a spike, not one call). If the schema is enforced from the first token with thinking disabled, an accepted call could cost about a quarter of today's output tokens; `KA_CHAT_THINKING` switches it without a code change (ADR-0014).
 - Prompt v2 candidates for the Decision Registrar, judged on the evaluation set, not on one artifact:
   - `decided_by` listed everyone present instead of the group named in the decision ("the board").
   - `impacts` was a generic summary not supported by the artifact, although the prompt says to omit unsupported fields.
+  - Unsupported fields also block updates (handoff 006 real run): the `DEC-0002` draft from ART-0002 filled `rationale` and `alternatives` with content the meeting notes do not state, so when ART-0004 gave the real rationale and the alternative that was set aside, the update had no empty field to fill and kept the invented ones. ART-0004's quotes are in the sources, not in the content.
+  - One data point to test, not a conclusion: `DEC-0002` was drafted with thinking disabled and invented both fields; `DEC-0003`, drafted with thinking enabled, left out the alternatives the artifact does not give and named "the board" as `decided_by`. Compare invented fields with thinking on and off on the evaluation set.
 
 ### When collaborators join
 
