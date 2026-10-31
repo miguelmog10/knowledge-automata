@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from knowledge_automata.agents.sensor import content_hash
+from knowledge_automata.agents.sensor import content_hash, copy_name
 from knowledge_automata.domains.project_management.registers import DECISION_LOG
 from knowledge_automata.storage.ledger_store import LedgerStore
 from knowledge_automata.storage.record_store import RecordStore
@@ -18,7 +18,7 @@ def test_every_ledger_entry_matches_the_sample_project():
         # compared with the file: autocrlf may change the bytes on disk (backlog, Open
         # questions).
         assert content_hash(copy.read_bytes()) == entry["content_hash"], entry["id"]
-        assert entry["source"]["name"] == copy.name
+        assert copy_name(entry["id"], entry["source"]["name"]) == copy.name, entry["id"]
         assert entry["status"] == "processed"
 
         for produced in entry["produced"]:
