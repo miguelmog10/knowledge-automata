@@ -207,3 +207,13 @@ Suggested improvement: offer copy with and without the reasoning.
 
 Note: when its output is piped (captured by a terminal tool or redirected), Python on Windows encodes `sys.stdout` as cp1252, not UTF-8; only an interactive console gets UTF-8. In the handoff 006 real run, `record-decision ART-0004` crashed with `UnicodeEncodeError` while printing the Comparator's reason, which contained U+2011 (a non-breaking hyphen), a character the console shows fine. The records and the Ledger had already been written, but the rest of the output was lost, including the reason, which is not stored anywhere. The CLI now reconfigures stdout and stderr to UTF-8 at start.
 Suggested improvement: Python's UTF-8 mode avoids it; PEP 686 makes it the default from Python 3.15, and earlier versions need `PYTHONUTF8=1` (this run used 3.12). For us, any CLI that prints model output sets its streams to UTF-8 itself.
+
+### 2026-10-31: Cohere Chat API raw versus billed input tokens (open observation)
+
+Note: in the handoff 006 real run, raw input tokens (`meta.tokens.input_tokens`) minus billed input tokens was the same for every call of a prompt, whatever the artifact or attempt: 473 for each Decision Registrar call with thinking disabled and 472 with it enabled (seven calls), and 253 and 252 for the Comparator (five calls). So the unbilled part looks like a fixed overhead per request shape (perhaps the template around the messages, or the `response_format` schema, which is larger for the Registrar), not something that grows with the content. The docs still do not say what the difference is (see the 2026-10-25 entry).
+Suggested improvement: document what raw tokens count that billed tokens do not.
+
+### 2026-10-31: Cohere Command A+ thinking length (open observation)
+
+Note: with thinking enabled, Comparator replies used 192, 324 and 1,149 output tokens for inputs of about the same size (1,202 to 1,252 billed input tokens). The long one was ART-0004, an update: the same decision restated with more detail, the hardest of the three to tell apart from a reaffirmation. The Decision Registrar used 1,519 to 1,670 output tokens per draft with thinking, against 311 for the one accepted draft without it. Thinking seems to scale with how hard the call is, which a fixed `token_budget` would cut first on the hard cases.
+Suggested improvement: report thinking tokens separately from answer tokens in `usage`, so a budget can be measured instead of guessed.
