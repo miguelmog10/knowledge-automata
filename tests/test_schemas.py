@@ -6,6 +6,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from knowledge_automata.core import schemas
+from knowledge_automata.core.prompts import load_prompt
 from knowledge_automata.core.registers import CLASSIFICATIONS, RegisterSpec
 from knowledge_automata.domains.project_management.registers import (
     DECISION_LOG,
@@ -64,6 +65,7 @@ def provider_compatibility_errors(schema: dict, path: str = "$") -> list[str]:
 def provider_schemas() -> list[tuple[str, dict]]:
     pairs = [(f"draft:{spec.name}", schemas.draft_schema(spec)) for spec in REGISTERS]
     pairs.append(("reconciliation", schemas.load_schema(schemas.RECONCILIATION_SCHEMA)))
+    pairs.append(("governor-reply", schemas.governor_schema(REGISTERS)))
     return pairs
 
 
@@ -71,6 +73,7 @@ def test_all_expected_schema_files_are_found():
     assert set(schemas.list_schemas()) >= {
         "core/record.v1.json",
         "core/draft.v1.json",
+        "core/governor-reply.v1.json",
         "core/ledger-entry.v1.json",
         "core/llm-event.v1.json",
         "core/reconciliation.v1.json",
@@ -160,6 +163,21 @@ def test_load_schema_raises_for_missing_file():
 def test_registers_point_at_existing_content_schemas():
     for spec in REGISTERS:
         assert spec.content_schema in schemas.list_schemas()
+
+
+@pytest.mark.parametrize("spec", REGISTERS, ids=lambda spec: spec.name)
+def test_registers_name_a_definition_that_loads(spec):
+    assert spec.definition == f"project-management/definitions/{spec.name}.v1"
+    definition = load_prompt(spec.definition)
+    assert definition.version == f"{spec.name}.v1"
+    assert definition.text.strip()
+
+
+def test_register_definition_is_optional():
+    spec = RegisterSpec(
+        "test-register", "TST", "project-management/decision.v1.json", CLASSIFICATIONS
+    )
+    assert spec.definition is None
 
 
 def test_risk_register_does_not_allow_supersession():

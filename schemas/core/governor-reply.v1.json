@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:knowledge-automata:schema:core:governor-reply:v1",
+  "x-version": "1.0",
+  "title": "Governor reply",
+  "description": "What the Governor (orchestrator) returns for one artifact: the items that belong in a register, each with evidence quotes. At runtime, code sets the allowed register names on 'register'. Code checks the reply before any work order is built from it.",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "maxItems": 100,
+      "description": "One item per distinct thing that fits a register, in the order they first appear. Empty when nothing fits.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "register": { "type": "string", "description": "The register this item belongs to." },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "items": { "type": "string", "maxLength": 500 },
+            "description": "Quotes copied word for word from the artifact that point to this item; the passage that states it first."
+          }
+        },
+        "required": ["register", "evidence"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["items"],
+  "additionalProperties": false
+}

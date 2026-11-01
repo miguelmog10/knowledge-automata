@@ -1,4 +1,5 @@
-"""Validators for records, Registrar drafts, Comparator results and Ledger entries (ADR-0011).
+"""Validators for records, Registrar drafts, Governor replies, Comparator results and Ledger
+entries (ADR-0011, ADR-0018).
 
 Validators never raise for invalid data: they return a ``ValidationResult`` whose error
 messages start with the JSON path of the problem. They raise only for programming errors,
@@ -7,14 +8,14 @@ such as a missing schema file.
 
 import functools
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
 
-from knowledge_automata.core.evidence import QuoteCheck, check_evidence
+from knowledge_automata.core.evidence import QuoteCheck, check_evidence, normalize_quote
 from knowledge_automata.core.ledger import CHECK_OUTCOMES, STORED_COPY_STATUSES, TRANSITIONS
 from knowledge_automata.core.ledger import SCHEMA_VERSION as LEDGER_SCHEMA_VERSION
 from knowledge_automata.core.registers import RegisterSpec
@@ -24,6 +25,7 @@ from knowledge_automata.core.schemas import (
     RECONCILIATION_SCHEMA,
     RECORD_SCHEMA,
     draft_schema,
+    governor_schema,
     load_schema,
     major_version,
     schema_version,
@@ -72,6 +74,11 @@ def _schema_validator(relative_path: str) -> Draft202012Validator:
 @functools.cache
 def _draft_validator(spec: RegisterSpec) -> Draft202012Validator:
     return Draft202012Validator(draft_schema(spec), format_checker=FORMAT_CHECKER)
+
+
+@functools.cache
+def _governor_validator(specs: tuple[RegisterSpec, ...]) -> Draft202012Validator:
+    return Draft202012Validator(governor_schema(specs), format_checker=FORMAT_CHECKER)
 
 
 def _schema_errors(validator: Draft202012Validator, instance: Any, path: str = "$") -> list[str]:
@@ -201,16 +208,27 @@ def revision_errors(old: Mapping[str, Any], new: Mapping[str, Any]) -> list[str]
 
 
 def _evidence_errors(
-    quotes: Iterable[tuple[int, str]], artifact_text: str
+    quotes: Iterable[tuple[int, str]], artifact_text: str, path: str = "$.evidence"
 ) -> tuple[list[str], tuple[QuoteCheck, ...]]:
     indexed = list(quotes)
     checks = tuple(check_evidence([quote for _, quote in indexed], artifact_text))
     errors = [
-        f"$.evidence[{index}]: {check.reason}: {check.quote!r}"
+        f"{path}[{index}]: {check.reason}: {check.quote!r}"
         for (index, _), check in zip(indexed, checks, strict=True)
         if not check.passed
     ]
     return errors, checks
+
+
+def _string_quotes(evidence: Any) -> list[tuple[int, str]]:
+    if not isinstance(evidence, list):
+        return []
+    return [(index, quote) for index, quote in enumerate(evidence) if isinstance(quote, str)]
+
+
+def _overlaps(a: str, b: str) -> bool:
+    """Two normalized quotes overlap when one contains the other."""
+    return a in b or b in a
 
 
 def validate_draft(draft: Any, spec: RegisterSpec, artifact_text: str) -> ValidationResult:
@@ -233,6 +251,54 @@ def validate_draft(draft: Any, spec: RegisterSpec, artifact_text: str) -> Valida
         evidence_errors, checks = _evidence_errors(quotes, artifact_text)
         errors.extend(evidence_errors)
     return ValidationResult(tuple(errors), checks)
+
+
+def validate_work_orders(
+    reply: Any, specs: Sequence[RegisterSpec], artifact_text: str
+) -> ValidationResult:
+    """Validate a Governor (orchestrator) reply: schema, evidence quotes and shared quotes.
+
+    Two items in the same register may not share a quote: after ``normalize_quote``, one
+    quote containing the other means one item was returned twice (ADR-0018). Quotes within
+    one item may overlap. Only quotes that pass the evidence check are compared, so a quote
+    that normalizes to almost nothing does not match everything. The number of items is
+    not checked here: the limit is a setting.
+    """
+    errors = _schema_errors(_governor_validator(tuple(specs)), reply)
+    items = reply.get("items") if isinstance(reply, dict) else None
+    if not isinstance(items, list):
+        return ValidationResult(tuple(errors))
+
+    seen: list[tuple[int, Any, str]] = []  # (item index, register, normalized quote)
+    for item_index, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        quotes = _string_quotes(item.get("evidence"))
+        path = f"$.items[{item_index}].evidence"
+        evidence_errors, checks = _evidence_errors(quotes, artifact_text, path)
+        errors.extend(evidence_errors)
+        register = item.get("register")
+        passed = [
+            (quote_index, normalize_quote(quote))
+            for (quote_index, quote), check in zip(quotes, checks, strict=True)
+            if check.passed
+        ]
+        for quote_index, normalized in passed:
+            earlier = next(
+                (
+                    other_index
+                    for other_index, other_register, other in seen
+                    if other_register == register and _overlaps(normalized, other)
+                ),
+                None,
+            )
+            if earlier is not None:
+                errors.append(
+                    f"{path}[{quote_index}]: also quoted by item {earlier} in the same "
+                    "register; return one item for one thing"
+                )
+        seen.extend((item_index, register, normalized) for _, normalized in passed)
+    return ValidationResult(tuple(errors))
 
 
 def validate_reconciliation(
