@@ -45,6 +45,7 @@
 - Supersession of more than one record at once (`relations.supersedes` already allows a list).
 - Repair for a Ledger left behind its records by an interrupted run (today the pipeline detects it and stops).
 - Sensor relevance check and prompt-injection detection.
+  - An artifact could contain fake `<work-order>` text inside the artifact block, to steer a Registrar towards another item. Today the safety net is in code: the draft must quote something that matches the real work order (handoff 007).
 - Oracle insight feedback loop: Operator-confirmed conclusions from Oracle conversations are saved as new raw artifacts ("insight notes") and re-enter through the Sensor, so there is still one write path.
 - Enterprise connectors (Jira, Confluence, Microsoft Teams) as Sensor sources.
 - Alternative LLM providers behind the service layer, for example OpenAI as a temporary fallback if the trial key's monthly cap is reached (Miguel, 2026-10-31). Cohere stays the default, and another provider's adapter needs its own schema reduction, like the Cohere one.
@@ -112,3 +113,4 @@
 - If writing the views or the Ledger entry fails after a record is saved, a rerun of `record-decision` is refused because the Ledger is behind the records. The fix is by hand today (`knowledge-automata views`, then the Ledger entry); the error could say so step by step.
 - `release` does not check the stored copy's hash: a quarantined copy edited in place is released, then refused by `record-decision`. Checking the hash at release would fail sooner, with the same message.
 - A crash between writing an artifact copy and its Ledger entry leaves an orphan copy, and the next `ingest` stops on "file exists" for the same ID until the copy is deleted. It fails loudly; the error could say which file to remove.
+- The Comparator keeps its own call, check and retry loop; the Registrars and the Governor share `agents/checked_chat.py` (handoff 007, part 7A). Moving the Comparator onto it would remove the duplicate, as long as its tests stay unchanged.

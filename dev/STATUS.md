@@ -2,11 +2,11 @@
 
 ## Last updated
 
-2026-10-31
+2026-11-01
 
 ## Current phase
 
-Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation). Handoff 007, the Governor (orchestrator), is designed and written (`dev/handoffs/007-governor.md`, on `feat/governor`), in three parts, 7A, 7B and 7C. The Governor spike is done and the prompts are settled; next, Copilot plans part 7A.
+Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation). Handoff 007, the Governor (orchestrator), is in progress on `feat/governor`, in three parts, 7A, 7B and 7C. Part 7A (the Governor agent and the work order support in the Decision Registrar, offline) is built, 814 tests passing; next, Claude reviews it and Copilot plans part 7B.
 
 ## Done
 
@@ -98,11 +98,18 @@ Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation).
   - `process ARTIFACT_ID` replaces `record-decision`. No work orders means `processed` with zero records.
   - Three parts, each ending green, so Copilot can stop after any of them while credits are low.
 - The Governor spike (`runtime/diagnostics/spike_governor.py`, git-ignored), run by Miguel on 2026-10-31 with the real prompts, 17 calls in three rounds: every reply was valid JSON and every quote passed the evidence check. Round 1 (ART-0001 to ART-0008, and three `decision-registrar.v2` drafts) matched on 7 of 8 artifacts: ART-0004's rationale sentence came back as a second decision; the drafts invented no rationale or alternatives. A new prompt line fixed ART-0004 but dropped ART-0006's confirmation of `DEC-0003` (round 2); the narrowed line found every expected item on ART-0003, ART-0004 and ART-0006 (round 3). Details in `dev/handoffs/007-governor.md`, section 6.
+- Part 7A, built by Copilot on 2026-11-01 after Miguel approved the plan, in five commits, 814 tests passing offline (all LLM calls faked); no pipeline, CLI or prompt change, so `record-decision` still uses `decision-registrar.v1`:
+  - Register definitions: `RegisterSpec.definition` names a versioned prompt file; both project-management registers point to theirs.
+  - The Governor reply schema (`schemas/core/governor-reply.v1.json`, the register enum set by `governor_schema`) and `validate_work_orders`: schema, every quote checked against the artifact, and no quote shared by two items of the same register (text-based, one quote containing another counts, so a decision repeated in a summary is caught).
+  - `core/work_orders.py`: `WorkOrder`, sorting by the earliest quote position in the artifact, numbering from 1, and `placeholder_label` (the first-listed quote, cut at a word boundary to at most 60 characters, plus `...`).
+  - `agents/checked_chat.py`: the call, check and retry loop, shared by the Registrars and the Governor. `tests/test_registrar.py` passes unchanged, and each attempt keeps its prompt version in `CallContext` as before. The Comparator keeps its own loop (technical debt).
+  - `agents/governor.py`: the Governor builds its system text by replacing `{registers}` with one block per register definition, and refuses a setup without the placeholder, a register without a definition, or a definition that does not match its spec. `find_work_orders` checks the artifact, calls once, retries once with the errors, and returns sorted work orders.
+  - The Decision Registrar with a work order: the user message adds the work order as JSON between `<work-order>` lines (every `<` escaped), and `validate_draft` requires a passing quote that matches a work order quote. Without a work order the message is byte-for-byte unchanged. A work order for another register is refused before any call.
 
 ## Next
 
 - An evaluation harness grown from the spike, as a small step after handoff 007 (backlog).
-- Copilot plans and builds part 7A, then 7B, then the real run in 7C, each after Miguel's approval and Claude's review.
+- Copilot plans and builds part 7B, then the real run in 7C, each after Miguel's approval and Claude's review (7A is built and waits for review).
 - Claude: the visual guide still says "thinking off" (`docs/guide/index.html`, line 178); refresh it with the guide steps, together with the 007 diagrams.
 - Enable GitHub Pages in the repository settings, if not done yet, and mark ADR-0016 accepted once the guide is online.
 - After the Governor: the Risk Registrar, the folder command, the sample project as an evaluation set, and the v0.1.0 release (see `dev/backlog.md`).
