@@ -712,7 +712,7 @@ def test_release_is_refused_while_another_check_fails(inbox, memory, capsys):
     ("artifact_id", "reason", "fragment"),
     [
         ("ART-0002", "Looks fine", "ART-0002 is not in the Ledger"),
-        ("ART-0001", "Looks fine", "only a quarantined artifact can be released"),
+        ("ART-0001", "Looks fine", "only a quarantined or held artifact can be released"),
         ("ART-0001", "   ", "--reason must be 1 to 500 characters"),
         ("ART-0001", "x" * 501, "--reason must be 1 to 500 characters"),
     ],

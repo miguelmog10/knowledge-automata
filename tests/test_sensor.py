@@ -333,7 +333,7 @@ def test_release_refuses_while_another_check_still_fails(memory, inbox, raw, che
 
 def test_release_needs_a_quarantined_entry_and_a_reason(memory, inbox):
     accepted = run(memory, drop(inbox, "notes.md", NOTES)).entry
-    with pytest.raises(SensorInputError, match="ART-0001 is accepted; only a quarantined"):
+    with pytest.raises(InputError, match="ART-0001 is accepted; only a quarantined or held"):
         release_artifact(artifact_id=accepted["id"], memory=memory, reason="Why not", now=LATER)
     with pytest.raises(LedgerEntryNotFoundError):
         release_artifact(artifact_id="ART-0009", memory=memory, reason="Why not", now=LATER)

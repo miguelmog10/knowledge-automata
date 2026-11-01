@@ -187,15 +187,28 @@ def ingest_file(
 def release_artifact(
     *, artifact_id: str, memory: Path, reason: str, now: datetime
 ) -> sensor.ReleaseOutcome:
-    """The Operator's release of a quarantined artifact (the Sensor decides; this stores it).
+    """The Operator's release of a quarantined or held artifact.
 
-    Raises ``SensorInputError`` for a missing reason or an entry that is not quarantined,
-    and ``LedgerEntryNotFoundError`` for an unknown ID, before the copy is read.
+    A ``held`` artifact becomes ``accepted`` by ``operator`` with no Sensor check and no
+    read of its copy (its bytes were already accepted); the next ``process`` runs its saved
+    work orders. For a quarantined artifact the Sensor reruns its checks and decides.
+
+    Raises ``SensorInputError`` for a missing reason, ``InputError`` for an entry that is
+    neither quarantined nor held, and ``LedgerEntryNotFoundError`` for an unknown ID, before
+    the copy is read.
     """
-    sensor.check_reason(reason)
+    reason = sensor.check_reason(reason)
     store = LedgerStore(memory)
     entry = store.load(artifact_id)
-    sensor.check_releasable(entry)
+    if entry["status"] == "held":
+        released = ledger.transition(entry, to="accepted", by="operator", at=now, reason=reason)
+        store.save_transition(entry, released)
+        return sensor.ReleaseOutcome(True, released)
+    if entry["status"] != "quarantined":
+        raise InputError(
+            f"{artifact_id} is {entry['status']}; only a quarantined or held artifact can be "
+            "released"
+        )
     raw = artifact_files.read_copy(memory, entry["stored_path"])
     outcome = sensor.release(entry, raw, reason=reason, now=now)
     if outcome.released:

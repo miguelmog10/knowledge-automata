@@ -110,10 +110,12 @@ def _parser() -> argparse.ArgumentParser:
 
     release = commands.add_parser(
         "release",
-        help="Release a quarantined artifact after review.",
+        help="Release a quarantined or held artifact after review.",
         description=(
-            "The Operator's manual release: rerun the Sensor's checks on the stored copy "
-            "without the size limit and, if they pass, mark the artifact accepted."
+            "The Operator's manual release. A quarantined artifact: rerun the Sensor's "
+            "checks on the stored copy without the size limit and, if they pass, mark it "
+            "accepted. A held artifact (more work orders than KA_GOVERNOR_MAX_ITEMS): mark it "
+            "accepted, so that process runs all its saved work orders."
         ),
     )
     release.add_argument("artifact_id", metavar="ARTIFACT_ID", help="for example ART-0005")
@@ -429,6 +431,12 @@ def _release(args: argparse.Namespace, clock: Callable[[], datetime]) -> int:
             "nothing was written",
             EXIT_REJECTED,
         )
+    if outcome.entry["history"][-2]["status"] == "held":
+        print(
+            f"Released {args.artifact_id}: it is now accepted; process {args.artifact_id} "
+            "runs its saved work orders"
+        )
+        return EXIT_OK
     print(f"Released {args.artifact_id}: it is now accepted")
     return EXIT_OK
 

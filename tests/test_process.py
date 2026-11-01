@@ -1168,7 +1168,90 @@ def test_a_saved_file_over_its_limit_is_held_again_with_no_call(memory, clock, m
     assert held["status"] == "held" and held["history"][-1]["run_id"] == RUN_ID
 
 
-def test_a_governor_rejection_survives_a_rerun_that_is_held(memory, clock, monkeypatch, capsys):
+def release(clock, memory, artifact_id, reason="Reviewed by Miguel: two real decisions"):
+    return run(
+        FakeBuild(), clock, "release", artifact_id, "--reason", reason, "--memory", str(memory)
+    )
+
+
+def test_a_released_artifact_runs_every_saved_order_with_no_governor_call(
+    memory, clock, monkeypatch, capsys
+):
+    monkeypatch.setenv("KA_GOVERNOR_MAX_ITEMS", "1")
+    assert process(FakeBuild(MIXED), clock, memory, "ART-0006") == 1
+    capsys.readouterr()
+
+    def no_read(*args):
+        raise AssertionError("a held artifact is released without reading its copy")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(pipeline.artifact_files, "read_copy", no_read)
+        assert release(clock, memory, "ART-0006") == 0
+    assert capsys.readouterr().out == (
+        "Released ART-0006: it is now accepted; process ART-0006 runs its saved work orders\n"
+    )
+    released = entry(memory, "ART-0006")
+    assert valid(memory, "ART-0006")
+    assert released["status"] == "accepted"
+    assert released["history"][-1] == {
+        "at": released["history"][-1]["at"],
+        "status": "accepted",
+        "by": "operator",
+        "reason": "Reviewed by Miguel: two real decisions",
+    }
+    assert released["governor"]["run_id"] == RUN_ID
+
+    # The limit is still 1: the release covers this file, so every order runs.
+    build = FakeBuild(REPORTS, STALL, answer("new", reason="Another topic."))
+    assert process(build, clock, memory, "ART-0006") == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[1] == f"Using 3 saved work orders from run {RUN_ID}; the Governor was not called."
+    assert "governor" not in build.agents
+    assert states(memory, "ART-0006") == ["recorded", "recorded", "not-routed"]
+    done = entry(memory, "ART-0006")
+    assert valid(memory, "ART-0006")
+    assert done["status"] == "processed"
+    assert listed(done["produced"]) == [("DEC-0001", 1), ("DEC-0002", 2)]
+    assert statuses(memory, "ART-0006") == [
+        "received",
+        "accepted",
+        "held",
+        "accepted",
+        "processed",
+    ]
+
+
+def test_a_release_covers_only_the_file_whose_run_id_was_held(memory, clock, monkeypatch, capsys):
+    monkeypatch.setenv("KA_GOVERNOR_MAX_ITEMS", "1")
+    assert process(FakeBuild(MIXED), clock, memory, "ART-0006") == 1
+    assert release(clock, memory, "ART-0006") == 0
+    WorkOrderStore(memory).path("ART-0006").unlink()  # deleted by hand
+    capsys.readouterr()
+
+    build = FakeBuild(MIXED, run_id=OTHER_RUN_ID)
+    assert process(build, clock, memory, "ART-0006") == 1
+    assert build.agents == ["governor"]
+    assert "more than KA_GOVERNOR_MAX_ITEMS (1)" in capsys.readouterr().err
+    held = entry(memory, "ART-0006")
+    assert valid(memory, "ART-0006")
+    assert held["status"] == "held"
+    assert held["history"][-1]["run_id"] == OTHER_RUN_ID
+    assert work_orders(memory, "ART-0006")["run_id"] == OTHER_RUN_ID
+    assert not (memory / "registers").exists()
+
+
+def test_releasing_an_artifact_that_is_not_held_or_quarantined_is_refused(memory, clock, capsys):
+    assert release(clock, memory, "ART-0006") == 2
+    assert (
+        "ART-0006 is accepted; only a quarantined or held artifact can be released"
+        in capsys.readouterr().err
+    )
+    assert statuses(memory, "ART-0006") == ["received", "accepted"]
+
+
+def test_a_governor_rejection_survives_a_hold_a_release_and_the_run_after_it(
+    memory, clock, monkeypatch, capsys
+):
     unusable = LLMResponseError("truncated")
     assert process(FakeBuild(unusable, unusable), clock, memory, "ART-0006") == 1
     (governor_item,) = entry(memory, "ART-0006")["rejected"]
@@ -1181,7 +1264,28 @@ def test_a_governor_rejection_survives_a_rerun_that_is_held(memory, clock, monke
     assert held["status"] == "held"
     assert held["rejected"] == [governor_item]
     assert held["history"][-1]["run_id"] == OTHER_RUN_ID
-    assert statuses(memory, "ART-0006") == ["received", "accepted", "processed", "held"]
+
+    assert release(clock, memory, "ART-0006") == 0
+    released = entry(memory, "ART-0006")
+    assert valid(memory, "ART-0006")
+    assert released["rejected"] == [governor_item]
+
+    build = FakeBuild(REPORTS, STALL, answer("new", reason="Another topic."))
+    assert process(build, clock, memory, "ART-0006") == 0
+    assert "governor" not in build.agents
+    done = entry(memory, "ART-0006")
+    assert valid(memory, "ART-0006")
+    assert done["status"] == "processed"
+    assert done["rejected"] == [governor_item]
+    assert listed(done["produced"]) == [("DEC-0001", 1), ("DEC-0002", 2)]
+    assert statuses(memory, "ART-0006") == [
+        "received",
+        "accepted",
+        "processed",
+        "held",
+        "accepted",
+        "processed",
+    ]
 
 
 # Output hygiene
