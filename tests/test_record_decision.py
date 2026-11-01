@@ -298,7 +298,7 @@ def test_the_four_classifications_from_an_empty_memory_folder(memory, clock, cap
     assert pipeline.supersession_link_problems(memory) == []
     for artifact_id in ("ART-0001", "ART-0002", "ART-0003", "ART-0004", "ART-0005"):
         assert validate_ledger_entry(entry(memory, artifact_id)).ok, artifact_id
-        assert entry(memory, artifact_id)["schema_version"] == "1.1"
+        assert entry(memory, artifact_id)["schema_version"] == "1.2"
 
     assert entry(memory, "ART-0001")["produced"] == [
         {

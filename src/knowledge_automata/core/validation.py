@@ -406,12 +406,14 @@ def _ledger_history_errors(history: list[dict[str, Any]]) -> list[str]:
             )
         if by == "operator" and "reason" not in step:
             errors.append(f"{path}: an Operator entry needs a reason")
+        if status == "held" and "reason" not in step:
+            errors.append(f"{path}: a 'held' entry needs a reason")
 
-        ran = status in ("processed", "failed")
+        ran = status in ("processed", "failed", "held")
         if ran and "run_id" not in step:
             errors.append(f"{path}: a {status!r} entry needs a run_id")
         elif not ran and "run_id" in step:
-            errors.append(f"{path}.run_id: only 'processed' and 'failed' entries have one")
+            errors.append(f"{path}.run_id: only 'processed', 'failed' and 'held' entries have one")
         if status == "failed" and "error_type" not in step:
             errors.append(f"{path}: a 'failed' entry needs an error_type")
         elif status != "failed" and "error_type" in step:
@@ -460,6 +462,31 @@ def _produced_errors(produced: list[dict[str, Any]]) -> list[str]:
     return errors
 
 
+def _work_order_errors(entry: Mapping[str, Any]) -> list[str]:
+    """Work order numbers need a Governor block; each produced item has its own order."""
+    errors = []
+    has_governor = "governor" in entry
+    seen: set[int] = set()
+    for index, item in enumerate(entry["produced"]):
+        path = f"$.produced[{index}]"
+        number = item.get("work_order")
+        if number is None:
+            if has_governor:
+                errors.append(f"{path}: needs a work_order when the entry has a governor block")
+            continue
+        if not has_governor:
+            errors.append(f"{path}.work_order: only an entry with a governor block has one")
+        elif number in seen:
+            errors.append(f"{path}.work_order: work order {number} is listed twice")
+        seen.add(number)
+    for index, item in enumerate(entry["rejected"]):
+        if "work_order" in item and not has_governor:
+            errors.append(
+                f"$.rejected[{index}].work_order: only an entry with a governor block has one"
+            )
+    return errors
+
+
 def validate_ledger_entry(entry: Any) -> ValidationResult:
     """Validate a stored Artifact Ledger entry: schema, history path and status rules (ADR-0015).
 
@@ -495,19 +522,33 @@ def validate_ledger_entry(entry: Any) -> ValidationResult:
         errors.append("$: media_type is required unless the format is unsupported")
 
     if status != "processed":
-        if entry["produced"]:
-            errors.append("$.produced: must be empty unless the status is 'processed'")
-        ran_before = any(step["status"] == "processed" for step in history[:-1])
-        if entry["rejected"] and not (status == "failed" and ran_before):
+        if entry["produced"] and not (status == "failed" and "governor" in entry):
             errors.append(
-                "$.rejected: must be empty unless the status is 'processed', or 'failed' "
-                "after an earlier 'processed' step"
+                "$.produced: must be empty unless the status is 'processed', or 'failed' "
+                "with a governor block"
             )
+    released_from_hold = status == "accepted" and any(
+        step["status"] == "held" for step in history[:-1]
+    )
+    keeps_results = status in ("processed", "failed", "held") or released_from_hold
+    if entry["rejected"] and not keeps_results:
+        errors.append(
+            "$.rejected: must be empty unless the status is 'processed', 'failed' or 'held', "
+            "or 'accepted' after a release from 'held'"
+        )
+    if "governor" in entry and not keeps_results:
+        errors.append(
+            "$.governor: only a 'processed', 'failed' or 'held' entry, or an 'accepted' one "
+            "after a release from 'held', has one"
+        )
     errors.extend(_schema_version_errors(entry["schema_version"]))
     errors.extend(_produced_errors(entry["produced"]))
+    errors.extend(_work_order_errors(entry))
     run_ids = {step["run_id"] for step in history if step["status"] == "processed"}
     for index, item in enumerate(entry["rejected"]):
-        if "run_id" in item and item["run_id"] not in run_ids:
+        # Items with a work order come from the work orders file, whose runs may have
+        # ended failed or been interrupted.
+        if "run_id" in item and "work_order" not in item and item["run_id"] not in run_ids:
             errors.append(
                 f"$.rejected[{index}].run_id: not the run_id of a 'processed' history entry"
             )

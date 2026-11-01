@@ -77,7 +77,7 @@ def test_new_entry_matches_the_handoff_example_in_schema_key_order():
         "rejected",
         "history",
     ]
-    assert entry["schema_version"] == "1.1"
+    assert entry["schema_version"] == "1.2"
     assert entry["source"] == {"type": "file", "name": "pilot-review.md"}
     assert entry["created_at"] == "2026-10-28T14:00:00Z"
     assert entry["updated_at"] == "2026-10-28T14:00:20Z"
@@ -178,6 +178,17 @@ def test_transitions_outside_the_table_or_by_the_wrong_owner_are_refused(steps, 
         [("quarantined", "sensor"), ("accepted", "operator"), ("processed", "pipeline")],
         [("accepted", "sensor"), ("processed", "pipeline"), ("processed", "pipeline")],
         [("accepted", "sensor"), ("processed", "pipeline"), ("failed", "pipeline")],
+        [("accepted", "sensor"), ("processed", "governor"), ("failed", "governor")],
+        [("accepted", "sensor"), ("held", "governor"), ("accepted", "operator")],
+        [("accepted", "sensor"), ("failed", "governor"), ("held", "governor")],
+        [("accepted", "sensor"), ("processed", "governor"), ("held", "governor")],
+        [
+            ("quarantined", "sensor"),
+            ("accepted", "operator"),
+            ("held", "governor"),
+            ("accepted", "operator"),
+            ("processed", "governor"),
+        ],
     ],
 )
 def test_every_allowed_path_is_accepted(path):
@@ -185,6 +196,24 @@ def test_every_allowed_path_is_accepted(path):
     for status, by in path:
         entry = transition(entry, to=status, by=by, at=NOW)
     assert entry["status"] == path[-1][0]
+
+
+@pytest.mark.parametrize(
+    ("steps", "message"),
+    [
+        ([("accepted", "sensor"), ("held", "pipeline")], "allowed: governor"),
+        ([("accepted", "sensor"), ("held", "operator")], "allowed: governor"),
+        ([("accepted", "sensor"), ("held", "governor"), ("processed", "governor")], "'held' to"),
+        ([("accepted", "sensor"), ("held", "governor"), ("failed", "governor")], "'held' to"),
+        ([("accepted", "sensor"), ("held", "governor"), ("accepted", "governor")], "operator"),
+        ([("quarantined", "sensor"), ("held", "governor")], "'quarantined' to 'held'"),
+    ],
+)
+def test_held_transitions_outside_the_table_are_refused(steps, message):
+    entry = received()
+    with pytest.raises(LedgerError, match=message):
+        for status, by in steps:
+            entry = transition(entry, to=status, by=by, at=NOW)
 
 
 @pytest.mark.parametrize("to", ["processed", "failed"])
@@ -340,7 +369,7 @@ def test_a_hand_edited_history_is_caught():
     [
         ({"check": "oversized"}, "$.history[1].check: 'oversized' leads to 'quarantined'"),
         ({"check": None}, "$.history[1]: a Sensor 'rejected' entry needs the check"),
-        ({"run_id": RUN_ID}, "$.history[1].run_id: only 'processed' and 'failed' entries"),
+        ({"run_id": RUN_ID}, "$.history[1].run_id: only 'processed', 'failed' and 'held'"),
         ({"error_type": "X"}, "$.history[1].error_type: only 'failed' entries have one"),
     ],
 )
@@ -399,18 +428,21 @@ def test_media_type_is_absent_only_for_an_unsupported_format():
     assert "$.media_type: must be absent when the format is unsupported" in errors_of(rejected)
 
 
-def test_results_are_empty_unless_processed():
+def test_results_are_empty_unless_processed_or_kept_by_a_later_run():
     entry = ledger.with_results(accepted(), [PRODUCED], [REJECTED])
     assert errors_of(entry) == (
-        "$.produced: must be empty unless the status is 'processed'",
-        "$.rejected: must be empty unless the status is 'processed', or 'failed' after an "
-        "earlier 'processed' step",
+        "$.produced: must be empty unless the status is 'processed', or 'failed' with a "
+        "governor block",
+        "$.rejected: must be empty unless the status is 'processed', 'failed' or 'held', or "
+        "'accepted' after a release from 'held'",
     )
     failed = transition(
-        accepted(), to="failed", by="pipeline", at=LATER, run_id=RUN_ID, error_type="X"
+        accepted(), to="failed", by="governor", at=LATER, run_id=RUN_ID, error_type="X"
     )
-    assert "$.rejected: must be empty" in "\n".join(
-        errors_of(ledger.with_results(failed, [], [REJECTED]))
+    # Ledger 1.2: a first run that failed keeps the drafts it rejected before the error.
+    assert errors_of(ledger.with_results(failed, [], [REJECTED])) == ()
+    assert "$.produced: must be empty" in "\n".join(
+        errors_of(ledger.with_results(failed, [PRODUCED], []))
     )
 
 
@@ -618,3 +650,181 @@ def test_a_reason_is_limited_to_500_characters():
 def test_validation_never_raises_for_non_objects():
     for value in (None, [], "ART-0001", {"history": []}):
         assert errors_of(value)
+
+
+# Ledger 1.2: held, the Governor block and work orders
+
+OTHER_RUN = "2c0f9b3d-5a4e-4d7c-8b2f-3e8a6f9d4c21"
+GOVERNOR = {
+    "model": "command-a-plus-05-2026",
+    "prompt_version": "governor.v1",
+    "attempts": 1,
+    "definitions": ["decision-log.v1", "risk-register.v1"],
+    "run_id": RUN_ID,
+    "work_orders": [
+        {"register": "decision-log", "count": 2, "routed": True},
+        {"register": "risk-register", "count": 1, "routed": False},
+    ],
+}
+HELD_REASON = "The Governor found 12 work orders, more than KA_GOVERNOR_MAX_ITEMS (10)"
+
+
+def held():
+    entry = transition(
+        accepted(), to="held", by="governor", at=LATER, run_id=RUN_ID, reason=HELD_REASON
+    )
+    return ledger.with_results(entry, [], [], governor=GOVERNOR)
+
+
+def released():
+    return transition(held(), to="accepted", by="operator", at=LATER, reason="Reviewed")
+
+
+def test_a_held_entry_and_its_release_are_valid_and_keep_the_governor_block():
+    entry = held()
+    assert errors_of(entry) == ()
+    assert list(entry).index("governor") == list(entry).index("updated_at") + 1
+    assert list(entry["governor"]) == list(GOVERNOR)
+    assert entry["stored_path"]
+    after = released()
+    assert errors_of(after) == ()
+    assert after["governor"] == GOVERNOR
+
+
+@pytest.mark.parametrize(
+    ("drop", "message"),
+    [
+        ("run_id", "$.history[2]: a 'held' entry needs a run_id"),
+        ("reason", "$.history[2]: a 'held' entry needs a reason"),
+    ],
+)
+def test_a_held_history_entry_needs_a_run_id_and_a_reason(drop, message):
+    entry = held()
+    del entry["history"][-1][drop]
+    assert message in errors_of(entry)
+
+
+def test_a_failed_entry_with_a_governor_block_keeps_the_records_before_the_error():
+    failed = transition(
+        accepted(), to="failed", by="governor", at=LATER, run_id=RUN_ID, error_type="X"
+    )
+    item = {**PRODUCED, "work_order": 2}
+    rejected = {**REJECTED, "work_order": 1, "run_id": RUN_ID}
+    entry = ledger.with_results(failed, [item], [rejected], governor=GOVERNOR)
+    assert errors_of(entry) == ()
+    assert list(entry["produced"][0])[:2] == ["register", "work_order"]
+    assert list(entry["rejected"][0])[:2] == ["register", "work_order"]
+
+
+@pytest.mark.parametrize("build", [held, released])
+def test_held_and_released_entries_never_list_records(build):
+    entry = ledger.with_results(build(), [{**PRODUCED, "work_order": 1}], [])
+    assert (
+        "$.produced: must be empty unless the status is 'processed', or 'failed' with a "
+        "governor block" in errors_of(entry)
+    )
+
+
+def test_rejected_items_are_kept_on_held_and_after_the_release():
+    item = {"stage": "governor", "attempts": 2, "prompt_version": "g", "error_paths": ["$"]}
+    item["run_id"] = RUN_ID
+    first = transition(accepted(), to="processed", by="governor", at=NOW, run_id=RUN_ID)
+    first = ledger.with_results(first, [], [item])
+    assert errors_of(first) == ()
+    held_entry = transition(
+        first, to="held", by="governor", at=LATER, run_id=OTHER_RUN, reason=HELD_REASON
+    )
+    held_entry = ledger.with_results(
+        held_entry, [], first["rejected"], governor={**GOVERNOR, "run_id": OTHER_RUN}
+    )
+    assert errors_of(held_entry) == ()
+    after = transition(held_entry, to="accepted", by="operator", at=LATER, reason="Reviewed")
+    assert errors_of(after) == ()
+    assert after["rejected"] == [item]
+
+
+def test_the_governor_block_appears_only_after_the_governor_ran():
+    entry = ledger.with_results(accepted(), [], [], governor=GOVERNOR)
+    assert errors_of(entry) == (
+        "$.governor: only a 'processed', 'failed' or 'held' entry, or an 'accepted' one "
+        "after a release from 'held', has one",
+    )
+    processed_entry = transition(accepted(), to="processed", by="governor", at=LATER, run_id=RUN_ID)
+    assert errors_of(ledger.with_results(processed_entry, [], [], governor=GOVERNOR)) == ()
+    assert "governor" in ledger.with_results(released(), [], [])
+
+
+@pytest.mark.parametrize(
+    ("item", "ok"),
+    [
+        ({"stage": "governor", "attempts": 2, "prompt_version": "g", "error_paths": ["$"]}, True),
+        ({**REJECTED, "stage": "governor"}, False),
+        ({**REJECTED, "stage": "draft"}, True),
+        ({k: v for k, v in REJECTED.items() if k != "register"}, False),
+        ({k: v for k, v in REJECTED.items() if k != "register"} | {"stage": "draft"}, False),
+        (
+            {"stage": "governor", "work_order": 1, "attempts": 1, "prompt_version": "g"}
+            | {"error_paths": ["$"]},
+            False,
+        ),
+        ({**REJECTED, "work_order": 0}, False),
+    ],
+)
+def test_register_is_required_unless_the_stage_is_governor(item, ok):
+    entry = transition(accepted(), to="processed", by="governor", at=LATER, run_id=RUN_ID)
+    entry = ledger.with_results(entry, [], [item], governor=GOVERNOR)
+    assert (errors_of(entry) == ()) is ok
+
+
+def test_work_order_numbers_need_a_governor_block_and_are_unique_in_produced():
+    entry = transition(accepted(), to="processed", by="governor", at=LATER, run_id=RUN_ID)
+    numbered = {**PRODUCED, "work_order": 1}
+    assert errors_of(ledger.with_results(entry, [numbered], [{**REJECTED, "work_order": 2}])) == (
+        "$.produced[0].work_order: only an entry with a governor block has one",
+        "$.rejected[0].work_order: only an entry with a governor block has one",
+    )
+    with_block = ledger.with_results(
+        entry, [PRODUCED, numbered, {**numbered, "record_id": "DEC-0003"}], [], governor=GOVERNOR
+    )
+    assert errors_of(with_block) == (
+        "$.produced[0]: needs a work_order when the entry has a governor block",
+        "$.produced[2].work_order: work order 1 is listed twice",
+    )
+
+
+def test_a_rejected_item_with_a_work_order_may_name_a_run_that_failed():
+    failed = transition(
+        accepted(), to="failed", by="governor", at=NOW, run_id=RUN_ID, error_type="X"
+    )
+    rerun = transition(failed, to="processed", by="governor", at=LATER, run_id=OTHER_RUN)
+    from_file = {**REJECTED, "work_order": 1, "run_id": RUN_ID}
+    assert errors_of(ledger.with_results(rerun, [], [from_file], governor=GOVERNOR)) == ()
+    without_order = {**REJECTED, "run_id": RUN_ID}
+    assert errors_of(ledger.with_results(rerun, [], [without_order], governor=GOVERNOR)) == (
+        "$.rejected[0].run_id: not the run_id of a 'processed' history entry",
+    )
+
+
+def test_with_results_keeps_an_existing_governor_block_when_none_is_given():
+    entry = held()
+    assert ledger.with_results(entry, [], [])["governor"] == GOVERNOR
+    replaced = ledger.with_results(entry, [], [], governor={**GOVERNOR, "attempts": 2})
+    assert replaced["governor"]["attempts"] == 2
+    assert entry["governor"]["attempts"] == 1
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("definitions", []),
+        ("attempts", 0),
+        ("run_id", "not-a-uuid"),
+        ("work_orders", [{"register": "decision-log", "count": 0, "routed": True}]),
+        ("work_orders", [{"register": "decision-log", "count": 1}]),
+        ("extra", True),
+    ],
+)
+def test_schema_rejects_a_bad_governor_block(field, value):
+    entry = held()
+    entry["governor"][field] = value
+    assert errors_of(entry)

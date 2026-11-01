@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:knowledge-automata:schema:core:ledger-entry:v1",
-  "x-version": "1.1",
+  "x-version": "1.2",
   "title": "Artifact Ledger entry",
   "description": "One artifact in the Artifact Ledger: what arrived, where its copy is, its status and an append-only history of every status change (ADR-0006, ADR-0015). Code owns every field. Never sent to an LLM provider.",
   "type": "object",
@@ -59,7 +59,7 @@
       "type": "string",
       "maxLength": 255,
       "pattern": "^artifacts/[A-Za-z0-9][A-Za-z0-9._-]*$",
-      "description": "Path of the read-only copy, relative to the memory folder. Present for accepted, quarantined, processed and failed; absent for rejected."
+      "description": "Path of the read-only copy, relative to the memory folder. Present for accepted, quarantined, processed, failed and held; absent for rejected."
     },
     "same_name_as": {
       "type": "array",
@@ -71,15 +71,54 @@
     "status": { "$ref": "#/$defs/status" },
     "created_at": { "$ref": "#/$defs/timestamp" },
     "updated_at": { "$ref": "#/$defs/timestamp" },
+    "governor": {
+      "type": "object",
+      "description": "The Governor (orchestrator) run whose reply was accepted and saved as the work orders file. Present from then on, for processed, failed, held, and accepted after a release from held. Added in 1.2.",
+      "properties": {
+        "model": { "type": "string", "minLength": 1 },
+        "prompt_version": { "type": "string", "minLength": 1 },
+        "attempts": { "type": "integer", "minimum": 1 },
+        "definitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "The register definition versions in the Governor's prompt, in register order."
+        },
+        "run_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "The run that called the Governor; the run_id of the work orders file."
+        },
+        "work_orders": {
+          "type": "array",
+          "description": "How many work orders the Governor found per register, in register order; registers with none are left out.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "register": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+              "count": { "type": "integer", "minimum": 1 },
+              "routed": {
+                "type": "boolean",
+                "description": "Whether the register has a Registrar, so its work orders are drafted."
+              }
+            },
+            "required": ["register", "count", "routed"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["model", "prompt_version", "attempts", "definitions", "run_id", "work_orders"],
+      "additionalProperties": false
+    },
     "produced": {
       "type": "array",
       "items": { "$ref": "#/$defs/produced_record" },
-      "description": "Records written or revised from this artifact. Empty unless the status is processed."
+      "description": "Records written or revised from this artifact. Empty unless the status is processed, or failed with a governor block (the results before the error)."
     },
     "rejected": {
       "type": "array",
       "items": { "$ref": "#/$defs/rejected_draft" },
-      "description": "Drafts that failed validation or comparison, kept across reruns. Empty unless the status is processed, or failed after an earlier processed step."
+      "description": "Governor replies, drafts and comparisons that were rejected, kept across every later status change. Empty until a run lists one."
     },
     "history": {
       "type": "array",
@@ -110,8 +149,8 @@
       "description": "Artifact Ledger ID, for example ART-0001. Assigned by code."
     },
     "status": {
-      "enum": ["received", "accepted", "quarantined", "rejected", "processed", "failed"],
-      "description": "Artifact statuses from ADR-0006."
+      "enum": ["received", "accepted", "quarantined", "rejected", "processed", "failed", "held"],
+      "description": "Artifact statuses from ADR-0006. held is added in 1.2."
     },
     "timestamp": {
       "type": "string",
@@ -128,6 +167,11 @@
       "description": "One record this artifact created or revised. model and prompt_version are the Registrar's draft.",
       "properties": {
         "register": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "work_order": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The number of the work order that produced the record. Added in 1.2; absent before the Governor (orchestrator)."
+        },
         "record_id": {
           "$ref": "#/$defs/record_id",
           "description": "The record written: the new record for new and supersession, the revised record for update and reaffirmation."
@@ -174,12 +218,21 @@
     },
     "rejected_draft": {
       "type": "object",
-      "description": "A draft that failed validation or comparison, listed without its error messages: evidence errors quote the model's draft, which is unvalidated model text.",
+      "description": "A Governor reply, draft or comparison that failed its checks, listed without its error messages: evidence errors quote the model's reply, which is unvalidated model text.",
       "properties": {
-        "register": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "register": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Required unless the stage is governor, whose reply covers every register."
+        },
+        "work_order": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The number of the work order the draft was for. Added in 1.2; absent before the Governor (orchestrator) and for the governor stage."
+        },
         "stage": {
-          "enum": ["draft", "comparison"],
-          "description": "Where the draft was rejected: by the Registrar's checks or by the Comparator's. Absent means draft."
+          "enum": ["governor", "draft", "comparison"],
+          "description": "Where it was rejected: by the Governor's checks, the Registrar's or the Comparator's. Absent means draft. governor is added in 1.2."
         },
         "attempts": { "type": "integer", "minimum": 1 },
         "prompt_version": { "type": "string", "minLength": 1 },
@@ -199,11 +252,19 @@
         "run_id": {
           "type": "string",
           "format": "uuid",
-          "description": "The run that rejected the draft; the run_id of a processed history entry."
+          "description": "The run that rejected it. Without a work_order, the run_id of a processed history entry."
         }
       },
-      "required": ["register", "attempts", "prompt_version", "error_paths"],
-      "additionalProperties": false
+      "required": ["attempts", "prompt_version", "error_paths"],
+      "additionalProperties": false,
+      "if": {
+        "properties": { "stage": { "const": "governor" } },
+        "required": ["stage"]
+      },
+      "then": {
+        "not": { "anyOf": [{ "required": ["register"] }, { "required": ["work_order"] }] }
+      },
+      "else": { "required": ["register"] }
     },
     "history_entry": {
       "type": "object",
@@ -212,7 +273,7 @@
         "status": { "$ref": "#/$defs/status" },
         "by": {
           "enum": ["sensor", "operator", "pipeline", "governor"],
-          "description": "Who made the change. pipeline stands in for the Governor (orchestrator) until it exists; governor is reserved."
+          "description": "Who made the change. The Governor (orchestrator) makes every processing change from 1.2; pipeline stood in for it before and stays valid in earlier history."
         },
         "check": {
           "enum": ["unsupported-format", "empty", "encoding", "oversized", "delimiter"],
@@ -227,7 +288,7 @@
         "run_id": {
           "type": "string",
           "format": "uuid",
-          "description": "The run whose LLM events belong to this change (processed and failed only)."
+          "description": "The run whose LLM events belong to this change (processed, failed and held only). For held, the run that called the Governor."
         },
         "error_type": {
           "type": "string",

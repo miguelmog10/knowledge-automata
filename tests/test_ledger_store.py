@@ -17,7 +17,7 @@ RUN_ID = "1b9e8a2c-4f3d-4c6b-9a1e-2d7f5e8c3b10"
 # Written by hand from the handoff's rules: schema key order, two-space indent, LF,
 # non-ASCII kept as is, trailing newline.
 EXPECTED_ART_0002 = """{
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "id": "ART-0002",
   "title": "Pilot review: café",
   "source": {
@@ -212,9 +212,9 @@ def test_save_transition_raises_a_1_0_entry_to_the_current_version_only(tmp_path
     assert store.load("ART-0002")["schema_version"] == "1.0"
 
     rerun = transition(sideways, to="processed", by="pipeline", at=LATER, run_id=RUN_ID)
-    assert rerun["schema_version"] == "1.1"
+    assert rerun["schema_version"] == "1.2"
     store.save_transition(sideways, rerun)
-    assert store.load("ART-0002")["schema_version"] == "1.1"
+    assert store.load("ART-0002")["schema_version"] == "1.2"
 
     downgraded = transition(
         rerun, to="failed", by="pipeline", at=LATER, run_id=RUN_ID, error_type="X"
@@ -287,3 +287,90 @@ def test_ids_with_name_is_exact_and_includes_every_status(tmp_path):
     store.save_new(entry("ART-0003", name="notes.md", content_hash="ef", status="quarantined"))
     assert store.ids_with_name("notes.md") == ["ART-0001", "ART-0003"]
     assert store.ids_with_name("notes") == []
+
+
+GOVERNOR = {
+    "model": "m",
+    "prompt_version": "governor.v1",
+    "attempts": 1,
+    "definitions": ["decision-log.v1"],
+    "run_id": RUN_ID,
+    "work_orders": [{"register": "decision-log", "count": 3, "routed": True}],
+}
+
+
+def produced_item(number, record_id):
+    return {
+        "register": "decision-log",
+        "work_order": number,
+        "record_id": record_id,
+        "model": "m",
+        "prompt_version": "decision-registrar.v2",
+        "schema_version": "1.0",
+    }
+
+
+def rejected_item(number, run_id=RUN_ID):
+    return {
+        "register": "decision-log",
+        "work_order": number,
+        "attempts": 2,
+        "prompt_version": "decision-registrar.v2",
+        "error_paths": ["$.evidence"],
+        "run_id": run_id,
+    }
+
+
+def test_a_rerun_after_a_failed_run_appends_to_both_lists(tmp_path):
+    # Order 1 rejected, order 2 recorded, order 3 failed on a provider error; the rerun
+    # records orders 1 and 3. Earlier items stay first and in place.
+    store = LedgerStore(tmp_path)
+    old = entry()
+    store.save_new(old)
+    failed = transition(old, to="failed", by="governor", at=NOW, run_id=RUN_ID, error_type="X")
+    failed = with_results(
+        failed, [produced_item(2, "DEC-0002")], [rejected_item(1)], governor=GOVERNOR
+    )
+    store.save_transition(old, failed)
+
+    second_run = "2c0f9b3d-5a4e-4d7c-8b2f-3e8a6f9d4c21"
+    rerun = transition(failed, to="processed", by="governor", at=LATER, run_id=second_run)
+    in_order_number = with_results(
+        rerun,
+        [produced_item(1, "DEC-0003"), produced_item(2, "DEC-0002"), produced_item(3, "DEC-0004")],
+        failed["rejected"],
+    )
+    with pytest.raises(LedgerStoreError, match="new produced list must keep the old one"):
+        store.save_transition(failed, in_order_number)
+
+    appended = with_results(
+        rerun,
+        [produced_item(2, "DEC-0002"), produced_item(1, "DEC-0003"), produced_item(3, "DEC-0004")],
+        failed["rejected"],
+    )
+    store.save_transition(failed, appended)
+    stored = store.load("ART-0002")
+    assert [item["work_order"] for item in stored["produced"]] == [2, 1, 3]
+    assert stored["rejected"] == [rejected_item(1)]
+    assert stored["governor"] == GOVERNOR
+
+
+def test_the_governor_block_cannot_be_removed_but_a_later_run_may_replace_it(tmp_path):
+    store = LedgerStore(tmp_path)
+    old = entry()
+    store.save_new(old)
+    first = with_results(
+        transition(old, to="processed", by="governor", at=NOW, run_id=RUN_ID),
+        [],
+        [],
+        governor=GOVERNOR,
+    )
+    store.save_transition(old, first)
+    second_run = "2c0f9b3d-5a4e-4d7c-8b2f-3e8a6f9d4c21"
+    rerun = transition(first, to="processed", by="governor", at=LATER, run_id=second_run)
+    dropped = {key: value for key, value in rerun.items() if key != "governor"}
+    with pytest.raises(LedgerStoreError, match="governor block cannot be removed"):
+        store.save_transition(first, dropped)
+    replaced = with_results(rerun, [], [], governor={**GOVERNOR, "run_id": second_run})
+    store.save_transition(first, replaced)
+    assert store.load("ART-0002")["governor"]["run_id"] == second_run
