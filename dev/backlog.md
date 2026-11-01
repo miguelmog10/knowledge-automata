@@ -72,6 +72,7 @@
 - Links across registers, for example a risk mitigated by a decision (a minor schema change).
 - Opt-in debug capture of prompts and responses to a git-ignored folder, for prompt tuning (never in the event log). A throwaway version (`runtime/diagnostics/inspect_chat_reply.py`, handoff 006 Addendum A) found the thinking problem with four calls.
 - Plain-text `chat` in the service layer, when an agent needs it (for example the Oracle).
+- Printed validation errors quote model output and artifact text; consider printing paths and checks only, keeping the full messages for the retry prompt.
 - Budget guard: stop a run before it exceeds a call or cost limit (trial keys are capped).
 - Event log rotation or archiving, if the file grows large.
 - A small report that sums calls, units and cost per run, per agent and per artifact from the event log.

@@ -6,7 +6,7 @@
 
 ## Current phase
 
-Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation). Handoff 007, the Governor (orchestrator), is in progress on `feat/governor`, in three parts, 7A, 7B and 7C. Part 7A (the Governor agent and the work order support in the Decision Registrar, offline) is built and approved after Claude's and Miguel's review, with a small fix commit. Part 7B (the `process` command, the work orders file, the `held` status and its release) is built, 949 tests passing offline; next, Claude's review of 7B, then the real run in part 7C after Miguel's go.
+Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation). Handoff 007, the Governor (orchestrator), is in progress on `feat/governor`, in three parts, 7A, 7B and 7C. Parts 7A and 7B are built and approved after Claude's and Miguel's reviews, each with a small fix commit, 951 tests passing offline. Next, part 7C: the real run, after Miguel's go.
 
 ## Done
 
@@ -114,11 +114,16 @@ Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation).
   - `KA_GOVERNOR_MAX_ITEMS` (default 10, `core/settings.py` shares the whole-number reader with the Comparator): more routed orders than the file's own `max_items`, and no order started, holds the artifact with no draft. `release` makes a held artifact `accepted` by `operator`, with no Sensor check and no read of its copy; the release covers only the file whose `run_id` was held.
   - The `record-decision` tests moved to `tests/test_process.py`, with the section 5 scenarios added (several orders per artifact, interrupted runs, holds and releases).
   - Docs: ADR-0006 and ADR-0015 amended, the architecture and README text, and the backlog. The Mermaid blocks still say `record-decision` and "planned Governor": Claude refreshes them.
+  - Review fixes (2026-11-01, one commit, 951 tests), from Claude's review of 7B:
+    - A rebuild of the Ledger from the work orders file exits 1, not 0, when an order is still rejected, by the same rule as a normal run.
+    - Without a work orders file, `process` refuses before any call when the Ledger entry shows a Governor run (records produced, a `governor` block, or a rejected item with `work_order`): "the work orders file is missing; restore it". A new Governor call could find other orders and record items twice. So deleting the file by hand after a release no longer leads to a new Governor run; the rule that a release covers only the file whose `run_id` was held stays, tested on `needs_hold`.
+    - The CLI docstring now says that rejected attempts print their validation errors, which may quote model output; the messages are unchanged, and a Later item in the backlog proposes printing paths and checks only.
+    - Stronger tests: the output hygiene test reaches a real hold and a Governor rejection on fresh artifacts, and removes a label only from its work order heading; the billing test runs two comparisons and checks every stage's totals against the event log.
 
 ## Next
 
 - An evaluation harness grown from the spike, as a small step after handoff 007 (backlog).
-- Claude reviews part 7B; then Copilot runs part 7C (the real run on ART-0006 to ART-0008, budget 50 calls) after Miguel's go.
+- Copilot runs part 7C (the real run on ART-0006 to ART-0008, budget 50 calls) after Miguel's go.
 - Claude: refresh the diagrams (`docs/diagrams/01`, `03` and `04`, and their copies in the README and `docs/architecture.md`) and the guide for the Governor and `process`.
 - Claude: the visual guide still says "thinking off" (`docs/guide/index.html`, line 178); refresh it with the guide steps, together with the 007 diagrams.
 - Enable GitHub Pages in the repository settings, if not done yet, and mark ADR-0016 accepted once the guide is online.

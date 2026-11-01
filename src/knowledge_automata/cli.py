@@ -3,9 +3,11 @@
 Exit codes: 0 success; 1 the Governor's reply, a draft or a comparison rejected, artifact
 held, quarantined or rejected, release refused, or views differ under ``--check``; 2 usage,
 configuration or file problem; 3 provider error. Output never includes the settings, the
-API key, prompts or artifact text (the title excepted). ``process`` prints the Comparator's
-reason, which is model output, so the reader sees why a draft was classified as it was,
-and each work order's label, which is verified artifact text (ADR-0018). Output is UTF-8.
+API key or prompts. ``process`` prints the artifact's title; each work order's label, which
+is verified artifact text (ADR-0018); the Comparator's reason, which is model output, so
+the reader sees why a draft was classified as it was; and, for a rejected attempt, its
+validation errors, which may quote model output, including text the model copied from the
+artifact. Output is UTF-8.
 """
 
 import argparse
@@ -258,7 +260,7 @@ def _report(result: pipeline.ProcessOutcome, memory: Path, thinking: str | None)
             f"{file['run_id']}); no call was made."
         )
         print(_summary(result))
-        return EXIT_OK
+        return EXIT_OK if result.ok else EXIT_REJECTED
     if governed is not None and not governed.accepted:
         _print(
             f"Rejected the Governor's reply for {artifact_id} after "

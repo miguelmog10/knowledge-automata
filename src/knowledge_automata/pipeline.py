@@ -383,9 +383,10 @@ def processable(artifact_id: str, memory: Path) -> ProcessPlan:
     recorded nothing may be processed again if the Governor was rejected (no work orders
     file), if a routed order is ``pending`` or ``rejected``, or if the Ledger is behind the
     work orders file. Before any call: the decision log's supersession links must be whole,
-    and the records must agree with the work orders file (or, without one, cite nothing
-    from the artifact). Reads only, so the CLI can call it before building the LLM. Raises
-    ``LedgerEntryNotFoundError`` for an unknown ID.
+    and the records must agree with the work orders file (or, without one, the Ledger must
+    list no Governor run and the records cite nothing from the artifact). Reads only, so
+    the CLI can call it before building the LLM. Raises ``LedgerEntryNotFoundError`` for an
+    unknown ID.
     """
     if not ARTIFACT_ID.fullmatch(artifact_id):
         raise InputError(f"The artifact ID must look like ART-0001, got {artifact_id!r}")
@@ -448,10 +449,17 @@ def processable(artifact_id: str, memory: Path) -> ProcessPlan:
 
 def _plan_without_file(entry: dict[str, Any], memory: Path, path: Path) -> ProcessPlan:
     artifact_id = entry["id"]
-    if entry["produced"]:
+    # A Governor run left results in the Ledger, so its work orders file must exist; a new
+    # Governor call could find different orders and record the same items twice.
+    governed = (
+        entry["produced"]
+        or "governor" in entry
+        or any("work_order" in item for item in entry["rejected"])
+    )
+    if governed:
         raise InputError(
-            f"{artifact_id} lists records in the Ledger, but its work orders file "
-            f"({path.as_posix()}) is missing; {NOTHING_SENT}. Restore the file."
+            f"The Ledger entry of {artifact_id} lists results of a Governor run, but its work "
+            f"orders file ({path.as_posix()}) is missing; {NOTHING_SENT}. Restore the file."
         )
     store = RecordStore(memory)
     cited = [

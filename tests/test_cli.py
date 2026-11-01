@@ -573,6 +573,7 @@ def test_records_citing_the_artifact_without_a_work_orders_file_stop_the_run(
     ledger = memory / "ledger" / "ART-0001.json"
     data = json.loads(ledger.read_text(encoding="utf-8"))
     data["produced"] = []
+    del data["governor"]
     ledger.write_text(json.dumps(data), encoding="utf-8")
     capsys.readouterr()
     build = FakeBuild()
@@ -600,7 +601,7 @@ def test_a_missing_work_orders_file_stops_the_run(ingested, memory, decision_dra
     build = FakeBuild()
     assert process(build, memory) == 2
     err = capsys.readouterr().err
-    assert "ART-0001 lists records in the Ledger, but its work orders file" in err
+    assert "The Ledger entry of ART-0001 lists results of a Governor run, but its work" in err
     assert "is missing; nothing was sent to the model. Restore the file." in err
     assert build.settings == []
 

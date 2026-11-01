@@ -5,6 +5,7 @@ import dataclasses
 import io
 import itertools
 import json
+import re
 import sys
 from datetime import UTC, datetime, timedelta
 
@@ -736,17 +737,51 @@ def test_the_billing_line_shows_the_units_rerank_reports(memory, clock, capsys, 
 
 
 def test_the_billing_line_adds_up_every_work_order(memory, clock, capsys):
+    record_first_two(memory, clock)
+    capsys.readouterr()
     build = FakeBuild()
+    another = answer("new", reason="Another topic.")
     build.fake = BilledRerank(
-        [MIXED, REPORTS, STALL, answer("new")], Usage(input_tokens=100, search_units=1)
+        [MIXED, REPORTS, another, STALL, another], Usage(input_tokens=100, search_units=1)
     )
     assert process(build, clock, memory, "ART-0006") == 0
     billed = next(
         line for line in capsys.readouterr().out.splitlines() if line.startswith("Billed")
     )
-    chat = [call for call in build.fake.calls if call.operation == "chat"]
-    assert len(chat) == 4
-    assert billed.endswith("; rerank (input tokens 100, search units 1)")
+    events = build.sink.events
+    assert [(event["agent"], event["operation"]) for event in events] == [
+        ("governor", "chat"),
+        *[
+            ("decision-registrar", "chat"),
+            ("comparator", "embed"),
+            ("comparator", "embed"),
+            ("comparator", "rerank"),
+            ("comparator", "chat"),
+        ]
+        * 2,
+    ]
+
+    def total(agent, operation, unit):
+        values = [
+            event[unit]
+            for event in events
+            if (event["agent"], event["operation"]) == (agent, operation)
+        ]
+        assert values and all(value > 0 for value in values)
+        return f"{sum(values):,}"
+
+    def chat(agent):
+        return (
+            f"input tokens {total(agent, 'chat', 'input_tokens')}, "
+            f"output tokens {total(agent, 'chat', 'output_tokens')}"
+        )
+
+    assert billed == (
+        f"Billed: governor ({chat('governor')}); drafts ({chat('decision-registrar')}); "
+        f"comparisons ({chat('comparator')}); "
+        f"embed (input tokens {total('comparator', 'embed', 'input_tokens')}); "
+        "rerank (input tokens 200, search units 2)"
+    )
 
 
 def test_a_reason_cp1252_cannot_encode_prints_as_utf8(memory, clock, monkeypatch):
@@ -1104,6 +1139,56 @@ def test_a_ledger_left_behind_after_a_governor_rejection_is_rebuilt_with_no_call
     assert done["history"][-1]["by"] == "governor"
 
 
+def test_a_rebuilt_ledger_with_a_rejected_order_exits_1(memory, clock, monkeypatch, capsys):
+    def interrupted(self, old, new):
+        raise DISK_FULL
+
+    with monkeypatch.context() as patch:
+        patch.setattr(LedgerStore, "save_transition", interrupted)
+        assert process(FakeBuild(MIXED, BAD, BAD, STALL), clock, memory, "ART-0006") == 2
+    assert states(memory, "ART-0006") == ["rejected", "recorded", "not-routed"]
+    assert entry(memory, "ART-0006")["status"] == "accepted"
+    capsys.readouterr()
+
+    build = FakeBuild()
+    assert process(build, clock, memory, "ART-0006") == 1
+    out = capsys.readouterr().out.splitlines()
+    assert build.settings == []
+    assert out[1:] == [
+        f"Rebuilt the Ledger entry of ART-0006 from its work orders file (run {RUN_ID}); "
+        "no call was made.",
+        "Recorded 1 of 2 routed work orders; 1 rejected; 1 not routed",
+    ]
+    done = entry(memory, "ART-0006")
+    assert valid(memory, "ART-0006")
+    assert done["status"] == "processed"
+    assert listed(done["produced"]) == [("DEC-0001", 2)]
+    assert listed(done["rejected"]) == [("draft", 1)]
+
+
+MISSING_FILE = "is missing; nothing was sent to the model. Restore the file."
+
+
+def test_a_missing_work_orders_file_after_every_order_was_rejected_is_refused(
+    memory, clock, capsys
+):
+    assert process(FakeBuild(order(FLUTTER), BAD, BAD), clock, memory, "ART-0001") == 1
+    rejected = entry(memory, "ART-0001")
+    assert rejected["status"] == "processed" and rejected["produced"] == []
+    assert listed(rejected["rejected"]) == [("draft", 1)]
+    WorkOrderStore(memory).path("ART-0001").unlink()  # deleted by hand
+    capsys.readouterr()
+
+    build = FakeBuild(order(FLUTTER), FLUTTER)
+    assert process(build, clock, memory, "ART-0001") == 2
+    err = capsys.readouterr().err
+    assert "The Ledger entry of ART-0001 lists results of a Governor run, but its work" in err
+    assert MISSING_FILE in err
+    assert build.settings == []
+    assert entry(memory, "ART-0001") == rejected
+    assert not (memory / "registers").exists()
+
+
 # Held for the Operator
 
 
@@ -1221,22 +1306,23 @@ def test_a_released_artifact_runs_every_saved_order_with_no_governor_call(
     ]
 
 
-def test_a_release_covers_only_the_file_whose_run_id_was_held(memory, clock, monkeypatch, capsys):
+def test_a_work_orders_file_deleted_after_a_release_is_refused(memory, clock, monkeypatch, capsys):
+    # The Governor is not called again: a new file would get a new run ID, which the
+    # release does not cover (test_work_order_file.py), and could record items twice.
     monkeypatch.setenv("KA_GOVERNOR_MAX_ITEMS", "1")
     assert process(FakeBuild(MIXED), clock, memory, "ART-0006") == 1
     assert release(clock, memory, "ART-0006") == 0
+    released = entry(memory, "ART-0006")
     WorkOrderStore(memory).path("ART-0006").unlink()  # deleted by hand
     capsys.readouterr()
 
     build = FakeBuild(MIXED, run_id=OTHER_RUN_ID)
-    assert process(build, clock, memory, "ART-0006") == 1
-    assert build.agents == ["governor"]
-    assert "more than KA_GOVERNOR_MAX_ITEMS (1)" in capsys.readouterr().err
-    held = entry(memory, "ART-0006")
-    assert valid(memory, "ART-0006")
-    assert held["status"] == "held"
-    assert held["history"][-1]["run_id"] == OTHER_RUN_ID
-    assert work_orders(memory, "ART-0006")["run_id"] == OTHER_RUN_ID
+    assert process(build, clock, memory, "ART-0006") == 2
+    err = capsys.readouterr().err
+    assert "The Ledger entry of ART-0006 lists results of a Governor run, but its work" in err
+    assert MISSING_FILE in err
+    assert build.settings == []
+    assert entry(memory, "ART-0006") == released
     assert not (memory / "registers").exists()
 
 
@@ -1291,30 +1377,73 @@ def test_a_governor_rejection_survives_a_hold_a_release_and_the_run_after_it(
 # Output hygiene
 
 
+HIRE_QUOTE = "We hire a second grower in June."
+SHOP_QUOTE = "We open the farm shop on Sundays."
+CRATES_QUOTE = "We buy reusable crates for the market."
+FRESH = [
+    ("board-2026-05-12.md", "2026-05-12", f"# Board, 12 May\n{HIRE_QUOTE}\n{SHOP_QUOTE}\n"),
+    ("board-2026-05-26.md", "2026-05-26", f"# Board, 26 May\n{CRATES_QUOTE}\n"),
+]
+# The only place a label may appear: a work order's heading.
+HEADING = re.compile(r'^Work order \d+ of \d+, [a-z-]+: "(?P<label>.*)"$')
+
+
+def ingest(memory, clock, name, date, text):
+    path = memory.parent / "inbox" / name
+    path.write_bytes((text + SENTINEL + "\n").encode("utf-8"))
+    args = ["ingest", str(path), "--artifact-date", date, "--memory", str(memory)]
+    assert run(FakeBuild(), clock, *args) == 0
+
+
+def without_labels(text, labels):
+    """``text`` with each label removed from its heading line, and only there."""
+    lines = []
+    for line in text.splitlines():
+        match = HEADING.match(line)
+        if match is not None and match["label"] in labels:
+            line = line[: match.start("label")] + line[match.end("label") :]
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def test_no_output_contains_artifact_text_other_than_titles_labels_and_reasons(
     memory, clock, monkeypatch, capsys
 ):
     record_first_two(memory, clock)
+    for name, date, text in FRESH:
+        ingest(memory, clock, name, date, text)
     bad = answer("update", "DEC-0009")
     reaffirm = answer("reaffirmation", "DEC-0001")
-    process(FakeBuild(order(FLUTTER_AGAIN), FLUTTER_AGAIN, reaffirm), clock, memory, "ART-0003")
-    process(FakeBuild(order(LADDER_DETAIL), LADDER_DETAIL, bad, bad), clock, memory, "ART-0004")
-    rate_limited = FakeBuild(order(NATIVE), NATIVE, LLMRateLimitError("slow down"))
-    process(rate_limited, clock, memory, "ART-0005")
-    process(FakeBuild(MIXED, BAD, BAD, STALL, answer("new")), clock, memory, "ART-0006")
+    build = FakeBuild(order(FLUTTER_AGAIN), FLUTTER_AGAIN, reaffirm)
+    assert process(build, clock, memory, "ART-0003") == 0
+    build = FakeBuild(order(LADDER_DETAIL), LADDER_DETAIL, bad, bad)
+    assert process(build, clock, memory, "ART-0004") == 1
+    build = FakeBuild(order(NATIVE), NATIVE, LLMRateLimitError("slow down"))
+    assert process(build, clock, memory, "ART-0005") == 3
+    build = FakeBuild(MIXED, BAD, BAD, STALL, answer("new"))
+    assert process(build, clock, memory, "ART-0006") == 1
+    # A fresh artifact over the limit is held.
     monkeypatch.setenv("KA_GOVERNOR_MAX_ITEMS", "1")
-    process(FakeBuild(), clock, memory, "ART-0006")
-    run(FakeBuild(), clock, "ledger", "--memory", str(memory))
+    assert process(FakeBuild(decisions(HIRE_QUOTE, SHOP_QUOTE)), clock, memory, "ART-0007") == 1
+    assert entry(memory, "ART-0007")["status"] == "held"
+    monkeypatch.delenv("KA_GOVERNOR_MAX_ITEMS")
+    # Another fresh artifact: the Governor returns one item twice, so its reply is rejected.
+    twice = decisions(CRATES_QUOTE, CRATES_QUOTE)
+    assert process(FakeBuild(twice, twice), clock, memory, "ART-0008") == 1
+    assert listed(entry(memory, "ART-0008")["rejected"]) == [("governor", None)]
+    assert run(FakeBuild(), clock, "ledger", "--memory", str(memory)) == 0
     out, err = capsys.readouterr()
-    labels = [
+
+    labels = {
         item["label"]
-        for artifact_id in ("ART-0001", "ART-0002", "ART-0003", "ART-0004", "ART-0005", "ART-0006")
-        for item in work_orders(memory, artifact_id)["orders"]
-    ]
+        for number in range(1, 9)
+        for item in (work_orders(memory, f"ART-{number:04d}") or {"orders": []})["orders"]
+    }
+    assert {HIRE_QUOTE, SHOP_QUOTE, REPORTS_QUOTE, STALL_QUOTE} <= labels
+    assert f'Work order 1 of 3, decision-log: "{REPORTS_QUOTE}"' in out
+    lines = [line for _, _, text in ARTIFACTS + FRESH for line in text.splitlines()[1:]]
     for text in (out, err):
         assert SENTINEL not in text
-        for label in labels:
-            text = text.replace(f'"{label}"', "")
-        for _, _, artifact in ARTIFACTS:
-            for line in artifact.splitlines()[1:]:
-                assert line not in text
+        text = without_labels(text, labels)
+        for line in lines:
+            assert line not in text
