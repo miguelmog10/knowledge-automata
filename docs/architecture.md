@@ -197,22 +197,22 @@ Understanding an artifact, drafting a record and judging how it relates to exist
 | Name | Plain role | Responsibility | v0.1 |
 |---|---|---|---|
 | Sensor | Intake and input guardrail | Validates, hashes, normalizes and logs incoming artifacts in the Artifact Ledger; quarantines invalid or suspicious input | Yes (deterministic checks only) |
-| Governor | Orchestrator and router | Analyzes an accepted artifact and issues work orders to the relevant Registrars; marks artifacts processed or failed | Yes |
+| Governor | Orchestrator and router | Analyzes an accepted artifact and issues work orders to the relevant Registrars; marks artifacts processed, failed or held | Yes (built; work orders for registers without a Registrar are kept as not routed) |
 | Comparator | Reconciliation | Compares each validated draft with related active records (Embed, then Rerank) and classifies it as new, update, reaffirmation or supersession; code checks the proposal before anything is written | Yes (built for the decision log) |
 | Registrars | Specialist record keepers | One per register; drafts structured records that code validates, assigns IDs to and stores | Decision and Risk |
 | Observer | Quality control | Periodic health and cross-register consistency checks | Later |
 | Oracle | Query interface | Answers questions over the registers with citations to records and source artifacts | Stretch |
-| Operator | Human in the loop | Approves sensitive changes, reviews quarantine, overrides the system. A role, not an agent | Later (workflow) |
+| Operator | Human in the loop | Approves sensitive changes, reviews quarantined and held artifacts, overrides the system. A role, not an agent | Later (workflow) |
 
 ## Data flow for one artifact
 
 1. **Sensor (intake):** the artifact arrives. The Sensor checks it, hashes it and records it in the Artifact Ledger as accepted, quarantined or rejected. If accepted, it normalizes the text and adds metadata. Its checks are deterministic (format, empty, encoding, size, delimiter), and accepted and quarantined artifacts are kept as read-only copies ([ADR-0015](decisions/0015-artifact-ledger-storage-and-sensor-checks.md)).
-2. **Governor (orchestrator):** reads the artifact, identifies its content (for example two decisions and one risk) and sends work orders to the Decision and Risk Registrars.
+2. **Governor (orchestrator):** reads the artifact once and returns work orders, one per item it found (for example two decisions and one risk): the register each belongs to and one to five evidence quotes, with no free text. Code checks the reply (schema, every quote, no quote shared by two items in the same register) with one retry, sorts the orders by where their earliest quote appears and saves them in a work orders file before any draft. Orders for a register with no Registrar yet are kept as not routed. An artifact with more routed orders than `KA_GOVERNOR_MAX_ITEMS` (default 10) is held for the Operator before anything is drafted ([ADR-0018](decisions/0018-governor-work-orders.md)).
 3. **Registrars (specialist record keepers):** for each work order, draft records as structured data, with evidence quotes from the artifact. Code checks the evidence quotes and validates the draft against the schema. A rejected draft affects only that record. Independent Registrars can run in parallel. All Registrars share one drafting loop: an invalid draft gets one retry with its validation errors, and if the retry fails too, the record is rejected and nothing is written ([ADR-0014](decisions/0014-registrar-drafting-loop.md)).
 4. **Comparator (reconciliation):** for each checked draft, retrieves related active records in the same register (Embed ranks them, Rerank reorders the closest) and proposes a classification (new, update, reaffirmation or supersession) and a target record. Code checks the proposal, with one retry as in the drafting loop, then assigns the ID of any new record and applies the write rule. This order is deliberate: the Comparator only judges content that code has already grounded in the artifact ([ADR-0017](decisions/0017-comparator-reconciliation.md)).
-5. **Governor:** marks the artifact as processed in the Ledger, listing the records it produced.
+5. **Governor:** after each work order's writes, saves its result (recorded or rejected) in the work orders file; at the end of the run, marks the artifact as processed in the Ledger (or failed, with the results so far, on a provider error), listing the records it produced and the drafts it rejected, rebuilt from the work orders file.
 
-The Sensor and the Artifact Ledger run since handoff 005: `knowledge-automata ingest` is step 1. `knowledge-automata record-decision` runs steps 3 to 5 for the decision log on an accepted artifact, with a pipeline stand-in for the Governor that skips step 2 and sets `processed` and `failed`. An artifact whose run recorded nothing (its draft or comparison was rejected, or a provider error stopped it) can be run again. The Sensor decides from bytes alone; the stand-in writes the artifact copies, records and Ledger entries, because agents never touch storage. A quarantined artifact waits for the Operator's `knowledge-automata release`.
+The Sensor and the Artifact Ledger run since handoff 005: `knowledge-automata ingest` is step 1. Since handoff 007, `knowledge-automata process` runs steps 2 to 5 on an accepted artifact: every work order for the decision log is drafted, compared and written, one after another, so a later item is compared with the records an earlier one wrote. A run that stops (a rejected item, a provider error or an interruption) can be run again: it reuses the saved work orders with no Governor call and drafts only the orders that are not recorded yet. The Sensor and the Governor decide; the pipeline writes the artifact copies, work orders files, records and Ledger entries, because agents never touch storage. A quarantined or held artifact waits for the Operator's `knowledge-automata release`.
 
 Around this loop: the Observer (quality control) checks register health, the Oracle (query interface) answers questions from stored records, and the Operator (human in the loop) approves sensitive changes.
 
@@ -325,7 +325,7 @@ Raw artifacts are read-only. Every record links back to its source artifacts, an
 
 Every change increments `revision` and appends a history entry. Only `active` records can be the target of update, reaffirmation or supersession.
 
-An existing record changes only through a revision ([ADR-0017](decisions/0017-comparator-reconciliation.md)): the store replaces the file only if it still holds the revision the change was based on (no lost update), the revision goes up by one, and earlier history entries and sources stay unchanged. A supersession changes two files with no transaction, so code writes the new record (with `relations.supersedes`) before it marks the old one superseded. An interruption between the two writes leaves a new record whose target is still active: `record-decision` and `views` detect it and stop before any call, and in v0.1 it is repaired by hand.
+An existing record changes only through a revision ([ADR-0017](decisions/0017-comparator-reconciliation.md)): the store replaces the file only if it still holds the revision the change was based on (no lost update), the revision goes up by one, and earlier history entries and sources stay unchanged. A supersession changes two files with no transaction, so code writes the new record (with `relations.supersedes`) before it marks the old one superseded. An interruption between the two writes leaves a new record whose target is still active: `process` and `views` detect it and stop before any call, and in v0.1 it is repaired by hand.
 
 ## Storage and views
 
@@ -335,12 +335,14 @@ Records live in a **memory folder**: the stored institutional memory of one grou
 <memory>/
   artifacts/ART-0001-board-notes.md  copies of accepted and quarantined artifacts (read-only)
   ledger/ART-0001.json               one Artifact Ledger entry per artifact
+  work-orders/ART-0001.json          the Governor's checked work orders and their results
   registers/decision-log/DEC-0001.json
   views/decision-log.md              index (generated)
   views/decision-log/DEC-0001.md     one page per decision (generated)
 ```
 
-- **The Ledger tracks every artifact.** Each entry is one JSON file in the same deterministic format as records, validated before every write, with the current status and an append-only history of transitions. Only a valid status change may overwrite it ([ADR-0015](decisions/0015-artifact-ledger-storage-and-sensor-checks.md)). Writes go record, views, then Ledger, so an interrupted run leaves the Ledger behind the records, and the next run detects it.
+- **The Ledger tracks every artifact.** Each entry is one JSON file in the same deterministic format as records, validated before every write, with the current status and an append-only history of transitions. Only a valid status change may overwrite it ([ADR-0015](decisions/0015-artifact-ledger-storage-and-sensor-checks.md)).
+- **The work orders file is the run's checkpoint.** One JSON file per artifact holds the Governor's checked work orders, each with its state (pending, recorded, rejected or not routed) and results, validated before every write ([ADR-0018](decisions/0018-governor-work-orders.md)). Per work order, writes go records, views, then the order's result; the Ledger is written at the end of the run, its lists rebuilt from the file. A Ledger left behind the file is rebuilt by the next run with no call; records ahead of the file are detected before any call and left for a hand correction.
 - **JSON records are the source of truth.** Each record is one file, validated (envelope and content) before it is written, written to a temporary file and moved into place. A new record never overwrites an existing file; records can be revised (see Write rules) but are never deleted. Files are deterministic (UTF-8, LF line endings, two-space indentation, fixed key order), so diffs show only real changes.
 - **Views are generated.** Code renders the Markdown views from the records with standard relative links (index to pages, pages to their source artifacts, supersession both ways), so the registers browse like a wiki on GitHub. Each decision page groups its quotes under one heading per source artifact, and its history table has a Details column naming the fields an update filled and the decision a supersession replaced or was replaced by. Nobody edits them by hand: `knowledge-automata views` regenerates them, and CI runs `knowledge-automata views --check` on the sample project, which fails when the committed views differ from the generator's output.
 
@@ -358,6 +360,7 @@ All model calls go through `knowledge_automata.llm` (ADR-0003, [ADR-0012](decisi
 |---|---|
 | Overall system | Multi-agent system, orchestrator-workers pattern |
 | Governor | Orchestrator, routing |
+| Work orders file | Checkpointing (resumable runs) |
 | Registrars working simultaneously | Parallelization |
 | Comparator | Retrieve-then-rerank, retrieval-augmented generation (RAG) for entity resolution |
 | Oracle | Retrieval-augmented generation (RAG) with citations |
@@ -372,7 +375,7 @@ All model calls go through `knowledge_automata.llm` (ADR-0003, [ADR-0012](decisi
 
 ## Security: defence in depth
 
-The Sensor is the first line of defence, not the only one. Artifact text is always treated as data, schema validation blocks malformed writes, and the Operator approves sensitive changes. Together these protect the institutional memory from contamination (memory poisoning). Prompt-injection and relevance checks in the Sensor are planned (see `dev/backlog.md`). These guardrails are also relevant evidence for future cybersecurity compliance work such as the EU Cyber Resilience Act.
+The Sensor is the first line of defence, not the only one. Artifact text is always treated as data, schema validation blocks malformed writes, the Governor's limit on work orders holds an odd or hostile artifact before anything is drafted, and the Operator approves sensitive changes. Together these protect the institutional memory from contamination (memory poisoning). Prompt-injection and relevance checks in the Sensor are planned (see `dev/backlog.md`). These guardrails are also relevant evidence for future cybersecurity compliance work such as the EU Cyber Resilience Act.
 
 Supply-chain security (dependency auditing, pinned CI actions and an SBOM per release) complements this runtime defence in depth (ADR-0010).
 

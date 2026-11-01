@@ -8,7 +8,7 @@
   - Each page starts with a short front matter block (ID, status, dates).
   - Standard relative Markdown links only, no double-bracket wiki links: supersession linked both ways, each record linked to its source artifacts, and the index linked to each record, so the registers browse like a wiki.
   - A test renders fixture records against expected output, and a CI check fails if committed views differ from the generator's output (done for the decision log).
-- Governor (orchestrator and router): work orders, resumable runs, the `held` status and the `process` command (handoff 007, in progress; ADR-0018 proposed).
+- Governor (orchestrator and router): work orders, resumable runs, the `held` status and the `process` command (handoff 007: parts 7A and 7B built and tested offline; the real run on the sample project, part 7C, is next; ADR-0018 proposed).
 - Risk Registrar. The Governor already finds risks (handoff 007) and keeps their work orders as not routed; whether the Risk Registrar drafts from those saved work orders or through reprocessing is decided in its handoff.
 - Fictional sample project in `examples/`, doubling as a small evaluation set with expected records.
   - Evaluation harness, grown from the handoff 007 spike (`runtime/diagnostics/spike_governor.py`, git-ignored): a committed script with a call budget, the expected results as a data file (from `dev/handoffs/007-governor-inputs.md` and the handoff 006 table), and a short saved report per run (counts matched, quotes passed, records as expected, calls and tokens used), so runs can be compared, for example `decision-registrar.v1` against v2, or two wordings of a Governor prompt. Run by hand before a real run or after a prompt change, never in pull request CI: it costs calls and needs the key, and the model's answers vary between runs, so results are rates, not pass or fail. This is an evaluation of the model with our prompts; the offline tests check our code, and `scripts/cohere_smoke.py` is the integration check that the API works with our requests. One run per artifact is only a sample: in the 007 spike, a one-line prompt change fixed one artifact and broke another (Miguel and Claude, 2026-10-31). A small step of its own after handoff 007.
@@ -36,14 +36,14 @@
 - Format converters (PDF, Word) as a step before the Sensor; the Ledger hashes the original file and stores the extracted text that evidence is checked against.
 - Artifact Ledger Markdown view.
 - Reprocessing an artifact that produced records, after a prompt change: needs a `correction` change that replaces content and keeps history (update, reaffirmation and supersession all misdescribe it), a way out of `processed`, and reruns in artifact date order.
-- Rerunning an artifact whose draft was rejected: done for artifacts that recorded nothing (handoff 006). `record-decision` runs them again from `processed` or `failed`, keeping the earlier rejected drafts.
+- Rerunning an artifact whose draft was rejected: done for artifacts that recorded nothing (handoff 006), and since handoff 007 for any run that stopped: `process` runs the work orders that are not recorded yet from `processed` or `failed`, keeping the earlier rejected drafts and records.
 - Tune `KA_COMPARATOR_TOP_K` and `KA_COMPARATOR_TOP_N` on the evaluation set, and consider a minimum Rerank score below which candidates are dropped and the draft is classified as new without a Command call (saves calls, but a wrong threshold lets duplicates in).
 - Skip Embed when the register has no more active records than K (Rerank can read them all).
 - A cheap pre-check that skips drafting for obvious repeats, if reaffirmation drafts become a visible cost in the event log.
 - A git-ignored embedding cache next to the records, if the register grows large.
 - Automatic repair of an interrupted supersession.
 - Supersession of more than one record at once (`relations.supersedes` already allows a list).
-- Repair for a Ledger left behind its records by an interrupted run (today the pipeline detects it and stops).
+- Repair for records left ahead of the work orders file by an interrupted run (today `process` detects it before any call and stops). A Ledger left behind the work orders file is already rebuilt with no call (handoff 007).
 - Sensor relevance check and prompt-injection detection.
   - An artifact could contain fake `<work-order>` text inside the artifact block, to steer a Registrar towards another item. Today the safety net is in code: the draft must quote something that matches the real work order (handoff 007).
 - Oracle insight feedback loop: Operator-confirmed conclusions from Oracle conversations are saved as new raw artifacts ("insight notes") and re-enter through the Sensor, so there is still one write path.
@@ -110,7 +110,7 @@
 
 ## Technical debt
 
-- If writing the views or the Ledger entry fails after a record is saved, a rerun of `record-decision` is refused because the Ledger is behind the records. The fix is by hand today (`knowledge-automata views`, then the Ledger entry); the error could say so step by step.
-- `release` does not check the stored copy's hash: a quarantined copy edited in place is released, then refused by `record-decision`. Checking the hash at release would fail sooner, with the same message.
+- If writing the views or the work order's result fails after a record is saved, a rerun of `process` is refused because the work orders file is behind the records. The fix is by hand today (`knowledge-automata views`, then the order's state and results in the work orders file); the error could say so step by step.
+- `release` does not check the stored copy's hash: a quarantined copy edited in place is released, then refused by `process`. Checking the hash at release would fail sooner, with the same message.
 - A crash between writing an artifact copy and its Ledger entry leaves an orphan copy, and the next `ingest` stops on "file exists" for the same ID until the copy is deleted. It fails loudly; the error could say which file to remove.
 - The Comparator keeps its own call, check and retry loop; the Registrars and the Governor share `agents/checked_chat.py` (handoff 007, part 7A). Moving the Comparator onto it would remove the duplicate, as long as its tests stay unchanged.
