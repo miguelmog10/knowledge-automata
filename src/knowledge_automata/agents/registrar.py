@@ -2,18 +2,21 @@
 
 A Registrar is a register spec plus a versioned prompt. One loop serves every Registrar:
 draft with one call, check the draft with ``validate_draft``, retry once with the errors,
-then accept or reject. This module never writes files and never builds the envelope.
+then accept or reject (``agents/checked_chat.py``, shared with the Governor). This module
+never writes files and never builds the envelope.
 """
 
 import re
 from dataclasses import dataclass
 from typing import Any
 
+from knowledge_automata.agents.checked_chat import checked_chat
+from knowledge_automata.agents.checked_chat import retry_version as _retry_version
 from knowledge_automata.core.prompts import ERRORS_PLACEHOLDER, Prompt, retry_system_text
 from knowledge_automata.core.registers import RegisterSpec
 from knowledge_automata.core.schemas import draft_schema
 from knowledge_automata.core.validation import validate_draft
-from knowledge_automata.llm import CallContext, ChatModel, LLMResponseError, Usage
+from knowledge_automata.llm import ChatModel, Usage
 
 CLOSING_TAG = re.compile(r"</artifact", re.IGNORECASE)
 
@@ -38,7 +41,7 @@ class Registrar:
 
     @property
     def retry_version(self) -> str:
-        return f"{self.prompt.version}+{self.retry_prompt.version}"
+        return _retry_version(self.prompt, self.retry_prompt)
 
 
 @dataclass(frozen=True)
@@ -86,45 +89,23 @@ def draft_record(
     unchanged (the SDK already retried what can be retried).
     """
     check_artifact(artifact_text)
-    schema = draft_schema(registrar.spec)
-    user = user_message(artifact_text)
-    usage: list[Usage] = []
-    errors: tuple[str, ...] = ()
-    error_type: str | None = None
-    version = registrar.prompt.version
-
-    for attempt in range(1, registrar.max_attempts + 1):
-        if attempt == 1:
-            system, version = registrar.prompt.text, registrar.prompt.version
-        else:
-            system, version = retry_system_message(registrar, errors), registrar.retry_version
-        context = CallContext(registrar.agent, artifact_id, version)
-        try:
-            result = llm.chat_json(system=system, user=user, schema=schema, context=context)
-        except LLMResponseError as error:
-            if error.usage is not None:
-                usage.append(error.usage)
-            errors, error_type = (str(error),), type(error).__name__
-            continue
-        usage.append(result.usage)
-        validation = validate_draft(result.data, registrar.spec, artifact_text)
-        if validation.ok:
-            return DraftOutcome(
-                draft=result.data,
-                errors=(),
-                attempts=attempt,
-                model=result.model,
-                prompt_version=version,
-                usage=tuple(usage),
-            )
-        errors, error_type = validation.errors, None
-
+    reply = checked_chat(
+        llm,
+        agent=registrar.agent,
+        artifact_id=artifact_id,
+        prompt=registrar.prompt,
+        retry_prompt=registrar.retry_prompt,
+        user=user_message(artifact_text),
+        schema=draft_schema(registrar.spec),
+        check=lambda draft: validate_draft(draft, registrar.spec, artifact_text),
+        max_attempts=registrar.max_attempts,
+    )
     return DraftOutcome(
-        draft=None,
-        errors=errors,
-        attempts=registrar.max_attempts,
-        model=None,
-        prompt_version=version,
-        usage=tuple(usage),
-        error_type=error_type,
+        draft=reply.data,
+        errors=reply.errors,
+        attempts=reply.attempts,
+        model=reply.model,
+        prompt_version=reply.prompt_version,
+        usage=reply.usage,
+        error_type=reply.error_type,
     )
