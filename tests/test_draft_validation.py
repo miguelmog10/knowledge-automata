@@ -1,6 +1,6 @@
 import pytest
 
-from knowledge_automata.core.validation import validate_draft
+from knowledge_automata.core.validation import WORK_ORDER_MISMATCH, validate_draft
 from knowledge_automata.domains.project_management.registers import (
     DECISION_LOG,
     RISK_REGISTER,
@@ -133,3 +133,49 @@ def test_response_strategy_must_fit_kind(kind, strategy, fits):
 
 def test_risk_without_response_strategy_passes_semantic_check():
     assert check_response_strategy_fits_kind({"kind": "threat"}) == []
+
+
+DECISION_QUOTE = "the group agreed to buy the drip irrigation kit from supplier A"
+RISK_QUOTE = "the city\u2019s permits office may delay the water connection permit"
+
+
+def test_work_order_quote_inside_a_draft_quote_matches(decision_draft, artifact_text):
+    result = validate_draft(decision_draft, DECISION_LOG, artifact_text, (DECISION_QUOTE,))
+    assert result.ok, result.errors
+
+
+def test_draft_quote_inside_a_work_order_quote_matches(decision_draft, artifact_text):
+    decision_draft["evidence"] = ["Supplier B is rejected"]
+    wider = ("they guarantee delivery before the April planting. SUPPLIER B is rejected for",)
+    result = validate_draft(decision_draft, DECISION_LOG, artifact_text, wider)
+    assert result.ok, result.errors
+
+
+def test_one_matching_quote_is_enough(decision_draft, artifact_text):
+    work_order = (RISK_QUOTE, "Supplier B is rejected for this season.")
+    result = validate_draft(decision_draft, DECISION_LOG, artifact_text, work_order)
+    assert result.ok, result.errors
+
+
+def test_no_quote_matching_the_work_order_fails(decision_draft, artifact_text):
+    result = validate_draft(decision_draft, DECISION_LOG, artifact_text, (RISK_QUOTE,))
+    assert result.errors == (WORK_ORDER_MISMATCH,)
+
+
+def test_a_failed_quote_cannot_match_the_work_order(decision_draft, artifact_text):
+    decision_draft["evidence"] = ["Supplier B is rejected for this season, said nobody."]
+    work_order = ("Supplier B is rejected for this season.",)
+    result = validate_draft(decision_draft, DECISION_LOG, artifact_text, work_order)
+    assert_fails(result, "$.evidence[0]: ", WORK_ORDER_MISMATCH)
+
+
+def test_no_work_order_means_no_match_check(decision_draft, artifact_text):
+    result = validate_draft(decision_draft, DECISION_LOG, artifact_text, None)
+    assert result.ok, result.errors
+
+
+def test_missing_evidence_gets_no_match_error(decision_draft, artifact_text):
+    del decision_draft["evidence"]
+    result = validate_draft(decision_draft, DECISION_LOG, artifact_text, (DECISION_QUOTE,))
+    assert not result.ok
+    assert WORK_ORDER_MISMATCH not in result.errors

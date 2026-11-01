@@ -231,10 +231,23 @@ def _overlaps(a: str, b: str) -> bool:
     return a in b or b in a
 
 
-def validate_draft(draft: Any, spec: RegisterSpec, artifact_text: str) -> ValidationResult:
+WORK_ORDER_MISMATCH = (
+    "$.evidence: no quote matches the work order; draft the item the work order points to"
+)
+
+
+def validate_draft(
+    draft: Any,
+    spec: RegisterSpec,
+    artifact_text: str,
+    work_order_quotes: Sequence[str] | None = None,
+) -> ValidationResult:
     """Validate a Registrar draft: schema, semantic checks and evidence quotes.
 
-    One failed quote rejects the draft; the result names every failed quote.
+    One failed quote rejects the draft; the result names every failed quote. With
+    ``work_order_quotes``, at least one quote that passed the evidence check must match a
+    work order quote (after ``normalize_quote``, one contains the other), so the Registrar
+    drafts the item its work order points to (ADR-0018).
     """
     errors = _schema_errors(_draft_validator(spec), draft)
     if not isinstance(draft, dict):
@@ -250,6 +263,13 @@ def validate_draft(draft: Any, spec: RegisterSpec, artifact_text: str) -> Valida
         quotes = [(index, quote) for index, quote in enumerate(evidence) if isinstance(quote, str)]
         evidence_errors, checks = _evidence_errors(quotes, artifact_text)
         errors.extend(evidence_errors)
+        if work_order_quotes is not None:
+            ordered = [normalize_quote(quote) for quote in work_order_quotes]
+            drafted = [normalize_quote(check.quote) for check in checks if check.passed]
+            if not any(
+                _overlaps(quote, wanted) for quote in drafted for wanted in ordered if wanted
+            ):
+                errors.append(WORK_ORDER_MISMATCH)
     return ValidationResult(tuple(errors), checks)
 
 
