@@ -21,6 +21,7 @@ LEDGER_ENTRY_SCHEMA = "core/ledger-entry.v1.json"
 LLM_EVENT_SCHEMA = "core/llm-event.v1.json"
 RECONCILIATION_SCHEMA = "core/reconciliation.v1.json"
 RECORD_SCHEMA = "core/record.v1.json"
+WORK_ORDERS_SCHEMA = "core/work-orders.v1.json"
 
 
 @functools.cache

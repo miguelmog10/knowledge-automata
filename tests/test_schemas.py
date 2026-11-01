@@ -77,6 +77,7 @@ def test_all_expected_schema_files_are_found():
         "core/ledger-entry.v1.json",
         "core/llm-event.v1.json",
         "core/reconciliation.v1.json",
+        "core/work-orders.v1.json",
         "project-management/decision.v1.json",
         "project-management/risk.v1.json",
     }
