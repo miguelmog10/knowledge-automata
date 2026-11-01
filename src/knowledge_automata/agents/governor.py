@@ -8,7 +8,8 @@ orders: sorted by where they first appear, numbered, and labelled from verified 
 This module never writes files and never routes or drafts; the pipeline does.
 """
 
-from collections.abc import Iterable
+import os
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 
@@ -18,11 +19,37 @@ from knowledge_automata.agents.registrar import check_artifact, user_message
 from knowledge_automata.core.prompts import ERRORS_PLACEHOLDER, Prompt, load_prompt
 from knowledge_automata.core.registers import RegisterSpec
 from knowledge_automata.core.schemas import governor_schema
+from knowledge_automata.core.settings import whole_number
 from knowledge_automata.core.validation import validate_work_orders
 from knowledge_automata.core.work_orders import WorkOrder, build_work_orders
 from knowledge_automata.llm import ChatModel, Usage
 
 REGISTERS_PLACEHOLDER = "{registers}"
+MAX_ITEMS_VARIABLE = "KA_GOVERNOR_MAX_ITEMS"
+DEFAULT_MAX_ITEMS = 10
+
+
+class GovernorConfigError(Exception):
+    """A Governor setting in the environment is invalid."""
+
+
+@dataclass(frozen=True)
+class GovernorSettings:
+    """``max_items``: more work orders for registers with a Registrar than this, and the
+    artifact is held for the Operator before anything is drafted (a security control)."""
+
+    max_items: int = DEFAULT_MAX_ITEMS
+
+    def __post_init__(self) -> None:
+        if self.max_items < 1:
+            raise GovernorConfigError(f"{MAX_ITEMS_VARIABLE} must be at least 1")
+
+    @classmethod
+    def from_env(cls, env: Mapping[str, str] = os.environ) -> "GovernorSettings":
+        """Read the setting; unset or empty is the default."""
+        return cls(
+            max_items=whole_number(env, MAX_ITEMS_VARIABLE, DEFAULT_MAX_ITEMS, GovernorConfigError)
+        )
 
 
 def _definition_version(spec: RegisterSpec) -> str | None:

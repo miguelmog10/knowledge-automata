@@ -6,7 +6,11 @@ import pytest
 from knowledge_automata import cli, pipeline
 from knowledge_automata.agents.registrar import Registrar
 from knowledge_automata.core.prompts import Prompt
-from knowledge_automata.core.validation import validate_record
+from knowledge_automata.core.validation import (
+    validate_ledger_entry,
+    validate_record,
+    validate_work_orders_file,
+)
 from knowledge_automata.domains.project_management.registers import DECISION_LOG
 from knowledge_automata.llm import (
     LLMAuthError,
@@ -17,13 +21,20 @@ from knowledge_automata.llm import (
 )
 from knowledge_automata.llm.fake import FakeLLM
 from knowledge_automata.llm.settings import MISSING_KEY_HINT
+from knowledge_automata.storage import json_files
 from knowledge_automata.storage.ledger_store import LedgerStore
 
 RUN_ID = "7d1c6a52-3b0e-4c47-9a57-0e6f2d1f9a10"
 NOW = datetime(2026, 10, 26, 14, 3, 12, tzinfo=UTC)
 ARTIFACT_SENTINEL = "SENTINEL-ARTIFACT-4b81 do not print this line"
 PROMPT_SENTINEL = "SENTINEL-PROMPT-c27e"
-RETRY_VERSION = "decision-registrar.v1+registrar-retry.v1"
+RETRY_VERSION = "decision-registrar.v2+registrar-retry.v1"
+GOVERNOR_RETRY = "governor.v1+governor-retry.v1"
+QUOTE = "Supplier B is rejected for this season."
+AGREED = "the group agreed to buy the drip irrigation kit from supplier A"
+RISK = "Ana will call the permits office every week"
+# The Governor's reply: one decision-log work order the decision draft can quote from.
+FOUND = {"items": [{"register": "decision-log", "evidence": [QUOTE]}]}
 
 
 class FakeBuild:
@@ -92,8 +103,13 @@ def ingest(path, memory, *extra):
     return run(FakeBuild(), "ingest", str(path), "--memory", str(memory), *extra)
 
 
-def record(build, memory, artifact_id="ART-0001"):
-    return run(build, "record-decision", artifact_id, "--memory", str(memory))
+def process(build, memory, artifact_id="ART-0001"):
+    return run(build, "process", artifact_id, "--memory", str(memory))
+
+
+def work_orders(memory, artifact_id="ART-0001"):
+    path = memory / "work-orders" / f"{artifact_id}.json"
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def entry(memory, artifact_id="ART-0001"):
@@ -188,27 +204,32 @@ def test_ingest_a_missing_file_exits_2(memory, capsys):
     assert "Cannot read nope.md" in capsys.readouterr().err
 
 
-# record-decision
+# process
 
 
-def test_record_decision_stores_the_record_the_views_and_the_ledger(
+def test_process_stores_the_record_the_views_the_work_orders_and_the_ledger(
     ingested, memory, decision_draft, capsys
 ):
-    build = FakeBuild(decision_draft)
-    assert record(build, memory) == 0
+    build = FakeBuild(FOUND, decision_draft)
+    assert process(build, memory) == 0
 
     out, err = capsys.readouterr()
     assert err == ""
-    assert f"Run ID: {RUN_ID}" in out
-    assert (
-        "Drafted a decision from ART-0001 in 1 attempt "
-        "(model fake-chat, prompt decision-registrar.v1, thinking enabled)"
-    ) in out
-    assert "No active decisions to compare with: recorded as new without a comparison." in out
-    assert "Recorded DEC-0001 as a new decision" in out
-    assert "Billed: draft (input tokens " in out
-    assert "memory/registers/decision-log/DEC-0001.json" in out
-    assert "memory/views/decision-log.md" in out
+    lines = out.splitlines()
+    assert lines[:7] == [
+        f"Run ID: {RUN_ID}",
+        "Found 1 work order in ART-0001 in 1 attempt (model fake-chat, prompt governor.v1, "
+        "definitions decision-log.v1, risk-register.v1, thinking enabled): 1 decision-log",
+        f'Work order 1 of 1, decision-log: "{QUOTE}"',
+        "  Drafted in 1 attempt (prompt decision-registrar.v2)",
+        "  No active decisions to compare with: recorded as new without a comparison",
+        "  Recorded DEC-0001 as a new decision",
+        "Recorded 1 of 1 routed work order; 0 rejected; 0 not routed",
+    ]
+    assert lines[7].startswith("Billed: governor (input tokens ")
+    assert "; drafts (input tokens " in lines[7] and "embed" not in lines[7]
+    assert lines[8] == f"Index: {(memory / 'views' / 'decision-log.md').as_posix()}"
+    assert len(lines) == 9
 
     path = memory / "registers" / "decision-log" / "DEC-0001.json"
     stored = json.loads(path.read_text(encoding="utf-8"))
@@ -217,18 +238,36 @@ def test_record_decision_stores_the_record_the_views_and_the_ledger(
     assert stored["created_at"] == "2026-10-26T14:03:12Z"
     assert stored["sources"][0]["artifact_date"] == "2026-03-12"
     assert stored["history"][0]["model"] == "fake-chat"
+    assert stored["history"][0]["prompt_version"] == "decision-registrar.v2"
 
     page = (memory / "views" / "decision-log" / "DEC-0001.md").read_text(encoding="utf-8")
     assert "### [ART-0001](../../artifacts/ART-0001-steering-group.md), 2026-03-12\n" in page
     assert (memory / "views" / "decision-log.md").is_file()
-    assert [event["artifact_id"] for event in build.sink.events] == ["ART-0001"]
+    assert [event["agent"] for event in build.sink.events] == ["governor", "decision-registrar"]
+    assert [event["artifact_id"] for event in build.sink.events] == ["ART-0001", "ART-0001"]
+    # The draft call carries the work order after the artifact.
+    assert '"evidence": [\n    "Supplier B is rejected' in build.fake.calls[1].inputs["user"]
+
+    file = work_orders(memory)
+    assert validate_work_orders_file(file).ok
+    assert file["run_id"] == RUN_ID
+    assert file["governor"] == {
+        "model": "fake-chat",
+        "prompt_version": "governor.v1",
+        "attempts": 1,
+        "definitions": ["decision-log.v1", "risk-register.v1"],
+    }
+    (order,) = file["orders"]
+    assert (order["state"], order["label"], order["evidence"]) == ("recorded", QUOTE, [QUOTE])
+    assert order["produced"]["record_id"] == "DEC-0001"
 
     processed = entry(memory)
+    assert validate_ledger_entry(processed).ok
     assert processed["status"] == "processed"
     assert processed["history"][-1] == {
         "at": "2026-10-26T14:03:12Z",
         "status": "processed",
-        "by": "pipeline",
+        "by": "governor",
         "run_id": RUN_ID,
     }
     assert processed["produced"] == [
@@ -237,19 +276,24 @@ def test_record_decision_stores_the_record_the_views_and_the_ledger(
             "record_id": "DEC-0001",
             "change": "new",
             "model": "fake-chat",
-            "prompt_version": "decision-registrar.v1",
+            "prompt_version": "decision-registrar.v2",
             "schema_version": stored["schema_version"],
+            "work_order": 1,
         }
     ]
     assert processed["rejected"] == []
+    assert processed["governor"] == {
+        **file["governor"],
+        "run_id": RUN_ID,
+        "work_orders": [{"register": "decision-log", "count": 1, "routed": True}],
+    }
 
 
 def test_retry_is_reported_with_its_prompt_version(ingested, memory, decision_draft, capsys):
-    build = FakeBuild(bad(decision_draft), decision_draft)
-    assert record(build, memory) == 0
+    build = FakeBuild(FOUND, bad(decision_draft), decision_draft)
+    assert process(build, memory) == 0
     out = capsys.readouterr().out
-    assert "in 2 attempts" in out
-    assert f"prompt {RETRY_VERSION}" in out
+    assert f"  Drafted in 2 attempts (prompt {RETRY_VERSION})" in out
     stored = json.loads(
         (memory / "registers" / "decision-log" / "DEC-0001.json").read_text(encoding="utf-8")
     )
@@ -260,34 +304,40 @@ def test_retry_is_reported_with_its_prompt_version(ingested, memory, decision_dr
 def test_a_second_run_on_a_processed_artifact_makes_no_call(
     ingested, memory, decision_draft, capsys
 ):
-    assert record(FakeBuild(decision_draft), memory) == 0
+    assert process(FakeBuild(FOUND, decision_draft), memory) == 0
     capsys.readouterr()
-    second = FakeBuild(decision_draft)
-    assert record(second, memory) == 2
+    second = FakeBuild(FOUND, decision_draft)
+    assert process(second, memory) == 2
     assert second.settings == []
     assert "ART-0001 is already processed (recorded in DEC-0001)" in capsys.readouterr().err
 
 
 def test_a_missing_key_exits_2_with_the_hint(ingested, memory, capsys):
-    assert cli.main(["record-decision", "ART-0001", "--memory", str(memory)]) == 2
+    assert cli.main(["process", "ART-0001", "--memory", str(memory)]) == 2
     out, err = capsys.readouterr()
     assert MISSING_KEY_HINT in err
     assert out == ""
     assert not (memory / "registers").exists()
+    assert not (memory / "work-orders").exists()
     assert entry(memory)["status"] == "accepted"
 
 
 def test_a_rejected_draft_exits_1_and_is_listed_in_the_ledger(
     ingested, memory, decision_draft, capsys
 ):
-    build = FakeBuild(bad(decision_draft), bad(decision_draft))
-    assert record(build, memory) == 1
+    build = FakeBuild(FOUND, bad(decision_draft), bad(decision_draft))
+    assert process(build, memory) == 1
     out, err = capsys.readouterr()
-    assert "Rejected the draft from ART-0001 after 2 attempts" in err
-    assert "no record was written" in err
-    assert "- $.evidence[0]: " in err
-    assert "Billed: draft (input tokens " in out
-    assert len(build.fake.calls) == 2
+    assert err == ""
+    assert (
+        f"  Rejected the draft after 2 attempts (prompt {RETRY_VERSION}); the Ledger lists "
+        "it. Errors of the last attempt:"
+    ) in out
+    assert "  - $.evidence[0]: " in out
+    assert "Recorded 0 of 1 routed work order; 1 rejected; 0 not routed" in out
+    assert "; drafts (input tokens " in out
+    assert "Index:" not in out
+    assert len(build.fake.calls) == 3
     assert not (memory / "registers").exists()
     assert not (memory / "views").exists()
 
@@ -301,16 +351,22 @@ def test_a_rejected_draft_exits_1_and_is_listed_in_the_ledger(
             "run_id": RUN_ID,
             "attempts": 2,
             "prompt_version": RETRY_VERSION,
-            "error_paths": ["$.evidence[0]"],
+            # The draft quotes neither the artifact nor the work order.
+            "error_paths": ["$.evidence[0]", "$.evidence"],
+            "work_order": 1,
         }
     ]
+    assert work_orders(memory)["orders"][0]["state"] == "rejected"
     # The error messages quote model output, so the Ledger keeps only their paths.
     assert "supplier C" not in (memory / "ledger" / "ART-0001.json").read_text(encoding="utf-8")
+    assert "supplier C" not in (memory / "work-orders" / "ART-0001.json").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_unusable_responses_are_listed_with_their_error_type(ingested, memory, capsys):
-    build = FakeBuild(LLMResponseError("truncated"), LLMResponseError("not an object"))
-    assert record(build, memory) == 1
+    build = FakeBuild(FOUND, LLMResponseError("truncated"), LLMResponseError("not an object"))
+    assert process(build, memory) == 1
     assert entry(memory)["rejected"] == [
         {
             "register": "decision-log",
@@ -320,21 +376,105 @@ def test_unusable_responses_are_listed_with_their_error_type(ingested, memory, c
             "prompt_version": RETRY_VERSION,
             "error_paths": ["$"],
             "error_type": "LLMResponseError",
+            "work_order": 1,
         }
     ]
+
+
+def test_a_rejected_governor_reply_exits_1_and_writes_no_work_orders(ingested, memory, capsys):
+    unknown = {"items": [{"register": "lessons-learned", "evidence": [QUOTE]}]}
+    build = FakeBuild(unknown, LLMResponseError("truncated"))
+    assert process(build, memory) == 1
+    out, err = capsys.readouterr()
+    assert out.splitlines()[0] == f"Run ID: {RUN_ID}"
+    assert (
+        "Rejected the Governor's reply for ART-0001 after 2 attempts "
+        f"(prompt {GOVERNOR_RETRY}, thinking enabled); nothing was drafted"
+    ) in err
+    assert out.splitlines()[1].startswith("Billed: governor (input tokens ")
+    assert not (memory / "work-orders").exists()
+    processed = entry(memory)
+    assert validate_ledger_entry(processed).ok
+    assert processed["status"] == "processed"
+    assert processed["rejected"] == [
+        {
+            "stage": "governor",
+            "run_id": RUN_ID,
+            "attempts": 2,
+            "prompt_version": GOVERNOR_RETRY,
+            "error_paths": ["$"],
+            "error_type": "LLMResponseError",
+        }
+    ]
+    assert "governor" not in processed
+
+    # A rejected reply recorded nothing, so the artifact can be processed again.
+    build = FakeBuild(FOUND, {}, {})
+    capsys.readouterr()
+    assert process(build, memory) == 1
+    out = capsys.readouterr().out
+    assert out.splitlines()[0] == "Rerunning ART-0001: its earlier run recorded nothing."
+    rerun = entry(memory)
+    assert validate_ledger_entry(rerun).ok
+    assert [item["stage"] for item in rerun["rejected"]] == ["governor", "draft"]
+    assert rerun["history"][-1]["reason"] == "Rerun: the earlier run recorded nothing"
+
+
+def test_an_artifact_with_nothing_to_record_exits_0(ingested, memory, capsys):
+    build = FakeBuild({"items": []})
+    assert process(build, memory) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[1] == (
+        "Found no work orders in ART-0001 in 1 attempt (model fake-chat, prompt governor.v1, "
+        "definitions decision-log.v1, risk-register.v1, thinking enabled)"
+    )
+    assert lines[2] == "The Governor found nothing to record in ART-0001."
+    assert lines[3].startswith("Billed: governor (")
+    assert len(build.fake.calls) == 1
+    processed = entry(memory)
+    assert processed["status"] == "processed"
+    assert processed["governor"]["work_orders"] == []
+    assert work_orders(memory)["orders"] == []
+
+    second = FakeBuild()
+    assert process(second, memory) == 2
+    assert second.settings == []
+    assert (
+        "ART-0001 is already processed: the Governor found nothing to record in ART-0001"
+    ) in capsys.readouterr().err
+
+
+def test_an_artifact_with_only_orders_without_a_registrar_exits_0(ingested, memory, capsys):
+    build = FakeBuild({"items": [{"register": "risk-register", "evidence": [RISK]}]})
+    assert process(build, memory) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[1].endswith("thinking enabled): 1 risk-register (no Registrar yet, not routed)")
+    assert lines[2] == (
+        "The Governor found 1 work order, none for a register with a Registrar "
+        "(1 risk-register, not routed): nothing to record yet."
+    )
+    assert len(build.fake.calls) == 1
+    assert work_orders(memory)["orders"][0]["state"] == "not-routed"
+    assert entry(memory)["governor"]["work_orders"] == [
+        {"register": "risk-register", "count": 1, "routed": False}
+    ]
+    assert process(FakeBuild(), memory) == 2
+    assert "ART-0001 has no work orders for a register with a Registrar" in (
+        capsys.readouterr().err
+    )
 
 
 @pytest.mark.parametrize("artifact_id", ["ART-1", "art-0001", "ART-0001 ", "../ART-0001"])
 def test_a_bad_artifact_id_exits_2_before_building(ingested, memory, artifact_id, capsys):
     build = FakeBuild()
-    assert record(build, memory, artifact_id) == 2
+    assert process(build, memory, artifact_id) == 2
     assert build.settings == []
     assert "must look like ART-0001" in capsys.readouterr().err
 
 
 def test_an_unknown_artifact_exits_2_before_building(ingested, memory, capsys):
     build = FakeBuild()
-    assert record(build, memory, "ART-0002") == 2
+    assert process(build, memory, "ART-0002") == 2
     assert build.settings == []
     assert "ART-0002 is not in the Ledger" in capsys.readouterr().err
 
@@ -352,7 +492,7 @@ def test_quarantined_and_rejected_artifacts_are_not_sent(
     ingest(write(inbox, name, raw), memory)
     capsys.readouterr()
     build = FakeBuild()
-    assert record(build, memory) == 2
+    assert process(build, memory) == 2
     err = capsys.readouterr().err
     assert fragment in err
     assert build.settings == []
@@ -362,7 +502,7 @@ def test_a_quarantined_artifact_points_to_release(inbox, memory, monkeypatch, ca
     monkeypatch.setenv("KA_SENSOR_MAX_BYTES", "10")
     ingest(write(inbox, "long.md", b"x" * 11), memory)
     capsys.readouterr()
-    assert record(FakeBuild(), memory) == 2
+    assert process(FakeBuild(), memory) == 2
     assert "knowledge-automata release ART-0001 --reason TEXT" in capsys.readouterr().err
 
 
@@ -370,29 +510,31 @@ def test_a_provider_error_marks_the_artifact_failed_and_a_rerun_succeeds(
     ingested, memory, decision_draft, capsys
 ):
     error = LLMRateLimitError("Monthly call limit reached", monthly_cap=True)
-    assert record(FakeBuild(error), memory) == 3
+    assert process(FakeBuild(error), memory) == 3
     out, err = capsys.readouterr()
     assert "resets next month" in err
     assert "ART-0001 is now failed in the Ledger" in err
     assert f"Run ID: {RUN_ID}" in out
     assert not (memory / "registers").exists()
+    assert not (memory / "work-orders").exists()
     failed = entry(memory)
     assert failed["status"] == "failed"
     assert failed["history"][-1]["error_type"] == "LLMRateLimitError"
     assert failed["history"][-1]["run_id"] == RUN_ID
+    assert failed["history"][-1]["by"] == "governor"
 
-    assert record(FakeBuild(decision_draft), memory) == 0
+    assert process(FakeBuild(FOUND, decision_draft), memory) == 0
     statuses = [item["status"] for item in entry(memory)["history"]]
     assert statuses == ["received", "accepted", "failed", "processed"]
 
 
 def test_provider_errors_exit_3(ingested, memory, capsys):
-    assert record(FakeBuild(LLMAuthError("The provider rejected the API key")), memory) == 3
+    assert process(FakeBuild(LLMAuthError("The provider rejected the API key")), memory) == 3
     assert "LLMAuthError" in capsys.readouterr().err
     assert entry(memory)["status"] == "failed"
 
 
-def test_an_interrupted_run_leaves_the_ledger_behind_and_is_detected(
+def test_an_interrupted_run_leaves_the_ledger_behind_and_is_rebuilt(
     ingested, memory, decision_draft, monkeypatch, capsys
 ):
     def interrupted(self, old, new):
@@ -400,16 +542,66 @@ def test_an_interrupted_run_leaves_the_ledger_behind_and_is_detected(
 
     with monkeypatch.context() as patch:
         patch.setattr(LedgerStore, "save_transition", interrupted)
-        assert record(FakeBuild(decision_draft), memory) == 2
+        assert process(FakeBuild(FOUND, decision_draft), memory) == 2
     assert "ART-0001.json: No space left on device" in capsys.readouterr().err
     assert (memory / "registers" / "decision-log" / "DEC-0001.json").is_file()
+    assert work_orders(memory)["orders"][0]["state"] == "recorded"
     assert entry(memory)["status"] == "accepted"
 
-    build = FakeBuild(decision_draft)
-    assert record(build, memory) == 2
+    build = FakeBuild()
+    assert process(build, memory) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert build.settings == []
+    assert out[1] == (
+        f"Rebuilt the Ledger entry of ART-0001 from its work orders file (run {RUN_ID}); "
+        "no call was made."
+    )
+    assert out[2] == "Recorded 1 of 1 routed work order; 0 rejected; 0 not routed"
+    rebuilt = entry(memory)
+    assert validate_ledger_entry(rebuilt).ok
+    assert rebuilt["status"] == "processed"
+    assert rebuilt["history"][-1]["reason"] == "Rebuilt from the work orders file"
+    assert rebuilt["produced"][0]["record_id"] == "DEC-0001"
+    assert rebuilt["produced"][0]["work_order"] == 1
+
+
+def test_records_citing_the_artifact_without_a_work_orders_file_stop_the_run(
+    ingested, memory, decision_draft, capsys
+):
+    assert process(FakeBuild(FOUND, decision_draft), memory) == 0
+    (memory / "work-orders" / "ART-0001.json").unlink()
+    ledger = memory / "ledger" / "ART-0001.json"
+    data = json.loads(ledger.read_text(encoding="utf-8"))
+    data["produced"] = []
+    ledger.write_text(json.dumps(data), encoding="utf-8")
+    capsys.readouterr()
+    build = FakeBuild()
+    assert process(build, memory) == 2
     err = capsys.readouterr().err
-    assert "ART-0001 is accepted in the Ledger but already recorded in DEC-0001" in err
+    assert "ART-0001 is processed in the Ledger but already recorded in DEC-0001" in err
     assert "the Ledger is behind the records" in err
+    assert build.settings == []
+
+
+def test_a_missing_work_orders_file_stops_the_run(ingested, memory, decision_draft, capsys):
+    two = {
+        "items": [
+            {"register": "decision-log", "evidence": [AGREED]},
+            {"register": "decision-log", "evidence": [QUOTE]},
+        ]
+    }
+    build = FakeBuild(two, decision_draft, LLMRateLimitError("slow down"))
+    assert process(build, memory) == 3
+    failed = entry(memory)
+    assert failed["status"] == "failed"
+    assert [item["record_id"] for item in failed["produced"]] == ["DEC-0001"]
+    (memory / "work-orders" / "ART-0001.json").unlink()
+    capsys.readouterr()
+    build = FakeBuild()
+    assert process(build, memory) == 2
+    err = capsys.readouterr().err
+    assert "ART-0001 lists records in the Ledger, but its work orders file" in err
+    assert "is missing; nothing was sent to the model. Restore the file." in err
     assert build.settings == []
 
 
@@ -417,7 +609,7 @@ def test_a_changed_copy_is_refused(ingested, memory, capsys):
     copy = memory / "artifacts" / "ART-0001-steering-group.md"
     copy.write_bytes(copy.read_bytes() + b"Edited.\n")
     build = FakeBuild()
-    assert record(build, memory) == 2
+    assert process(build, memory) == 2
     assert "no longer matches its hash in the Ledger" in capsys.readouterr().err
     assert build.fake.calls == []
 
@@ -425,11 +617,15 @@ def test_a_changed_copy_is_refused(ingested, memory, capsys):
 def test_a_file_system_error_exits_2_naming_the_path(
     ingested, memory, decision_draft, monkeypatch, capsys
 ):
+    real = json_files.os.replace
+
     def locked(source, target):
-        raise PermissionError(13, "Permission denied", str(target))
+        if str(target).endswith("DEC-0001.json"):
+            raise PermissionError(13, "Permission denied", str(target))
+        return real(source, target)
 
     monkeypatch.setattr("knowledge_automata.storage.json_files.os.replace", locked)
-    assert record(FakeBuild(decision_draft), memory) == 2
+    assert process(FakeBuild(FOUND, decision_draft), memory) == 2
     err = capsys.readouterr().err
     assert "Cannot access " in err and "DEC-0001.json: Permission denied" in err
     assert "Traceback" not in err
@@ -439,13 +635,13 @@ def test_an_invalid_stored_record_exits_2_naming_the_file(ingested, memory, caps
     folder = memory / "registers" / "decision-log"
     folder.mkdir(parents=True)
     (folder / "DEC-0001.json").write_text("{}", encoding="utf-8")
-    assert record(FakeBuild(), memory) == 2
+    assert process(FakeBuild(), memory) == 2
     assert "DEC-0001.json" in capsys.readouterr().err
 
 
 def test_thinking_defaults_to_enabled(ingested, memory, decision_draft):
-    build = FakeBuild(decision_draft)
-    record(build, memory)
+    build = FakeBuild(FOUND, decision_draft)
+    process(build, memory)
     assert build.settings[0].chat_thinking == "enabled"
 
 
@@ -453,14 +649,31 @@ def test_ka_chat_thinking_overrides_the_default(
     ingested, memory, decision_draft, monkeypatch, capsys
 ):
     monkeypatch.setenv("KA_CHAT_THINKING", "disabled")
-    build = FakeBuild(decision_draft)
-    assert record(build, memory) == 0
+    build = FakeBuild(FOUND, decision_draft)
+    assert process(build, memory) == 0
     assert build.settings[0].chat_thinking == "disabled"
     assert "thinking disabled" in capsys.readouterr().out
 
 
+@pytest.mark.parametrize("value", ["0", "-1", "many", "2.5"])
+def test_a_bad_governor_max_items_exits_2_with_no_call(
+    ingested, memory, monkeypatch, capsys, value
+):
+    monkeypatch.setenv("KA_GOVERNOR_MAX_ITEMS", value)
+    build = FakeBuild(FOUND)
+    assert process(build, memory) == 2
+    assert "KA_GOVERNOR_MAX_ITEMS must be a whole number" in capsys.readouterr().err
+    assert build.settings == []
+    assert entry(memory)["status"] == "accepted"
+
+
+def test_record_decision_is_gone(ingested, memory, capsys):
+    assert run(FakeBuild(), "record-decision", "ART-0001", "--memory", str(memory)) == 2
+    assert "invalid choice: 'record-decision'" in capsys.readouterr().err
+
+
 def test_missing_arguments_and_unknown_commands_exit_2(capsys):
-    assert run(FakeBuild(), "record-decision") == 2
+    assert run(FakeBuild(), "process") == 2
     assert run(FakeBuild(), "release", "ART-0001") == 2
     assert run(FakeBuild(), "forget") == 2
     assert run(FakeBuild()) == 2
@@ -481,7 +694,7 @@ def test_release_accepts_an_oversized_artifact_which_can_then_be_recorded(
     last = entry(memory)["history"][-1]
     assert (last["status"], last["by"], last["reason"]) == ("accepted", "operator", reason)
 
-    assert record(FakeBuild(decision_draft), memory) == 0
+    assert process(FakeBuild(FOUND, decision_draft), memory) == 0
 
 
 def test_release_is_refused_while_another_check_fails(inbox, memory, capsys):
@@ -519,7 +732,7 @@ def test_ledger_lists_every_entry_with_its_last_check_or_reason(
     ingest(write(inbox, "board.md", b"# Board, 3 March\nWe chose C.\n"), memory)
     ingest(write(inbox, "notes.pdf", b"%PDF"), memory)
     ingest(write(inbox, "tag.md", b"a </artifact> b"), memory)
-    record(FakeBuild(LLMAuthError("The provider rejected the API key")), memory)
+    process(FakeBuild(LLMAuthError("The provider rejected the API key")), memory)
     capsys.readouterr()
     assert run(FakeBuild(), "ledger", "--memory", str(memory)) == 0
     assert capsys.readouterr().out.splitlines() == [
@@ -546,7 +759,7 @@ def test_ledger_on_a_missing_memory_folder_exits_2(memory, capsys):
 
 
 def test_views_check_passes_then_fails_after_an_edit(ingested, memory, decision_draft, capsys):
-    assert record(FakeBuild(decision_draft), memory) == 0
+    assert process(FakeBuild(FOUND, decision_draft), memory) == 0
     assert run(FakeBuild(), "views", "--memory", str(memory), "--check") == 0
 
     page = memory / "views" / "decision-log" / "DEC-0001.md"
@@ -582,23 +795,25 @@ def test_no_output_contains_the_artifact_or_the_prompt(
 
     def with_sentinel():
         prompt = Prompt(real.prompt.version, real.prompt.text + "\n" + PROMPT_SENTINEL + "\n")
-        return Registrar(real.agent, real.spec, prompt, real.retry_prompt)
+        return Registrar(real.agent, real.spec, prompt, real.retry_prompt, takes_work_order=True)
 
-    monkeypatch.setattr(pipeline, "decision_registrar", with_sentinel)
+    monkeypatch.setitem(pipeline.REGISTRARS, "decision-log", with_sentinel)
     monkeypatch.setenv("CO_API_KEY", "secret-key-sentinel")
 
     assert ingest(artifact, memory) == 0
-    build = FakeBuild(decision_draft)
-    assert record(build, memory) == 0
-    assert PROMPT_SENTINEL in build.fake.calls[0].inputs["system"]
+    build = FakeBuild(FOUND, decision_draft)
+    assert process(build, memory) == 0
+    assert PROMPT_SENTINEL in build.fake.calls[1].inputs["system"]
     assert ARTIFACT_SENTINEL in build.fake.calls[0].inputs["user"]
+    assert ARTIFACT_SENTINEL in build.fake.calls[1].inputs["user"]
 
     other = write(inbox, "other.md", artifact.read_bytes() + b"More notes.\n")
     assert ingest(other, memory) == 0
-    assert record(FakeBuild(bad(decision_draft), bad(decision_draft)), memory, "ART-0002") == 1
+    rejected = FakeBuild(FOUND, bad(decision_draft), bad(decision_draft))
+    assert process(rejected, memory, "ART-0002") == 1
     third = write(inbox, "third.md", artifact.read_bytes() + b"Even more notes.\n")
     assert ingest(third, memory) == 0
-    assert record(FakeBuild(LLMAuthError("The provider rejected the API key")), memory, "ART-0003")
+    assert process(FakeBuild(LLMAuthError("The provider rejected the API key")), memory, "ART-0003")
     assert ingest(artifact, memory) == 0
     assert run(FakeBuild(), "ledger", "--memory", str(memory)) == 0
 
