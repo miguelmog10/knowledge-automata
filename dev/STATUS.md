@@ -6,7 +6,7 @@
 
 ## Current phase
 
-Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation). Handoff 007, the Governor (orchestrator), is in progress on `feat/governor`, in three parts, 7A, 7B and 7C. Part 7A (the Governor agent and the work order support in the Decision Registrar, offline) is built, 814 tests passing; next, Claude reviews it and Copilot plans part 7B.
+Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation). Handoff 007, the Governor (orchestrator), is in progress on `feat/governor`, in three parts, 7A, 7B and 7C. Part 7A (the Governor agent and the work order support in the Decision Registrar, offline) is built and approved after Claude's and Miguel's review, with a small fix commit, 825 tests passing; next, Copilot plans part 7B.
 
 ## Done
 
@@ -105,11 +105,12 @@ Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation).
   - `agents/checked_chat.py`: the call, check and retry loop, shared by the Registrars and the Governor. `tests/test_registrar.py` passes unchanged, and each attempt keeps its prompt version in `CallContext` as before. The Comparator keeps its own loop (technical debt).
   - `agents/governor.py`: the Governor builds its system text by replacing `{registers}` with one block per register definition, and refuses a setup without the placeholder, a register without a definition, or a definition that does not match its spec. `find_work_orders` checks the artifact, calls once, retries once with the errors, and returns sorted work orders.
   - The Decision Registrar with a work order: the user message adds the work order as JSON between `<work-order>` lines (every `<` escaped), and `validate_draft` requires a passing quote that matches a work order quote. Without a work order the message is byte-for-byte unchanged. A work order for another register is refused before any call.
+  - Review fixes (2026-11-01, one commit, 825 tests): a Governor reply over the schema's sanity bound of 100 items is reported as one short error (`$.items: 101 items, at most 100`) instead of jsonschema's message, which copied the whole reply into the errors and the retry prompt; a Registrar's prompt and work order mode go together (`Registrar.takes_work_order`), so giving a work order to `decision-registrar.v1`, or none to `v2`, raises before any call; a test pins the whole user message with a work order, including the `\u003c` escape; the Governor refuses an empty definition; `placeholder_label` strips surrounding quote marks, straight and typographic.
 
 ## Next
 
 - An evaluation harness grown from the spike, as a small step after handoff 007 (backlog).
-- Copilot plans and builds part 7B, then the real run in 7C, each after Miguel's approval and Claude's review (7A is built and waits for review).
+- Copilot plans and builds part 7B, then the real run in 7C, each after Miguel's approval and Claude's review (7A is built and approved).
 - Claude: the visual guide still says "thinking off" (`docs/guide/index.html`, line 178); refresh it with the guide steps, together with the 007 diagrams.
 - Enable GitHub Pages in the repository settings, if not done yet, and mark ADR-0016 accepted once the guide is online.
 - After the Governor: the Risk Registrar, the folder command, the sample project as an evaluation set, and the v0.1.0 release (see `dev/backlog.md`).

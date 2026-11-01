@@ -14,7 +14,15 @@ from knowledge_automata.llm.fake import FakeLLM
 
 PROMPT_V2 = load_prompt("project-management/decision-registrar.v2")
 RETRY = load_prompt("core/registrar-retry.v1")
-REGISTRAR_V2 = Registrar("decision-registrar", DECISION_LOG, PROMPT_V2, RETRY)
+REGISTRAR_V2 = Registrar(
+    "decision-registrar", DECISION_LOG, PROMPT_V2, RETRY, takes_work_order=True
+)
+REGISTRAR_V1 = Registrar(
+    "decision-registrar",
+    DECISION_LOG,
+    load_prompt("project-management/decision-registrar.v1"),
+    RETRY,
+)
 RETRY_VERSION_V2 = "decision-registrar.v2+registrar-retry.v1"
 
 DECISION = "the group agreed to buy the drip irrigation kit from supplier A"
@@ -108,4 +116,39 @@ def test_work_order_for_another_register_is_refused_with_no_call(artifact_text):
     order = WorkOrder(3, "risk-register", RISK, (RISK,))
     with pytest.raises(ValueError, match="risk-register"):
         draft_record(REGISTRAR_V2, llm, artifact_text, artifact_id="ART-0001", work_order=order)
+    assert fake.calls == []
+
+
+def test_user_message_with_a_work_order_is_pinned():
+    order = WorkOrder(1, "decision-log", "label", ("buy a <b>kit</b>", "Tom\u2019s idea"))
+    expected = (
+        "<artifact>\n"
+        "Notes: buy a <b>kit</b>.\n"
+        "</artifact>\n"
+        "\n"
+        "<work-order>\n"
+        "{\n"
+        '  "register": "decision-log",\n'
+        '  "evidence": [\n'
+        '    "buy a \\u003cb>kit\\u003c/b>",\n'
+        '    "Tom\u2019s idea"\n'
+        "  ]\n"
+        "}\n"
+        "</work-order>"
+    )
+    assert user_message("Notes: buy a <b>kit</b>.", order) == expected
+
+
+@pytest.mark.parametrize(
+    ("registrar", "work_order", "message"),
+    [
+        (REGISTRAR_V1, WORK_ORDER, "decision-registrar.v1 does not take a work order"),
+        (REGISTRAR_V2, None, "decision-registrar.v2 drafts from a work order; none was given"),
+    ],
+    ids=["v1-with-work-order", "v2-without-work-order"],
+)
+def test_prompt_and_work_order_must_go_together(registrar, work_order, message, artifact_text):
+    fake, _, llm = observed()
+    with pytest.raises(ValueError, match=message):
+        draft_record(registrar, llm, artifact_text, artifact_id="ART-0001", work_order=work_order)
     assert fake.calls == []

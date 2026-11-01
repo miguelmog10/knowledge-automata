@@ -108,6 +108,10 @@ def without_definition():
         ({"registers": (DEFINITIONS[0], DEFINITIONS[0])}, "listed once"),
         ({"registers": ((without_definition(), DEFINITIONS[0][1]),)}, "has no definition"),
         ({"registers": ((DECISION_LOG, DEFINITIONS[1][1]),)}, "was given 'risk-register.v1'"),
+        (
+            {"registers": ((DECISION_LOG, Prompt(DEFINITIONS[0][1].version, " \n\t ")),)},
+            "has an empty definition",
+        ),
         ({"max_attempts": 0}, "max_attempts"),
     ],
     ids=[
@@ -117,6 +121,7 @@ def without_definition():
         "duplicate",
         "no-definition",
         "wrong-definition",
+        "empty-definition",
         "zero-attempts",
     ],
 )

@@ -34,6 +34,7 @@ class Registrar:
     prompt: Prompt
     retry_prompt: Prompt
     max_attempts: int = 2
+    takes_work_order: bool = False  # the prompt expects a work order (decision-registrar.v2)
 
     def __post_init__(self) -> None:
         if self.max_attempts < 1:
@@ -102,11 +103,17 @@ def draft_record(
     """Draft one record from an artifact, with at most ``max_attempts`` calls.
 
     With a ``work_order`` (ADR-0018), the user message carries it after the artifact and
-    the draft must quote something that matches one of its quotes. ``LLMResponseError``
-    counts as a failed attempt; every other ``LLMError`` propagates unchanged (the SDK
-    already retried what can be retried).
+    the draft must quote something that matches one of its quotes. A work order is given
+    exactly when the Registrar's prompt takes one (``takes_work_order``), and must be for
+    the Registrar's register; otherwise ``ValueError`` is raised before any call.
+    ``LLMResponseError`` counts as a failed attempt; every other ``LLMError`` propagates
+    unchanged (the SDK already retried what can be retried).
     """
     check_artifact(artifact_text)
+    if registrar.takes_work_order and work_order is None:
+        raise ValueError(f"{registrar.prompt.version} drafts from a work order; none was given")
+    if not registrar.takes_work_order and work_order is not None:
+        raise ValueError(f"{registrar.prompt.version} does not take a work order")
     if work_order is not None and work_order.register != registrar.spec.name:
         raise ValueError(
             f"Work order {work_order.number} is for {work_order.register!r}, "

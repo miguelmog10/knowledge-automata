@@ -13,6 +13,8 @@ from knowledge_automata.core.evidence import normalize_quote, normalize_text
 
 LABEL_MAX_CHARS = 60
 ELLIPSIS = "..."
+# Straight and typographic quote marks, as normalize_quote strips them.
+QUOTE_MARKS = "\"'\u2018\u2019\u201a\u201b\u201c\u201d\u201e\u201f"
 
 
 @dataclass(frozen=True)
@@ -24,12 +26,12 @@ class WorkOrder:
 
 
 def placeholder_label(quote: str) -> str:
-    """The quote with whitespace collapsed, cut at a word boundary after 60 characters.
+    """The quote without surrounding quote marks, whitespace collapsed, cut after 60 characters.
 
     When cut, ``...`` is added after the last whole word (the 60 do not count it); a
     single word longer than 60 characters is cut at 60.
     """
-    text = " ".join(quote.split())
+    text = " ".join(quote.split()).strip(QUOTE_MARKS + " ")
     if len(text) <= LABEL_MAX_CHARS:
         return text
     cut = text.rfind(" ", 0, LABEL_MAX_CHARS + 1)

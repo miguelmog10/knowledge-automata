@@ -57,6 +57,8 @@ class Governor:
                     f"Register {spec.name!r} names definition {spec.definition!r}, "
                     f"but was given {definition.version!r}"
                 )
+            if not definition.text.strip():
+                raise ValueError(f"Register {spec.name!r} has an empty definition")
 
     @property
     def specs(self) -> tuple[RegisterSpec, ...]:

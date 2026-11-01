@@ -79,6 +79,21 @@ def test_the_count_is_not_a_validation_error():
     assert result.ok, result.errors
 
 
+def test_too_many_items_is_one_short_error():
+    lines = [f"Decision {n}: the group chose option number {n}." for n in range(1, 102)]
+    reply = {"items": [item("decision-log", line) for line in lines]}
+    result = validate_work_orders(reply, REGISTERS, "\n".join(lines))
+    assert result.errors == ("$.items: 101 items, at most 100",)
+
+
+def test_too_many_quotes_in_an_item_is_one_short_error(artifact_text):
+    reply = {
+        "items": [item("decision-log", DECISION, REJECTED, DECISION, REJECTED, RISK, DECISION)]
+    }
+    errors = validate_work_orders(reply, REGISTERS, artifact_text).errors
+    assert errors[0] == "$.items[0].evidence: 6 items, at most 5"
+
+
 def test_quote_not_found_fails(artifact_text):
     reply = {"items": [item("decision-log", DECISION), item("risk-register", "the sky may fall")]}
     assert_fails(
@@ -255,3 +270,22 @@ def test_placeholder_label_keeps_a_word_that_ends_at_the_limit():
 
 def test_placeholder_label_cuts_a_single_long_word():
     assert placeholder_label("x" * 80) == "x" * 60 + "..."
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        '"Decision: QR labels."',
+        "'Decision: QR labels.'",
+        "\u201cDecision: QR labels.\u201d",
+        "\u2018 \u201cDecision: QR labels.\u201d\u2019 ",
+    ],
+    ids=["straight-double", "straight-single", "typographic", "nested"],
+)
+def test_placeholder_label_strips_surrounding_quote_marks(quote):
+    assert placeholder_label(quote) == "Decision: QR labels."
+
+
+def test_placeholder_label_keeps_inner_quote_marks():
+    assert placeholder_label("the city\u2019s permits office") == "the city\u2019s permits office"
+    assert placeholder_label('Tom said "yes" to it') == 'Tom said "yes" to it'

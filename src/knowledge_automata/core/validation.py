@@ -8,12 +8,12 @@ such as a missing schema file.
 
 import functools
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
 from knowledge_automata.core.evidence import QuoteCheck, check_evidence, normalize_quote
 from knowledge_automata.core.ledger import CHECK_OUTCOMES, STORED_COPY_STATUSES, TRANSITIONS
@@ -81,9 +81,21 @@ def _governor_validator(specs: tuple[RegisterSpec, ...]) -> Draft202012Validator
     return Draft202012Validator(governor_schema(specs), format_checker=FORMAT_CHECKER)
 
 
-def _schema_errors(validator: Draft202012Validator, instance: Any, path: str = "$") -> list[str]:
+def _schema_errors(
+    validator: Draft202012Validator,
+    instance: Any,
+    path: str = "$",
+    message: Callable[[ValidationError], str] = lambda error: error.message,
+) -> list[str]:
     errors = sorted(validator.iter_errors(instance), key=lambda error: error.json_path)
-    return [f"{path}{error.json_path[1:]}: {error.message}" for error in errors]
+    return [f"{path}{error.json_path[1:]}: {message(error)}" for error in errors]
+
+
+def _short_message(error: ValidationError) -> str:
+    """jsonschema's message, except that a list too long is counted, not copied."""
+    if error.validator == "maxItems" and isinstance(error.instance, list):
+        return f"{len(error.instance)} items, at most {error.validator_value}"
+    return error.message
 
 
 def _semantic_errors(spec: RegisterSpec, content: Mapping[str, Any]) -> list[str]:
@@ -281,10 +293,11 @@ def validate_work_orders(
     Two items in the same register may not share a quote: after ``normalize_quote``, one
     quote containing the other means one item was returned twice (ADR-0018). Quotes within
     one item may overlap. Only quotes that pass the evidence check are compared, so a quote
-    that normalizes to almost nothing does not match everything. The number of items is
-    not checked here: the limit is a setting.
+    that normalizes to almost nothing does not match everything. Beyond the schema's sanity
+    bound, the number of items is not checked here: the limit is a setting. A list that is
+    too long is reported by its length, not copied into the errors and the retry prompt.
     """
-    errors = _schema_errors(_governor_validator(tuple(specs)), reply)
+    errors = _schema_errors(_governor_validator(tuple(specs)), reply, message=_short_message)
     items = reply.get("items") if isinstance(reply, dict) else None
     if not isinstance(items, list):
         return ValidationResult(tuple(errors))
