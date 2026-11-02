@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-11-01
+2026-11-02
 
 ## Current phase
 
@@ -127,6 +127,7 @@ Handoffs 001 to 007 merged, the last as PR #15 (the Governor, orchestrator, squa
     - Calls: 38 of the 50 allowed (36 in the event log, 2 diagnostic). Every Governor reply passed on the first attempt; nothing was rejected. `views --check`, ruff and the full suite (951 tests) pass with the outputs committed.
     - Docs: ADR-0018 accepted; the sample project README; tool feedback on the timeouts; backlog items for the update that fills nothing, the wrong `decided_on`, the failed attempt that left no trace and the timeout (with the latencies); the held-split item now says that splitting again is not possible yet and that deleting the work orders file is refused on purpose.
 - Guide preview screenshots retaken after the Governor, and this status updated (Miguel and Claude, 2026-11-01, on `docs/guide-previews`).
+- Docs correction after the Cohere feedback side quest (Miguel and Claude, 2026-11-02, on `docs/json-instruction-cause`): the thinking-disabled failure came from prompts that never asked for JSON, which Cohere's docs require. README, ADR-0014 (note), the sample project README, the guide, tool feedback, principles in practice and the backlog now say so. No code or prompt changed.
 
 ## In progress
 
@@ -135,6 +136,7 @@ None.
 ## Next
 
 - Handoff 008, the Risk Registrar: record the risks the Governor already finds (today they are kept as not routed).
+- New prompt versions with the JSON instruction, then thinking disabled against enabled on the evaluation set (backlog, *Now*).
 - An evaluation harness grown from the Governor spike (backlog), then the sample project as an evaluation set, so prompt changes are measured. It also judges the real-run findings in the backlog: an update that fills nothing, the wrong `decided_on`, and per-agent timeouts.
 - The folder command: process every accepted artifact in a folder.
 - The v0.1.0 release. ADR-0010 promises an SBOM with every release: keep it, or amend the ADR first.
