@@ -18,7 +18,7 @@
 
 Knowledge Automata is a general-purpose institutional memory for any group that makes decisions together: a project team, a company department, a research group, a neighborhood association. A multi-agent LLM system turns messy artifacts (meeting notes, chats, documents) into validated, structured records, each traceable to the artifacts it came from, so people and AI tools can ask what the group knows and why. v0.1 targets project teams with PMI-aligned registers: a decision log and a risk register. It is open source (Apache 2.0) and built on Cohere's platform (Command, Embed, Rerank) behind a provider-agnostic service layer.
 
-**See it working:** [a real decision record](examples/sample-project/views/decision-log/DEC-0001.md) that Command drafted from [fictional meeting notes](examples/sample-project/artifacts/ART-0001-project-board-2026-02-03.md), with every quote checked against the source and committed unedited, and [the decision log](examples/sample-project/views/decision-log.md) that four later meetings added to, reaffirmed, updated and superseded.
+**See it working:** [a real decision record](examples/sample-project/views/decision-log/DEC-0001.md) that Command drafted from [fictional meeting notes](examples/sample-project/artifacts/ART-0001-project-board-2026-02-03.md), with every quote checked against the source and committed unedited, and [the decision log](examples/sample-project/views/decision-log.md) that seven later artifacts added to, reaffirmed, updated and superseded, the last three split into checked work orders by the Governor (orchestrator).
 
 ## Status
 
@@ -30,7 +30,7 @@ v0.1 in progress. Works today:
 - The Comparator (reconciliation): each new decision is compared with the existing ones (Embed, then Rerank, then Command) and recorded as new, a reaffirmation, an update or a supersession. Code checks the classification and applies the write rule, so a decision restated in a later meeting adds sources to its record instead of becoming a duplicate.
 - The Governor (orchestrator): reads an accepted artifact once and finds every item in it that belongs in a register, each tied to quotes that code checks. Every decision is then drafted, compared and recorded in turn, and a run that stops continues from its saved work orders without asking the Governor again. Risks are found and kept for the Risk Registrar, not drafted yet. An artifact with more items than a set limit is held for the Operator before anything is drafted.
 
-Next: the Governor's real run on the sample project, the Risk Registrar and an evaluation set. Details in [dev/STATUS.md](dev/STATUS.md).
+Next: the Risk Registrar and an evaluation set. Details in [dev/STATUS.md](dev/STATUS.md).
 
 ## Why
 

@@ -6,7 +6,7 @@
 
 ## Current phase
 
-Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation). Handoff 007, the Governor (orchestrator), is in progress on `feat/governor`, in three parts, 7A, 7B and 7C. Parts 7A and 7B are built and approved after Claude's and Miguel's reviews, each with a small fix commit, 951 tests passing offline. Next, part 7C: the real run, after Miguel's go.
+Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation). Handoff 007, the Governor (orchestrator), is complete on `feat/governor`, in three parts, 7A, 7B and 7C. Parts 7A and 7B are built and approved after Claude's and Miguel's reviews, each with a small fix commit, 951 tests passing offline. Part 7C, the real run on ART-0006 to ART-0008, is done and committed, and ADR-0018 is accepted. Next: Claude's review and diagram refresh, then the pull request.
 
 ## Done
 
@@ -120,10 +120,20 @@ Handoffs 001 to 006 merged, the last as PR #11 (the Comparator, reconciliation).
     - The CLI docstring now says that rejected attempts print their validation errors, which may quote model output; the messages are unchanged, and a Later item in the backlog proposes printing paths and checks only.
     - Stronger tests: the output hygiene test reaches a real hold and a Governor rejection on fresh artifacts, and removes a label only from its work order heading; the billing test runs two comparisons and checks every stage's totals against the event log.
 
+- Part 7C, the real run, with Miguel's go on 2026-11-01. The three inbox files matched their SHA-256; ingest accepted ART-0006 to ART-0008 (no calls). Each artifact was processed with `process` and reported before the next one; outputs committed unedited (`feat: process ART-0006 to ART-0008 in the sample project`), details and tables in `examples/sample-project/README.md`.
+  - Timeouts first: `process ART-0006` stopped twice at the Governor call, which returned nothing within 60 s (run `19abb35e-b01e-4322-87ec-eef4d057be8b`) and then 180 s (`KA_LLM_TIMEOUT_SECONDS=180`, run `e8083665-5a93-415f-b341-3da571628b92`), about 12 minutes apart, with no incident on Cohere's status page. Both left ART-0006 `failed`, with nothing written.
+  - Diagnostic, with Miguel's go (throwaway scripts in `runtime/diagnostics/`, git-ignored): offline, the pipeline's Governor request matched the spike's except for the schema's top-level title and description, which the Registrar requests also send. Then 2 calls through the adapter only, outside the event log: a connectivity check (2.7 s, billed 13 input and 167 output tokens) and the same Governor request with a 600 s timeout (18.3 s, billed 1,267 input and 2,882 output tokens, 2,679 reasoning tokens; accepted, 4 work orders). Most likely a temporary slowdown at Cohere or on the network.
+  - Then, with `KA_LLM_TIMEOUT_SECONDS=180` for the rest of the run (environment only):
+    - ART-0006 (run `23feff57-1c1d-4cb7-83b7-107f174fd8c3`, 16 calls): 3 decision and 1 risk work orders, as expected. `DEC-0003` updated to revision 2 with no field filled (expected a reaffirmation: the known borderline), new `DEC-0004` (no rationale or alternatives, `decided_by` "the board") and `DEC-0005`, the risk not routed. Governor 17.4 s.
+    - ART-0007 (run `98b81324-173e-4c44-9e4c-43919265e5c0`, 17 calls): one work order per decision despite the summary section, each quoting both places. `DEC-0004` updated to revision 2 with rationale and alternatives (NFC), and also `decided_on` 2026-06-09, the tech sync's date instead of the board's 2026-05-26 (a finding); `DEC-0006` supersedes `DEC-0005`; new `DEC-0007`, whose draft needed the retry; the risk not routed. Governor 14.5 s; the slowest draft 27.0 s.
+    - ART-0008 (run `9e94307b-9b47-4a44-a7e1-8138cd6565c0`, 1 call): `processed` with zero records and an empty work orders file. Governor 2.8 s.
+  - Calls: 38 of the 50 allowed (36 in the event log, 2 diagnostic). Every Governor reply passed on the first attempt; nothing was rejected. `views --check`, ruff and the full suite (951 tests) pass with the outputs committed.
+  - Docs: ADR-0018 accepted; the sample project README; tool feedback on the timeouts; backlog items for the update that fills nothing, the wrong `decided_on`, the failed attempt that left no trace and the timeout (with the latencies); the held-split item now says that splitting again is not possible yet and that deleting the work orders file is refused on purpose.
+
 ## Next
 
 - An evaluation harness grown from the spike, as a small step after handoff 007 (backlog).
-- Copilot runs part 7C (the real run on ART-0006 to ART-0008, budget 50 calls) after Miguel's go.
+- Claude reviews part 7C; Miguel opens the pull request for handoff 007 and adds its Copilot credits to `dev/costs.md`.
 - Claude: refresh the diagrams (`docs/diagrams/01`, `03` and `04`, and their copies in the README and `docs/architecture.md`) and the guide for the Governor and `process`.
 - Claude: the visual guide still says "thinking off" (`docs/guide/index.html`, line 178); refresh it with the guide steps, together with the 007 diagrams.
 - Enable GitHub Pages in the repository settings, if not done yet, and mark ADR-0016 accepted once the guide is online.

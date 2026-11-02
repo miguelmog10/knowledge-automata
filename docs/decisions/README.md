@@ -21,4 +21,4 @@ Short records of significant decisions: why the system looks the way it does. Ne
 | [0015](0015-artifact-ledger-storage-and-sensor-checks.md) | Artifact Ledger storage and Sensor checks | Accepted (amended 2026-11-01) |
 | [0016](0016-guide-on-github-pages.md) | Guide published with GitHub Pages | Proposed |
 | [0017](0017-comparator-reconciliation.md) | Comparator (reconciliation): compare checked drafts before writing | Accepted |
-| [0018](0018-governor-work-orders.md) | Governor (orchestrator): work orders and resumable runs | Proposed |
+| [0018](0018-governor-work-orders.md) | Governor (orchestrator): work orders and resumable runs | Accepted |

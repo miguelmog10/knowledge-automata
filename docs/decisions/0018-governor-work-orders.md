@@ -1,6 +1,6 @@
 # 0018. Governor (orchestrator): work orders and resumable runs
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-31
 
 ## Context
@@ -26,4 +26,4 @@ Until handoff 007, `record-decision` drafted the single most significant decisio
 - One more call per artifact, plus about five calls per routed item. The limit bounds the cost of one odd or hostile artifact, and is one layer of defence against memory poisoning next to the evidence check and the Comparator (reconciliation).
 - A new register needs a definition file; the Governor's prompt picks it up without a change, which a register configurator can build on later.
 - Risks are found before the Risk Registrar exists, but are not drafted. Records already produced are not reprocessed, which still needs its own design.
-- A split duplicate fails the shared-quote check when its two items quote the same words, and the retry asks for one item; otherwise it becomes a reaffirmation of the record written from the same artifact: harmless, but it costs a draft.
+- A split duplicate fails the shared-quote check when its two items quote the same words, and the retry asks for one item; otherwise it becomes a reaffirmation of the record written from the same artifact: harmless, but it costs a draft. In the real run (2026-11-01, sample project ART-0006 to ART-0008) neither happened: on a meeting that repeats every decision in a summary, the Governor returned one work order per decision, each quoting both places, on the first attempt.
