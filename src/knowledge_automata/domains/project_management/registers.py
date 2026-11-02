@@ -31,6 +31,7 @@ DECISION_LOG = RegisterSpec(
     id_prefix="DEC",
     content_schema="project-management/decision.v1.json",
     allowed_classifications=CLASSIFICATIONS,
+    definition="project-management/definitions/decision-log.v1",
 )
 
 RISK_REGISTER = RegisterSpec(
@@ -40,6 +41,7 @@ RISK_REGISTER = RegisterSpec(
     # Risks are updated in place; supersession is not allowed in v0.1.
     allowed_classifications=CLASSIFICATIONS - {"supersession"},
     semantic_checks=(check_response_strategy_fits_kind,),
+    definition="project-management/definitions/risk-register.v1",
 )
 
 REGISTERS: tuple[RegisterSpec, ...] = (DECISION_LOG, RISK_REGISTER)

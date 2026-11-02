@@ -1,0 +1,3 @@
+A decision is a choice the group actually made: to do something, not to do something, to choose one option over others, or to keep or change an earlier decision. The artifact states the outcome, for example "the board chose", "we agreed" or "Decision:". A group confirming or changing a decision it made before is still a decision; code links it to the earlier record.
+
+Not decisions: proposals and suggestions nobody has agreed to yet, options still under discussion, open questions, action items (who does what by when) and status reports. A choice about how to respond to a risk (accept it, reduce it, watch it) belongs with the risk, unless the group also made a separate decision about its work.

@@ -1,0 +1,65 @@
+{
+  "id": "DEC-0005",
+  "register": "decision-log",
+  "schema_version": "1.0",
+  "record_status": "superseded",
+  "revision": 2,
+  "created_at": "2026-11-02T00:14:28Z",
+  "updated_at": "2026-11-02T00:48:02Z",
+  "content": {
+    "title": "Offline count conflict: add counts instead of overwrite",
+    "statement": "When two offline counts of the same batch conflict, the app keeps both changes and adds them together, instead of keeping only the last count.",
+    "context": "Two offline counts of the same batch conflict.",
+    "rationale": "Sofia explained that growers often split one bench between two people, so both counts are usually real.",
+    "alternatives": [
+      "Keep only the last count (overwrite)"
+    ]
+  },
+  "sources": [
+    {
+      "artifact_id": "ART-0006",
+      "artifact_date": "2026-05-26",
+      "excerpt": "Decision: when two offline counts of the same batch conflict, the app keeps both changes and adds them together, instead of keeping only the last count.",
+      "added_at": "2026-11-02T00:14:28Z"
+    },
+    {
+      "artifact_id": "ART-0006",
+      "artifact_date": "2026-05-26",
+      "excerpt": "Sofia explained that growers often split one bench between two people, so both counts are usually real.",
+      "added_at": "2026-11-02T00:14:28Z"
+    },
+    {
+      "artifact_id": "ART-0006",
+      "artifact_date": "2026-05-26",
+      "excerpt": "When two phones count the same bench offline, the phone that syncs last overwrites the other count.",
+      "added_at": "2026-11-02T00:14:28Z"
+    }
+  ],
+  "relations": {
+    "superseded_by": "DEC-0006"
+  },
+  "history": [
+    {
+      "revision": 1,
+      "at": "2026-11-02T00:14:28Z",
+      "change": "new",
+      "artifact_id": "ART-0006",
+      "fields": [
+        "title",
+        "statement",
+        "context",
+        "rationale",
+        "alternatives"
+      ],
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v2"
+    },
+    {
+      "revision": 2,
+      "at": "2026-11-02T00:48:02Z",
+      "change": "superseded",
+      "artifact_id": "ART-0007",
+      "related_id": "DEC-0006"
+    }
+  ]
+}

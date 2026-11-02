@@ -1,0 +1,144 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "ART-0007",
+  "created_at": "2026-11-02T00:48:02Z",
+  "updated_at": "2026-11-02T00:48:02Z",
+  "run_id": "98b81324-173e-4c44-9e4c-43919265e5c0",
+  "governor": {
+    "model": "command-a-plus-05-2026",
+    "prompt_version": "governor.v1",
+    "attempts": 1,
+    "definitions": [
+      "decision-log.v1",
+      "risk-register.v1"
+    ]
+  },
+  "max_items": 10,
+  "orders": [
+    {
+      "number": 1,
+      "register": "decision-log",
+      "label": "The QR code labels for every bench stay the plan.",
+      "evidence": [
+        "The QR code labels for every bench stay the plan.",
+        "- QR code labels for every bench stay the plan."
+      ],
+      "state": "recorded",
+      "produced": {
+        "register": "decision-log",
+        "record_id": "DEC-0004",
+        "change": "update",
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-registrar.v2",
+        "schema_version": "1.0",
+        "comparison": {
+          "model": "command-a-plus-05-2026",
+          "prompt_version": "decision-comparator.v1",
+          "attempts": 1,
+          "candidates": [
+            {
+              "record_id": "DEC-0004",
+              "score": 0.744995
+            },
+            {
+              "record_id": "DEC-0001",
+              "score": 0.017049424
+            },
+            {
+              "record_id": "DEC-0003",
+              "score": 0.0064989934
+            }
+          ]
+        }
+      },
+      "rejected": []
+    },
+    {
+      "number": 2,
+      "register": "decision-log",
+      "label": "Marc and Sofia agreed to replace that rule: the app now...",
+      "evidence": [
+        "Marc and Sofia agreed to replace that rule: the app now keeps the most recent count and shows both counts to the grower, who confirms which one is right.",
+        "- Offline count conflicts: keep the most recent count and ask the grower to confirm."
+      ],
+      "state": "recorded",
+      "produced": {
+        "register": "decision-log",
+        "record_id": "DEC-0006",
+        "change": "supersession",
+        "related_id": "DEC-0005",
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-registrar.v2",
+        "schema_version": "1.0",
+        "comparison": {
+          "model": "command-a-plus-05-2026",
+          "prompt_version": "decision-comparator.v1",
+          "attempts": 1,
+          "candidates": [
+            {
+              "record_id": "DEC-0005",
+              "score": 0.7157932
+            },
+            {
+              "record_id": "DEC-0001",
+              "score": 0.05423169
+            },
+            {
+              "record_id": "DEC-0004",
+              "score": 0.028523367
+            }
+          ]
+        }
+      },
+      "rejected": []
+    },
+    {
+      "number": 3,
+      "register": "decision-log",
+      "label": "Marc agreed to launch with English and French for those two...",
+      "evidence": [
+        "Marc agreed to launch with English and French for those two screens only.",
+        "- Launch the count screen and the status picker in English and French."
+      ],
+      "state": "recorded",
+      "produced": {
+        "register": "decision-log",
+        "record_id": "DEC-0007",
+        "change": "new",
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-registrar.v2+registrar-retry.v1",
+        "schema_version": "1.0",
+        "comparison": {
+          "model": "command-a-plus-05-2026",
+          "prompt_version": "decision-comparator.v1",
+          "attempts": 1,
+          "candidates": [
+            {
+              "record_id": "DEC-0006",
+              "score": 0.10988485
+            },
+            {
+              "record_id": "DEC-0001",
+              "score": 0.08398288
+            },
+            {
+              "record_id": "DEC-0003",
+              "score": 0.07088036
+            }
+          ]
+        }
+      },
+      "rejected": []
+    },
+    {
+      "number": 4,
+      "register": "risk-register",
+      "label": "Translating the other screens could delay the July release...",
+      "evidence": [
+        "Translating the other screens could delay the July release if the translator is not available in June"
+      ],
+      "state": "not-routed",
+      "rejected": []
+    }
+  ]
+}

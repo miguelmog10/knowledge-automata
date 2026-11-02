@@ -20,7 +20,9 @@ class RegisterSpec:
     """One register, for example the decision log.
 
     ``content_schema`` is a path relative to ``schemas/``, for example
-    ``project-management/decision.v1.json``.
+    ``project-management/decision.v1.json``. ``definition`` names the prompt file that says
+    what belongs in the register, relative to ``prompts/`` and without the extension, for
+    example ``project-management/definitions/decision-log.v1`` (ADR-0018).
     """
 
     name: str
@@ -28,6 +30,7 @@ class RegisterSpec:
     content_schema: str
     allowed_classifications: frozenset[str]
     semantic_checks: tuple[SemanticCheck, ...] = ()
+    definition: str | None = None
 
     def __post_init__(self) -> None:
         if not _REGISTER_NAME.match(self.name):

@@ -3,9 +3,9 @@
   "register": "decision-log",
   "schema_version": "1.0",
   "record_status": "active",
-  "revision": 1,
+  "revision": 2,
   "created_at": "2026-10-31T15:40:42Z",
-  "updated_at": "2026-10-31T15:40:42Z",
+  "updated_at": "2026-11-02T00:14:28Z",
   "content": {
     "title": "Replace single status ladder with crop-specific paths",
     "statement": "The board replaced the single status ladder with one status path per crop type.",
@@ -41,6 +41,18 @@
       "artifact_date": "2026-04-28",
       "excerpt": "Discarded stays available at any step.",
       "added_at": "2026-10-31T15:40:42Z"
+    },
+    {
+      "artifact_id": "ART-0006",
+      "artifact_date": "2026-05-26",
+      "excerpt": "Julie confirmed that the status paths per crop type stay as the board decided in April.",
+      "added_at": "2026-11-02T00:14:28Z"
+    },
+    {
+      "artifact_id": "ART-0006",
+      "artifact_date": "2026-05-26",
+      "excerpt": "Wrong statuses dropped from 41 batches to 3 in the last four weeks.",
+      "added_at": "2026-11-02T00:14:28Z"
     }
   ],
   "relations": {
@@ -66,6 +78,15 @@
       "related_id": "DEC-0002",
       "model": "command-a-plus-05-2026",
       "prompt_version": "decision-registrar.v1"
+    },
+    {
+      "revision": 2,
+      "at": "2026-11-02T00:14:28Z",
+      "change": "update",
+      "artifact_id": "ART-0006",
+      "fields": [],
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v2"
     }
   ]
 }

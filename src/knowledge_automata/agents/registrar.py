@@ -2,18 +2,23 @@
 
 A Registrar is a register spec plus a versioned prompt. One loop serves every Registrar:
 draft with one call, check the draft with ``validate_draft``, retry once with the errors,
-then accept or reject. This module never writes files and never builds the envelope.
+then accept or reject (``agents/checked_chat.py``, shared with the Governor). This module
+never writes files and never builds the envelope.
 """
 
+import json
 import re
 from dataclasses import dataclass
 from typing import Any
 
+from knowledge_automata.agents.checked_chat import checked_chat
+from knowledge_automata.agents.checked_chat import retry_version as _retry_version
 from knowledge_automata.core.prompts import ERRORS_PLACEHOLDER, Prompt, retry_system_text
 from knowledge_automata.core.registers import RegisterSpec
 from knowledge_automata.core.schemas import draft_schema
 from knowledge_automata.core.validation import validate_draft
-from knowledge_automata.llm import CallContext, ChatModel, LLMResponseError, Usage
+from knowledge_automata.core.work_orders import WorkOrder
+from knowledge_automata.llm import ChatModel, Usage
 
 CLOSING_TAG = re.compile(r"</artifact", re.IGNORECASE)
 
@@ -29,6 +34,7 @@ class Registrar:
     prompt: Prompt
     retry_prompt: Prompt
     max_attempts: int = 2
+    takes_work_order: bool = False  # the prompt expects a work order (decision-registrar.v2)
 
     def __post_init__(self) -> None:
         if self.max_attempts < 1:
@@ -38,7 +44,7 @@ class Registrar:
 
     @property
     def retry_version(self) -> str:
-        return f"{self.prompt.version}+{self.retry_prompt.version}"
+        return _retry_version(self.prompt, self.retry_prompt)
 
 
 @dataclass(frozen=True)
@@ -56,9 +62,18 @@ class DraftOutcome:
         return self.draft is not None
 
 
-def user_message(artifact_text: str) -> str:
-    """The user message: only the artifact, between delimiter lines."""
-    return "<artifact>\n" + artifact_text + "\n</artifact>"
+def user_message(artifact_text: str, work_order: WorkOrder | None = None) -> str:
+    """The user message: the artifact between delimiter lines, then the work order if any.
+
+    The work order is one JSON object between ``<work-order>`` lines, with every ``<``
+    escaped as ``\\u003c`` (as in the Comparator) so no quote inside it can close the tag.
+    """
+    message = "<artifact>\n" + artifact_text + "\n</artifact>"
+    if work_order is None:
+        return message
+    payload = {"register": work_order.register, "evidence": list(work_order.evidence)}
+    body = json.dumps(payload, ensure_ascii=False, indent=2).replace("<", "\\u003c")
+    return message + "\n\n<work-order>\n" + body + "\n</work-order>"
 
 
 def retry_system_message(registrar: Registrar, errors: tuple[str, ...]) -> str:
@@ -78,53 +93,50 @@ def check_artifact(artifact_text: str) -> None:
 
 
 def draft_record(
-    registrar: Registrar, llm: ChatModel, artifact_text: str, *, artifact_id: str
+    registrar: Registrar,
+    llm: ChatModel,
+    artifact_text: str,
+    *,
+    artifact_id: str,
+    work_order: WorkOrder | None = None,
 ) -> DraftOutcome:
     """Draft one record from an artifact, with at most ``max_attempts`` calls.
 
+    With a ``work_order`` (ADR-0018), the user message carries it after the artifact and
+    the draft must quote something that matches one of its quotes. A work order is given
+    exactly when the Registrar's prompt takes one (``takes_work_order``), and must be for
+    the Registrar's register; otherwise ``ValueError`` is raised before any call.
     ``LLMResponseError`` counts as a failed attempt; every other ``LLMError`` propagates
     unchanged (the SDK already retried what can be retried).
     """
     check_artifact(artifact_text)
-    schema = draft_schema(registrar.spec)
-    user = user_message(artifact_text)
-    usage: list[Usage] = []
-    errors: tuple[str, ...] = ()
-    error_type: str | None = None
-    version = registrar.prompt.version
-
-    for attempt in range(1, registrar.max_attempts + 1):
-        if attempt == 1:
-            system, version = registrar.prompt.text, registrar.prompt.version
-        else:
-            system, version = retry_system_message(registrar, errors), registrar.retry_version
-        context = CallContext(registrar.agent, artifact_id, version)
-        try:
-            result = llm.chat_json(system=system, user=user, schema=schema, context=context)
-        except LLMResponseError as error:
-            if error.usage is not None:
-                usage.append(error.usage)
-            errors, error_type = (str(error),), type(error).__name__
-            continue
-        usage.append(result.usage)
-        validation = validate_draft(result.data, registrar.spec, artifact_text)
-        if validation.ok:
-            return DraftOutcome(
-                draft=result.data,
-                errors=(),
-                attempts=attempt,
-                model=result.model,
-                prompt_version=version,
-                usage=tuple(usage),
-            )
-        errors, error_type = validation.errors, None
-
+    if registrar.takes_work_order and work_order is None:
+        raise ValueError(f"{registrar.prompt.version} drafts from a work order; none was given")
+    if not registrar.takes_work_order and work_order is not None:
+        raise ValueError(f"{registrar.prompt.version} does not take a work order")
+    if work_order is not None and work_order.register != registrar.spec.name:
+        raise ValueError(
+            f"Work order {work_order.number} is for {work_order.register!r}, "
+            f"not {registrar.spec.name!r}"
+        )
+    quotes = None if work_order is None else work_order.evidence
+    reply = checked_chat(
+        llm,
+        agent=registrar.agent,
+        artifact_id=artifact_id,
+        prompt=registrar.prompt,
+        retry_prompt=registrar.retry_prompt,
+        user=user_message(artifact_text, work_order),
+        schema=draft_schema(registrar.spec),
+        check=lambda draft: validate_draft(draft, registrar.spec, artifact_text, quotes),
+        max_attempts=registrar.max_attempts,
+    )
     return DraftOutcome(
-        draft=None,
-        errors=errors,
-        attempts=registrar.max_attempts,
-        model=None,
-        prompt_version=version,
-        usage=tuple(usage),
-        error_type=error_type,
+        draft=reply.data,
+        errors=reply.errors,
+        attempts=reply.attempts,
+        model=reply.model,
+        prompt_version=reply.prompt_version,
+        usage=reply.usage,
+        error_type=reply.error_type,
     )

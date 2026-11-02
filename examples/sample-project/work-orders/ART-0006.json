@@ -1,0 +1,133 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "ART-0006",
+  "created_at": "2026-11-02T00:14:28Z",
+  "updated_at": "2026-11-02T00:14:28Z",
+  "run_id": "23feff57-1c1d-4cb7-83b7-107f174fd8c3",
+  "governor": {
+    "model": "command-a-plus-05-2026",
+    "prompt_version": "governor.v1",
+    "attempts": 1,
+    "definitions": [
+      "decision-log.v1",
+      "risk-register.v1"
+    ]
+  },
+  "max_items": 10,
+  "orders": [
+    {
+      "number": 1,
+      "register": "decision-log",
+      "label": "Julie confirmed that the status paths per crop type stay as...",
+      "evidence": [
+        "Julie confirmed that the status paths per crop type stay as the board decided in April."
+      ],
+      "state": "recorded",
+      "produced": {
+        "register": "decision-log",
+        "record_id": "DEC-0003",
+        "change": "update",
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-registrar.v2",
+        "schema_version": "1.0",
+        "comparison": {
+          "model": "command-a-plus-05-2026",
+          "prompt_version": "decision-comparator.v1",
+          "attempts": 1,
+          "candidates": [
+            {
+              "record_id": "DEC-0003",
+              "score": 0.6558646
+            },
+            {
+              "record_id": "DEC-0001",
+              "score": 0.011047408
+            }
+          ]
+        }
+      },
+      "rejected": []
+    },
+    {
+      "number": 2,
+      "register": "decision-log",
+      "label": "Decision: the board chose printed QR code labels for every...",
+      "evidence": [
+        "Decision: the board chose printed QR code labels for every bench, starting at Paul's greenhouse in June."
+      ],
+      "state": "recorded",
+      "produced": {
+        "register": "decision-log",
+        "record_id": "DEC-0004",
+        "change": "new",
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-registrar.v2",
+        "schema_version": "1.0",
+        "comparison": {
+          "model": "command-a-plus-05-2026",
+          "prompt_version": "decision-comparator.v1",
+          "attempts": 1,
+          "candidates": [
+            {
+              "record_id": "DEC-0001",
+              "score": 0.020737903
+            },
+            {
+              "record_id": "DEC-0003",
+              "score": 0.010112563
+            }
+          ]
+        }
+      },
+      "rejected": []
+    },
+    {
+      "number": 3,
+      "register": "risk-register",
+      "label": "Marc warned that the label printer the team ordered may not...",
+      "evidence": [
+        "Marc warned that the label printer the team ordered may not arrive before the June pilot.",
+        "If it is late, the labels would have to be printed at a print shop, at about three times the cost."
+      ],
+      "state": "not-routed",
+      "rejected": []
+    },
+    {
+      "number": 4,
+      "register": "decision-log",
+      "label": "Decision: when two offline counts of the same batch...",
+      "evidence": [
+        "Decision: when two offline counts of the same batch conflict, the app keeps both changes and adds them together, instead of keeping only the last count."
+      ],
+      "state": "recorded",
+      "produced": {
+        "register": "decision-log",
+        "record_id": "DEC-0005",
+        "change": "new",
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-registrar.v2",
+        "schema_version": "1.0",
+        "comparison": {
+          "model": "command-a-plus-05-2026",
+          "prompt_version": "decision-comparator.v1",
+          "attempts": 1,
+          "candidates": [
+            {
+              "record_id": "DEC-0001",
+              "score": 0.007257791
+            },
+            {
+              "record_id": "DEC-0003",
+              "score": 0.0037385128
+            },
+            {
+              "record_id": "DEC-0004",
+              "score": 0.0012092434
+            }
+          ]
+        }
+      },
+      "rejected": []
+    }
+  ]
+}

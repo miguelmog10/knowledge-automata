@@ -1,4 +1,5 @@
-"""Validators for records, Registrar drafts, Comparator results and Ledger entries (ADR-0011).
+"""Validators for records, Registrar drafts, Governor replies, Comparator results and Ledger
+entries (ADR-0011, ADR-0018).
 
 Validators never raise for invalid data: they return a ``ValidationResult`` whose error
 messages start with the JSON path of the problem. They raise only for programming errors,
@@ -7,14 +8,15 @@ such as a missing schema file.
 
 import functools
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+from referencing import Registry, Resource
 
-from knowledge_automata.core.evidence import QuoteCheck, check_evidence
+from knowledge_automata.core.evidence import QuoteCheck, check_evidence, normalize_quote
 from knowledge_automata.core.ledger import CHECK_OUTCOMES, STORED_COPY_STATUSES, TRANSITIONS
 from knowledge_automata.core.ledger import SCHEMA_VERSION as LEDGER_SCHEMA_VERSION
 from knowledge_automata.core.registers import RegisterSpec
@@ -23,7 +25,9 @@ from knowledge_automata.core.schemas import (
     LLM_EVENT_SCHEMA,
     RECONCILIATION_SCHEMA,
     RECORD_SCHEMA,
+    WORK_ORDERS_SCHEMA,
     draft_schema,
+    governor_schema,
     load_schema,
     major_version,
     schema_version,
@@ -74,9 +78,39 @@ def _draft_validator(spec: RegisterSpec) -> Draft202012Validator:
     return Draft202012Validator(draft_schema(spec), format_checker=FORMAT_CHECKER)
 
 
-def _schema_errors(validator: Draft202012Validator, instance: Any, path: str = "$") -> list[str]:
+@functools.cache
+def _governor_validator(specs: tuple[RegisterSpec, ...]) -> Draft202012Validator:
+    return Draft202012Validator(governor_schema(specs), format_checker=FORMAT_CHECKER)
+
+
+@functools.cache
+def _work_orders_validator() -> Draft202012Validator:
+    """The work orders file schema refers to the Ledger's produced and rejected items by
+    ``$id``, so both are defined once; the registry resolves the reference offline."""
+    ledger_schema = load_schema(LEDGER_ENTRY_SCHEMA)
+    registry: Registry = Registry().with_resource(
+        ledger_schema["$id"], Resource.from_contents(ledger_schema)
+    )
+    return Draft202012Validator(
+        load_schema(WORK_ORDERS_SCHEMA), registry=registry, format_checker=FORMAT_CHECKER
+    )
+
+
+def _schema_errors(
+    validator: Draft202012Validator,
+    instance: Any,
+    path: str = "$",
+    message: Callable[[ValidationError], str] = lambda error: error.message,
+) -> list[str]:
     errors = sorted(validator.iter_errors(instance), key=lambda error: error.json_path)
-    return [f"{path}{error.json_path[1:]}: {error.message}" for error in errors]
+    return [f"{path}{error.json_path[1:]}: {message(error)}" for error in errors]
+
+
+def _short_message(error: ValidationError) -> str:
+    """jsonschema's message, except that a list too long is counted, not copied."""
+    if error.validator == "maxItems" and isinstance(error.instance, list):
+        return f"{len(error.instance)} items, at most {error.validator_value}"
+    return error.message
 
 
 def _semantic_errors(spec: RegisterSpec, content: Mapping[str, Any]) -> list[str]:
@@ -201,22 +235,46 @@ def revision_errors(old: Mapping[str, Any], new: Mapping[str, Any]) -> list[str]
 
 
 def _evidence_errors(
-    quotes: Iterable[tuple[int, str]], artifact_text: str
+    quotes: Iterable[tuple[int, str]], artifact_text: str, path: str = "$.evidence"
 ) -> tuple[list[str], tuple[QuoteCheck, ...]]:
     indexed = list(quotes)
     checks = tuple(check_evidence([quote for _, quote in indexed], artifact_text))
     errors = [
-        f"$.evidence[{index}]: {check.reason}: {check.quote!r}"
+        f"{path}[{index}]: {check.reason}: {check.quote!r}"
         for (index, _), check in zip(indexed, checks, strict=True)
         if not check.passed
     ]
     return errors, checks
 
 
-def validate_draft(draft: Any, spec: RegisterSpec, artifact_text: str) -> ValidationResult:
+def _string_quotes(evidence: Any) -> list[tuple[int, str]]:
+    if not isinstance(evidence, list):
+        return []
+    return [(index, quote) for index, quote in enumerate(evidence) if isinstance(quote, str)]
+
+
+def _overlaps(a: str, b: str) -> bool:
+    """Two normalized quotes overlap when one contains the other."""
+    return a in b or b in a
+
+
+WORK_ORDER_MISMATCH = (
+    "$.evidence: no quote matches the work order; draft the item the work order points to"
+)
+
+
+def validate_draft(
+    draft: Any,
+    spec: RegisterSpec,
+    artifact_text: str,
+    work_order_quotes: Sequence[str] | None = None,
+) -> ValidationResult:
     """Validate a Registrar draft: schema, semantic checks and evidence quotes.
 
-    One failed quote rejects the draft; the result names every failed quote.
+    One failed quote rejects the draft; the result names every failed quote. With
+    ``work_order_quotes``, at least one quote that passed the evidence check must match a
+    work order quote (after ``normalize_quote``, one contains the other), so the Registrar
+    drafts the item its work order points to (ADR-0018).
     """
     errors = _schema_errors(_draft_validator(spec), draft)
     if not isinstance(draft, dict):
@@ -232,7 +290,63 @@ def validate_draft(draft: Any, spec: RegisterSpec, artifact_text: str) -> Valida
         quotes = [(index, quote) for index, quote in enumerate(evidence) if isinstance(quote, str)]
         evidence_errors, checks = _evidence_errors(quotes, artifact_text)
         errors.extend(evidence_errors)
+        if work_order_quotes is not None:
+            ordered = [normalize_quote(quote) for quote in work_order_quotes]
+            drafted = [normalize_quote(check.quote) for check in checks if check.passed]
+            if not any(
+                _overlaps(quote, wanted) for quote in drafted for wanted in ordered if wanted
+            ):
+                errors.append(WORK_ORDER_MISMATCH)
     return ValidationResult(tuple(errors), checks)
+
+
+def validate_work_orders(
+    reply: Any, specs: Sequence[RegisterSpec], artifact_text: str
+) -> ValidationResult:
+    """Validate a Governor (orchestrator) reply: schema, evidence quotes and shared quotes.
+
+    Two items in the same register may not share a quote: after ``normalize_quote``, one
+    quote containing the other means one item was returned twice (ADR-0018). Quotes within
+    one item may overlap. Only quotes that pass the evidence check are compared, so a quote
+    that normalizes to almost nothing does not match everything. Beyond the schema's sanity
+    bound, the number of items is not checked here: the limit is a setting. A list that is
+    too long is reported by its length, not copied into the errors and the retry prompt.
+    """
+    errors = _schema_errors(_governor_validator(tuple(specs)), reply, message=_short_message)
+    items = reply.get("items") if isinstance(reply, dict) else None
+    if not isinstance(items, list):
+        return ValidationResult(tuple(errors))
+
+    seen: list[tuple[int, Any, str]] = []  # (item index, register, normalized quote)
+    for item_index, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        quotes = _string_quotes(item.get("evidence"))
+        path = f"$.items[{item_index}].evidence"
+        evidence_errors, checks = _evidence_errors(quotes, artifact_text, path)
+        errors.extend(evidence_errors)
+        register = item.get("register")
+        passed = [
+            (quote_index, normalize_quote(quote))
+            for (quote_index, quote), check in zip(quotes, checks, strict=True)
+            if check.passed
+        ]
+        for quote_index, normalized in passed:
+            earlier = next(
+                (
+                    other_index
+                    for other_index, other_register, other in seen
+                    if other_register == register and _overlaps(normalized, other)
+                ),
+                None,
+            )
+            if earlier is not None:
+                errors.append(
+                    f"{path}[{quote_index}]: also quoted by item {earlier} in the same "
+                    "register; return one item for one thing"
+                )
+        seen.extend((item_index, register, normalized) for _, normalized in passed)
+    return ValidationResult(tuple(errors))
 
 
 def validate_reconciliation(
@@ -307,12 +421,14 @@ def _ledger_history_errors(history: list[dict[str, Any]]) -> list[str]:
             )
         if by == "operator" and "reason" not in step:
             errors.append(f"{path}: an Operator entry needs a reason")
+        if status == "held" and "reason" not in step:
+            errors.append(f"{path}: a 'held' entry needs a reason")
 
-        ran = status in ("processed", "failed")
+        ran = status in ("processed", "failed", "held")
         if ran and "run_id" not in step:
             errors.append(f"{path}: a {status!r} entry needs a run_id")
         elif not ran and "run_id" in step:
-            errors.append(f"{path}.run_id: only 'processed' and 'failed' entries have one")
+            errors.append(f"{path}.run_id: only 'processed', 'failed' and 'held' entries have one")
         if status == "failed" and "error_type" not in step:
             errors.append(f"{path}: a 'failed' entry needs an error_type")
         elif status != "failed" and "error_type" in step:
@@ -361,6 +477,31 @@ def _produced_errors(produced: list[dict[str, Any]]) -> list[str]:
     return errors
 
 
+def _work_order_errors(entry: Mapping[str, Any]) -> list[str]:
+    """Work order numbers need a Governor block; each produced item has its own order."""
+    errors = []
+    has_governor = "governor" in entry
+    seen: set[int] = set()
+    for index, item in enumerate(entry["produced"]):
+        path = f"$.produced[{index}]"
+        number = item.get("work_order")
+        if number is None:
+            if has_governor:
+                errors.append(f"{path}: needs a work_order when the entry has a governor block")
+            continue
+        if not has_governor:
+            errors.append(f"{path}.work_order: only an entry with a governor block has one")
+        elif number in seen:
+            errors.append(f"{path}.work_order: work order {number} is listed twice")
+        seen.add(number)
+    for index, item in enumerate(entry["rejected"]):
+        if "work_order" in item and not has_governor:
+            errors.append(
+                f"$.rejected[{index}].work_order: only an entry with a governor block has one"
+            )
+    return errors
+
+
 def validate_ledger_entry(entry: Any) -> ValidationResult:
     """Validate a stored Artifact Ledger entry: schema, history path and status rules (ADR-0015).
 
@@ -396,19 +537,33 @@ def validate_ledger_entry(entry: Any) -> ValidationResult:
         errors.append("$: media_type is required unless the format is unsupported")
 
     if status != "processed":
-        if entry["produced"]:
-            errors.append("$.produced: must be empty unless the status is 'processed'")
-        ran_before = any(step["status"] == "processed" for step in history[:-1])
-        if entry["rejected"] and not (status == "failed" and ran_before):
+        if entry["produced"] and not (status == "failed" and "governor" in entry):
             errors.append(
-                "$.rejected: must be empty unless the status is 'processed', or 'failed' "
-                "after an earlier 'processed' step"
+                "$.produced: must be empty unless the status is 'processed', or 'failed' "
+                "with a governor block"
             )
+    released_from_hold = status == "accepted" and any(
+        step["status"] == "held" for step in history[:-1]
+    )
+    keeps_results = status in ("processed", "failed", "held") or released_from_hold
+    if entry["rejected"] and not keeps_results:
+        errors.append(
+            "$.rejected: must be empty unless the status is 'processed', 'failed' or 'held', "
+            "or 'accepted' after a release from 'held'"
+        )
+    if "governor" in entry and not keeps_results:
+        errors.append(
+            "$.governor: only a 'processed', 'failed' or 'held' entry, or an 'accepted' one "
+            "after a release from 'held', has one"
+        )
     errors.extend(_schema_version_errors(entry["schema_version"]))
     errors.extend(_produced_errors(entry["produced"]))
+    errors.extend(_work_order_errors(entry))
     run_ids = {step["run_id"] for step in history if step["status"] == "processed"}
     for index, item in enumerate(entry["rejected"]):
-        if "run_id" in item and item["run_id"] not in run_ids:
+        # Items with a work order come from the work orders file, whose runs may have
+        # ended failed or been interrupted.
+        if "run_id" in item and "work_order" not in item and item["run_id"] not in run_ids:
             errors.append(
                 f"$.rejected[{index}].run_id: not the run_id of a 'processed' history entry"
             )
@@ -420,4 +575,79 @@ def validate_ledger_entry(entry: Any) -> ValidationResult:
             errors.append("$.same_name_as: IDs must be in ascending order")
         if max(sequences) >= _sequence(entry["id"]):
             errors.append("$.same_name_as: may list only earlier entries")
+    return ValidationResult(tuple(errors))
+
+
+_ORDER_STATES = {
+    # state: (produced present, rejected list non-empty); None means either
+    "pending": (False, False),
+    "rejected": (False, True),
+    "recorded": (True, None),
+    "not-routed": (False, False),
+}
+
+
+def _order_errors(index: int, order: Mapping[str, Any]) -> list[str]:
+    path = f"$.orders[{index}]"
+    errors = []
+    if order["number"] != index + 1:
+        errors.append(f"{path}.number: expected {index + 1}, got {order['number']}")
+    state = order["state"]
+    has_produced, has_rejected = _ORDER_STATES[state]
+    if has_produced and "produced" not in order:
+        errors.append(f"{path}: a {state!r} order needs its produced item")
+    elif not has_produced and "produced" in order:
+        errors.append(f"{path}.produced: only a 'recorded' order has one")
+    # A recorded order may also list drafts rejected by earlier runs.
+    if has_rejected is True and not order["rejected"]:
+        errors.append(f"{path}.rejected: a 'rejected' order lists at least one rejected item")
+    elif has_rejected is False and order["rejected"]:
+        errors.append(f"{path}.rejected: must be empty for a {state!r} order")
+
+    produced = order.get("produced")
+    if produced is not None:
+        if "work_order" in produced:
+            errors.append(f"{path}.produced.work_order: the order's number stands in for it")
+        if produced["register"] != order["register"]:
+            errors.append(f"{path}.produced.register: not the order's register")
+        errors.extend(
+            error.replace("$.produced[0]", f"{path}.produced", 1)
+            for error in _produced_errors([dict(produced)])
+        )
+    for item_index, item in enumerate(order["rejected"]):
+        item_path = f"{path}.rejected[{item_index}]"
+        if "work_order" in item:
+            errors.append(f"{item_path}.work_order: the order's number stands in for it")
+        if item.get("stage") == "governor":
+            errors.append(
+                f"{item_path}.stage: a work order's draft is never rejected by the Governor"
+            )
+        elif item.get("register") != order["register"]:
+            errors.append(f"{item_path}.register: not the order's register")
+        if "run_id" not in item:
+            errors.append(f"{item_path}: needs the run_id that rejected it")
+    return errors
+
+
+def validate_work_orders_file(data: Any) -> ValidationResult:
+    """Validate a work orders file: schema, order numbers and each order's state (3.5).
+
+    Orders are numbered 1 to n. ``pending`` and ``not-routed`` orders have no results yet;
+    a ``rejected`` order lists at least one rejected item; a ``recorded`` order has its
+    produced item and may also list drafts rejected before it was recorded. Items carry no
+    ``work_order``: the order's number stands in for it until the Ledger is rebuilt.
+    """
+    errors = _schema_errors(_work_orders_validator(), data)
+    if errors:
+        return ValidationResult(tuple(errors))
+    current = load_schema(WORK_ORDERS_SCHEMA)["x-version"]
+    version = data["schema_version"]
+    if major_version(version) != major_version(current):
+        errors.append(f"$.schema_version: {version!r} is not a {major_version(current)}.x version")
+    elif int(version.split(".")[1]) > int(current.split(".")[1]):
+        errors.append(f"$.schema_version: {version!r} is newer than this code's {current!r}")
+    if data["updated_at"] < data["created_at"]:
+        errors.append("$.updated_at: earlier than created_at")
+    for index, order in enumerate(data["orders"]):
+        errors.extend(_order_errors(index, order))
     return ValidationResult(tuple(errors))

@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.2",
+  "id": "ART-0008",
+  "title": "Tallyleaf weekly status",
+  "source": {
+    "type": "file",
+    "name": "status-update-2026-06-16.md"
+  },
+  "artifact_date": "2026-06-16",
+  "media_type": "text/markdown",
+  "size_bytes": 326,
+  "content_hash": "sha256:5fb8ee63b0493b8c00bf0ee16c18236029e421eabc88580bc2e1493aee40c4f2",
+  "stored_path": "artifacts/ART-0008-status-update-2026-06-16.md",
+  "status": "processed",
+  "created_at": "2026-11-01T23:16:06Z",
+  "updated_at": "2026-11-02T01:08:18Z",
+  "governor": {
+    "model": "command-a-plus-05-2026",
+    "prompt_version": "governor.v1",
+    "attempts": 1,
+    "definitions": [
+      "decision-log.v1",
+      "risk-register.v1"
+    ],
+    "run_id": "9e94307b-9b47-4a44-a7e1-8138cd6565c0",
+    "work_orders": []
+  },
+  "produced": [],
+  "rejected": [],
+  "history": [
+    {
+      "at": "2026-11-01T23:16:06Z",
+      "status": "received",
+      "by": "sensor"
+    },
+    {
+      "at": "2026-11-01T23:16:06Z",
+      "status": "accepted",
+      "by": "sensor"
+    },
+    {
+      "at": "2026-11-02T01:08:18Z",
+      "status": "processed",
+      "by": "governor",
+      "run_id": "9e94307b-9b47-4a44-a7e1-8138cd6565c0"
+    }
+  ]
+}

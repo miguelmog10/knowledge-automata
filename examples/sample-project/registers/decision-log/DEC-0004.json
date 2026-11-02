@@ -1,0 +1,83 @@
+{
+  "id": "DEC-0004",
+  "register": "decision-log",
+  "schema_version": "1.0",
+  "record_status": "active",
+  "revision": 2,
+  "created_at": "2026-11-02T00:14:28Z",
+  "updated_at": "2026-11-02T00:48:02Z",
+  "content": {
+    "title": "Printed QR code bench labels",
+    "statement": "The board chose printed QR code labels for every bench, starting at Paul's greenhouse in June.",
+    "context": "Aisha showed the label layout: the bench number in large type above a QR code.",
+    "rationale": "Half of growers' phones cannot read NFC, and a printed QR label costs a few cents.",
+    "alternatives": [
+      "NFC tags"
+    ],
+    "decided_by": [
+      "the board"
+    ],
+    "decided_on": "2026-06-09"
+  },
+  "sources": [
+    {
+      "artifact_id": "ART-0006",
+      "artifact_date": "2026-05-26",
+      "excerpt": "Decision: the board chose printed QR code labels for every bench, starting at Paul's greenhouse in June.",
+      "added_at": "2026-11-02T00:14:28Z"
+    },
+    {
+      "artifact_id": "ART-0006",
+      "artifact_date": "2026-05-26",
+      "excerpt": "Aisha showed the label layout: the bench number in large type above a QR code.",
+      "added_at": "2026-11-02T00:14:28Z"
+    },
+    {
+      "artifact_id": "ART-0007",
+      "artifact_date": "2026-06-09",
+      "excerpt": "The QR code labels for every bench stay the plan.",
+      "added_at": "2026-11-02T00:48:02Z"
+    },
+    {
+      "artifact_id": "ART-0007",
+      "artifact_date": "2026-06-09",
+      "excerpt": "Aisha explained why the board picked QR codes in May instead of NFC tags:",
+      "added_at": "2026-11-02T00:48:02Z"
+    },
+    {
+      "artifact_id": "ART-0007",
+      "artifact_date": "2026-06-09",
+      "excerpt": "half of the growers' phones cannot read NFC, and a printed QR label costs a few cents.",
+      "added_at": "2026-11-02T00:48:02Z"
+    }
+  ],
+  "history": [
+    {
+      "revision": 1,
+      "at": "2026-11-02T00:14:28Z",
+      "change": "new",
+      "artifact_id": "ART-0006",
+      "fields": [
+        "title",
+        "statement",
+        "context",
+        "decided_by"
+      ],
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v2"
+    },
+    {
+      "revision": 2,
+      "at": "2026-11-02T00:48:02Z",
+      "change": "update",
+      "artifact_id": "ART-0007",
+      "fields": [
+        "rationale",
+        "alternatives",
+        "decided_on"
+      ],
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v2"
+    }
+  ]
+}

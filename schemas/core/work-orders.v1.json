@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:knowledge-automata:schema:core:work-orders:v1",
+  "x-version": "1.0",
+  "title": "Work orders file",
+  "description": "The work orders the Governor (orchestrator) found in one artifact, and each order's result: the checkpoint that lets an interrupted run continue without calling the Governor again (ADR-0018, handoff 007, 3.5). Stored as <memory>/work-orders/<artifact ID>.json. Code owns every field; the evidence and labels are verified artifact text. Never sent to an LLM provider.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "description": "Version (MAJOR.MINOR) of this schema."
+    },
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^ART-[0-9]{4,}$",
+      "description": "The Artifact Ledger entry these work orders come from."
+    },
+    "created_at": { "$ref": "#/$defs/timestamp" },
+    "updated_at": { "$ref": "#/$defs/timestamp" },
+    "run_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "The run that called the Governor. A held Ledger entry with this run_id, followed by a release, releases this file."
+    },
+    "governor": {
+      "type": "object",
+      "description": "The Governor run whose reply was accepted.",
+      "properties": {
+        "model": { "type": "string", "minLength": 1 },
+        "prompt_version": { "type": "string", "minLength": 1 },
+        "attempts": { "type": "integer", "minimum": 1 },
+        "definitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "The register definition versions in the Governor's prompt, in register order."
+        }
+      },
+      "required": ["model", "prompt_version", "attempts", "definitions"],
+      "additionalProperties": false
+    },
+    "max_items": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "KA_GOVERNOR_MAX_ITEMS when the file was written. The hold check uses this value, not the current setting."
+    },
+    "orders": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/order" },
+      "description": "Every work order, numbered from 1 in the order their earliest quote appears in the artifact."
+    }
+  },
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_at",
+    "updated_at",
+    "run_id",
+    "governor",
+    "max_items",
+    "orders"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+      "description": "UTC, YYYY-MM-DDTHH:MM:SSZ, as in records and the Ledger."
+    },
+    "order": {
+      "type": "object",
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "register": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "description": "Placeholder built by code from the first quote: at most 60 characters, plus ... when cut."
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "description": "The Governor's quotes, checked against the artifact, in the Governor's order."
+        },
+        "state": {
+          "enum": ["pending", "recorded", "rejected", "not-routed"],
+          "description": "pending: not drafted yet. recorded: produced a record (final). rejected: its last draft or comparison was rejected; a rerun drafts it again. not-routed: its register has no Registrar yet (final)."
+        },
+        "produced": {
+          "$ref": "urn:knowledge-automata:schema:core:ledger-entry:v1#/$defs/produced_record",
+          "description": "The Ledger produced item, without work_order. Present only when recorded."
+        },
+        "rejected": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:knowledge-automata:schema:core:ledger-entry:v1#/$defs/rejected_draft"
+          },
+          "description": "Ledger rejected items for this order, without work_order, each with its run_id. Append-only."
+        }
+      },
+      "required": ["number", "register", "label", "evidence", "state", "rejected"],
+      "additionalProperties": false
+    }
+  }
+}

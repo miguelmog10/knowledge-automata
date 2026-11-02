@@ -241,3 +241,13 @@ Evidence: `dev/handoffs/006-comparator.md` (Addendum A), ADR-0014 (amended 2026-
 
 Talking the thinking failure through by voice, Miguel noted that working alone he would have spiked the provider's behavior first: small throwaway scripts, outside the project, that try thinking on and off and look at the raw replies. The team had done a spike (the handoff 003 smoke check), but with one artifact and a one-line prompt, and moving fast it treated one clean result as settled. The lesson for the next provider behavior a design depends on: spike it with several inputs and the real prompts before building on it. The throwaway diagnostic from handoff 006 Addendum A is the template.
 Evidence: `scripts/cohere_smoke.py`, `dev/handoffs/006-comparator.md` (Addendum A), `dev/tool-feedback.md` (2026-10-31).
+
+### 2026-10-31: P10 Distrust the happy path (product)
+
+Designing the Governor (orchestrator), Claude proposed a limit on items per artifact to protect the trial key's monthly calls. Miguel pushed it further: a badly shaped or hostile document could also pollute the institutional memory, so the limit is a security control on any key; and a real meeting with twelve decisions must not quietly lose two. The design changed on both points. Above the limit code drafts nothing and holds the artifact for review, with the reason in the Ledger, and the Operator's release runs every saved work order. Nothing is cut silently. The deeper checks this points to (semantic guardrails, with the Governor escalating to a separate checker) went to the backlog.
+Evidence: `dev/handoffs/007-governor.md` (decision 9, sections 3.7 and 3.8), ADR-0018 (proposed), `dev/backlog.md` (semantic guardrails with escalation).
+
+### 2026-10-31: P2 Architecture is a first-class deliverable (product)
+
+Miguel asked whether a team using Knowledge Automata could add record types that the PMBOK Guide does not define, as the decision log already is, without an architecture change. Mostly yes: schemas and prompts are data files and the core works from a register spec. The one thing handoff 007 could have hardcoded, what counts as a decision or a risk, became a versioned definition file per register, named by its spec, and the Governor's prompt is built from those files. A register configurator later needs generic defaults for what is still code (semantic checks, views, write rules), not a redesign.
+Evidence: `prompts/project-management/definitions/`, `dev/handoffs/007-governor.md` (section 3.2), `dev/backlog.md` (register configurator).

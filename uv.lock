@@ -518,6 +518,7 @@ source = { editable = "." }
 dependencies = [
     { name = "cohere" },
     { name = "jsonschema" },
+    { name = "referencing" },
 ]
 
 [package.optional-dependencies]
@@ -533,6 +534,7 @@ requires-dist = [
     { name = "jsonschema", specifier = ">=4.23" },
     { name = "pip-audit", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'" },
+    { name = "referencing", specifier = ">=0.28.4" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.17.2" },
 ]
 provides-extras = ["dev"]

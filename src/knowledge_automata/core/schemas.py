@@ -8,6 +8,7 @@ from the repository's ``schemas/`` folder.
 import copy
 import functools
 import json
+from collections.abc import Sequence
 from importlib import resources
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -15,10 +16,12 @@ from typing import Any
 from knowledge_automata.core.registers import RegisterSpec
 
 DRAFT_SCHEMA = "core/draft.v1.json"
+GOVERNOR_REPLY_SCHEMA = "core/governor-reply.v1.json"
 LEDGER_ENTRY_SCHEMA = "core/ledger-entry.v1.json"
 LLM_EVENT_SCHEMA = "core/llm-event.v1.json"
 RECONCILIATION_SCHEMA = "core/reconciliation.v1.json"
 RECORD_SCHEMA = "core/record.v1.json"
+WORK_ORDERS_SCHEMA = "core/work-orders.v1.json"
 
 
 @functools.cache
@@ -65,6 +68,18 @@ def draft_schema(spec: RegisterSpec) -> dict[str, Any]:
     """
     schema = load_schema(DRAFT_SCHEMA)
     schema["properties"]["content"] = load_schema(spec.content_schema)
+    return schema
+
+
+def governor_schema(specs: Sequence[RegisterSpec]) -> dict[str, Any]:
+    """Return the Governor reply schema with ``register`` limited to the registers' names.
+
+    The names are inlined as an ``enum``, like ``draft_schema`` inlines content, in the
+    order given.
+    """
+    schema = load_schema(GOVERNOR_REPLY_SCHEMA)
+    item = schema["properties"]["items"]["items"]
+    item["properties"]["register"]["enum"] = [spec.name for spec in specs]
     return schema
 
 

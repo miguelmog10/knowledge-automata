@@ -7,3 +7,7 @@ Generated from the JSON records in `registers/decision-log/`. Do not edit this f
 | [DEC-0001](decision-log/DEC-0001.md) | Build one Flutter app for iOS and Android | 2026-02-03 | active |
 | [DEC-0002](decision-log/DEC-0002.md) | Define batch status workflow | 2026-03-03 | superseded by [DEC-0003](decision-log/DEC-0003.md) |
 | [DEC-0003](decision-log/DEC-0003.md) | Replace single status ladder with crop-specific paths | 2026-04-28 | active |
+| [DEC-0004](decision-log/DEC-0004.md) | Printed QR code bench labels | 2026-06-09 | active |
+| [DEC-0005](decision-log/DEC-0005.md) | Offline count conflict: add counts instead of overwrite |  | superseded by [DEC-0006](decision-log/DEC-0006.md) |
+| [DEC-0006](decision-log/DEC-0006.md) | Offline count conflict handling |  | active |
+| [DEC-0007](decision-log/DEC-0007.md) | Launch count screen and status picker in English and French | 2026-06-09 | active |

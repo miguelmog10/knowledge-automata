@@ -13,17 +13,20 @@ from typing import Any
 from knowledge_automata.core.records import format_timestamp, order_like_schema
 from knowledge_automata.core.schemas import LEDGER_ENTRY_SCHEMA, load_schema
 
-STATUSES = ("received", "accepted", "quarantined", "rejected", "processed", "failed")
+STATUSES = ("received", "accepted", "quarantined", "rejected", "processed", "failed", "held")
 # rejected is always final; processed is final once it lists a record (ADR-0015).
 FINAL_STATUSES = frozenset({"rejected"})
-STORED_COPY_STATUSES = frozenset({"accepted", "quarantined", "processed", "failed"})
+STORED_COPY_STATUSES = frozenset({"accepted", "quarantined", "processed", "failed", "held"})
 ACTORS = ("sensor", "operator", "pipeline", "governor")
 # Copies live in <memory>/artifacts/; stored_path is relative to the memory folder.
 ARTIFACTS_FOLDER = "artifacts"
 
+# The Governor (orchestrator) makes every processing change; "pipeline" stood in for it
+# before Ledger 1.2 and stays valid in earlier history.
 _PIPELINE = frozenset({"pipeline", "governor"})
+_GOVERNOR = frozenset({"governor"})
 
-# (from, to) -> who may make the change. "pipeline" stands in for the Governor until it exists.
+# (from, to) -> who may make the change.
 TRANSITIONS: dict[tuple[str | None, str], frozenset[str]] = {
     (None, "received"): frozenset({"sensor"}),
     ("received", "accepted"): frozenset({"sensor"}),
@@ -37,6 +40,11 @@ TRANSITIONS: dict[tuple[str | None, str], frozenset[str]] = {
     # A rerun of an artifact whose earlier run recorded nothing (refused once it produced).
     ("processed", "processed"): _PIPELINE,
     ("processed", "failed"): _PIPELINE,
+    # More work orders than KA_GOVERNOR_MAX_ITEMS: held until the Operator releases it.
+    ("accepted", "held"): _GOVERNOR,
+    ("failed", "held"): _GOVERNOR,
+    ("processed", "held"): _GOVERNOR,
+    ("held", "accepted"): frozenset({"operator"}),
 }
 
 # Each Sensor check decides one outcome.
@@ -191,11 +199,14 @@ def with_results(
     entry: Mapping[str, Any],
     produced: Iterable[Mapping[str, Any]],
     rejected: Iterable[Mapping[str, Any]],
+    *,
+    governor: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a copy of ``entry`` with ``produced`` and ``rejected`` set, keys in schema order.
 
-    Used together with the ``processed`` transition. On a rerun the caller passes the
-    earlier rejected drafts too, so they are never lost.
+    Used together with a ``processed``, ``failed`` or ``held`` transition. On a rerun the
+    caller passes the earlier items too, so they are never lost. ``governor``, when given,
+    sets the entry's Governor block; otherwise any existing block is kept.
     """
     updated = copy.deepcopy(dict(entry))
     updated["produced"] = [
@@ -204,7 +215,11 @@ def with_results(
     updated["rejected"] = [
         order_like_schema(dict(item), _defs("rejected_draft")) for item in rejected
     ]
-    return updated
+    if governor is not None:
+        updated["governor"] = order_like_schema(
+            copy.deepcopy(dict(governor)), _schema()["properties"]["governor"]
+        )
+    return order_like_schema(updated, _schema())
 
 
 def error_paths(errors: Iterable[str]) -> list[str]:

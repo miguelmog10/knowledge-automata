@@ -1,0 +1,57 @@
+{
+  "id": "DEC-0007",
+  "register": "decision-log",
+  "schema_version": "1.0",
+  "record_status": "active",
+  "revision": 1,
+  "created_at": "2026-11-02T00:48:02Z",
+  "updated_at": "2026-11-02T00:48:02Z",
+  "content": {
+    "title": "Launch count screen and status picker in English and French",
+    "statement": "Launch the count screen and the status picker in English and French.",
+    "context": "Two French-speaking growers require the count screen and status picker in French.",
+    "rationale": "To meet the two French-speaking growers' need for those screens in French.",
+    "decided_by": [
+      "Marc Gagnon"
+    ],
+    "decided_on": "2026-06-09"
+  },
+  "sources": [
+    {
+      "artifact_id": "ART-0007",
+      "artifact_date": "2026-06-09",
+      "excerpt": "- Launch the count screen and the status picker in English and French.",
+      "added_at": "2026-11-02T00:48:02Z"
+    },
+    {
+      "artifact_id": "ART-0007",
+      "artifact_date": "2026-06-09",
+      "excerpt": "Marc agreed to launch with English and French for those two screens only.",
+      "added_at": "2026-11-02T00:48:02Z"
+    },
+    {
+      "artifact_id": "ART-0007",
+      "artifact_date": "2026-06-09",
+      "excerpt": "Aisha’s survey found that the two French-speaking growers need the count screen and the status picker in French.",
+      "added_at": "2026-11-02T00:48:02Z"
+    }
+  ],
+  "history": [
+    {
+      "revision": 1,
+      "at": "2026-11-02T00:48:02Z",
+      "change": "new",
+      "artifact_id": "ART-0007",
+      "fields": [
+        "title",
+        "statement",
+        "context",
+        "rationale",
+        "decided_by",
+        "decided_on"
+      ],
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v2+registrar-retry.v1"
+    }
+  ]
+}

@@ -18,6 +18,7 @@ from knowledge_automata.core.prompts import ERRORS_PLACEHOLDER, Prompt, retry_sy
 from knowledge_automata.core.registers import RegisterSpec
 from knowledge_automata.core.retrieval import comparison_text, top_k
 from knowledge_automata.core.schemas import RECONCILIATION_SCHEMA, load_schema
+from knowledge_automata.core.settings import whole_number
 from knowledge_automata.core.validation import validate_reconciliation
 from knowledge_automata.llm import CallContext, LanguageModel, LLMResponseError, Usage
 
@@ -29,19 +30,6 @@ DEFAULT_TOP_N = 3
 
 class ComparatorConfigError(Exception):
     """A Comparator setting in the environment is invalid."""
-
-
-def _whole_number(env: Mapping[str, str], name: str, default: int) -> int:
-    raw = env.get(name, "").strip()
-    if not raw:
-        return default
-    try:
-        value = int(raw)
-    except ValueError:
-        value = 0
-    if value < 1:
-        raise ComparatorConfigError(f"{name} must be a whole number of at least 1, got {raw!r}")
-    return value
 
 
 @dataclass(frozen=True)
@@ -64,8 +52,8 @@ class ComparatorSettings:
     def from_env(cls, env: Mapping[str, str] = os.environ) -> "ComparatorSettings":
         """Read both settings; unset or empty is the default."""
         return cls(
-            top_k=_whole_number(env, TOP_K_VARIABLE, DEFAULT_TOP_K),
-            top_n=_whole_number(env, TOP_N_VARIABLE, DEFAULT_TOP_N),
+            top_k=whole_number(env, TOP_K_VARIABLE, DEFAULT_TOP_K, ComparatorConfigError),
+            top_n=whole_number(env, TOP_N_VARIABLE, DEFAULT_TOP_N, ComparatorConfigError),
         )
 
 

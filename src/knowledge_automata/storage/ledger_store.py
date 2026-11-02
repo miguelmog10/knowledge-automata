@@ -22,7 +22,9 @@ ARTIFACT_ID = re.compile(r"ART-[0-9]{4,}", re.ASCII)
 _ENTRY_FILE = re.compile(r"ART-([0-9]{4,})\.json", re.ASCII)
 
 # The only fields a status change may touch; everything else describes what arrived.
-_CHANGING_FIELDS = frozenset({"status", "updated_at", "produced", "rejected", "history"})
+_CHANGING_FIELDS = frozenset(
+    {"status", "updated_at", "governor", "produced", "rejected", "history"}
+)
 
 
 class LedgerStoreError(Exception):
@@ -113,10 +115,11 @@ class LedgerStore:
     def save_transition(self, old: dict[str, Any], new: dict[str, Any]) -> Path:
         """Replace ``old`` with ``new``, a later state of the same entry.
 
-        Refused unless the stored file still equals ``old`` (no lost update), ``old`` lists
-        no records yet, ``new`` keeps ``old``'s history and rejected drafts unchanged and adds
-        to the history, and only status fields change. ``schema_version`` may change only to
-        the current version of the same major.
+        Refused unless the stored file still equals ``old`` (no lost update), ``old`` is not
+        a ``processed`` entry that lists records, ``new`` keeps ``old``'s history, produced
+        records and rejected items unchanged at the start of each list and adds to the
+        history, a Governor block once set is kept, and only status fields change.
+        ``schema_version`` may change only to the current version of the same major.
         """
         result = validate_ledger_entry(new)
         if not result.ok:
@@ -143,6 +146,12 @@ class LedgerStore:
             raise LedgerStoreError(
                 f"{artifact_id}: the new rejected list must keep the old one unchanged"
             )
+        if new["produced"][: len(old["produced"])] != old["produced"]:
+            raise LedgerStoreError(
+                f"{artifact_id}: the new produced list must keep the old one unchanged"
+            )
+        if "governor" in old and "governor" not in new:
+            raise LedgerStoreError(f"{artifact_id}: the governor block cannot be removed")
         changed = {
             key
             for key in old.keys() | new.keys()
