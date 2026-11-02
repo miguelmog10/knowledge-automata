@@ -170,15 +170,15 @@ footer { margin-top: 80px; padding: 24px 0 56px; border-top: 2px solid var(--ink
       <a class="btn btn-secondary" href="https://github.com/miguelmog10/knowledge-automata">View on GitHub</a>
     </div>
   </div>
-  <div class="ticket" aria-label="Summary of the first real run">
-    <div class="row" style="font-weight: 500"><span>ARTIFACT ART-0001</span><span>#1</span></div>
-    <div class="sub2">Board meeting · 03 FEB 2026</div>
+  <div class="ticket" aria-label="Summary of the latest real run">
+    <div class="row" style="font-weight: 500"><span>ARTIFACT ART-0006</span><span>#6</span></div>
+    <div class="sub2">Board meeting · 26 MAY 2026</div>
     <div class="rule"></div>
-    <div>1 × decision</div>
-    <div class="sub2">thinking off · 1 retry</div>
+    <div>3 × decision · 1 × risk</div>
+    <div class="sub2">split by the Governor · thinking on</div>
     <div class="rule"></div>
-    <div class="row"><span>RUN</span><span>2026-10-26</span></div>
-    <div class="row hot"><span>RECORDED</span><span>DEC-0001</span></div>
+    <div class="row"><span>RUN</span><span>2026-11-01</span></div>
+    <div class="row hot"><span>RECORDED</span><span>DEC-0003 to 0005</span></div>
   </div>
 </div>
 
@@ -189,20 +189,19 @@ footer { margin-top: 80px; padding: 24px 0 56px; border-top: 2px solid var(--ink
   <div class="legend">
     <span><i class="sw sw-built"></i>Built on main</span>
     <span><i class="sw sw-planned"></i>Planned</span>
-    <span><span class="standin">stand-in</span> simple code does it today</span>
   </div>
   <div class="line">
     <div class="station built"><span class="eyebrow">Station 1 · built</span><b>Sensor</b><span>Intake and input guardrail. Checks, hashes and logs every artifact.</span></div>
-    <span class="conn dotted" aria-hidden="true"><i></i>▶</span>
-    <div class="station planned"><span class="eyebrow">Station 2 · planned</span><b>Governor</b><span>Orchestrator. Reads the artifact and sends work orders.</span></div>
-    <span class="conn dotted" aria-hidden="true"><i></i>▶</span>
+    <span class="conn solid" aria-hidden="true"><i></i>▶</span>
+    <div class="station built"><span class="eyebrow">Station 2 · built</span><b>Governor</b><span>Orchestrator. Reads the artifact once and writes a work order for each decision or risk, from verified quotes. Holds an unusual artifact for review.</span></div>
+    <span class="conn solid" aria-hidden="true"><i></i>▶</span>
     <div class="station built"><span class="eyebrow">Station 3 · partly built</span><b>Registrars</b><span>Specialist record keepers. Decision Registrar built, Risk Registrar planned. Code checks every draft.</span></div>
     <span class="conn solid" aria-hidden="true"><i></i>▶</span>
     <div class="station built"><span class="eyebrow">Station 4 · built</span><b>Comparator</b><span>Reconciliation. Finds related records with Embed and Rerank; Command judges new, update, reaffirmation or supersession.</span></div>
     <span class="conn solid" aria-hidden="true"><i></i>▶</span>
-    <div class="station built"><span class="eyebrow">Back to · <span class="standin">stand-in</span></span><b>Artifact Ledger</b><span>Marks the artifact processed and lists the records it produced.</span></div>
+    <div class="station built"><span class="eyebrow">Back to · built</span><b>Artifact Ledger</b><span>The Governor marks the artifact processed, failed or held, and lists the records it produced.</span></div>
   </div>
-  <p class="note"><em>Today:</em> <code>record-decision</code> sends an accepted artifact to the Decision Registrar, then compares the checked draft with the Comparator, and a pipeline stand-in for the Governor updates the Ledger. The draft comes before the comparison on purpose: the Comparator only judges content already grounded in the artifact (<a href="https://github.com/miguelmog10/knowledge-automata/blob/main/docs/decisions/0017-comparator-reconciliation.md">ADR-0017</a>). Around the line, the Operator (human in the loop) releases quarantined files; the Observer (quality control) and the Oracle (query interface) are planned.</p>
+  <p class="note"><em>Today:</em> <code>process</code> runs the Governor, then each decision work order through the Decision Registrar and the Comparator. A work orders file saves progress, so a run stopped by an error resumes where it left off (<a href="https://github.com/miguelmog10/knowledge-automata/blob/main/docs/decisions/0018-governor-work-orders.md">ADR-0018</a>). Risks are found, and wait for the Risk Registrar. The draft comes before the comparison on purpose: the Comparator only judges content already grounded in the artifact (<a href="https://github.com/miguelmog10/knowledge-automata/blob/main/docs/decisions/0017-comparator-reconciliation.md">ADR-0017</a>). Around the line, the Operator (human in the loop) releases quarantined and held artifacts; the Observer (quality control) and the Oracle (query interface) are planned.</p>
   <figure class="diagram" id="diagram-loop">
     <div class="canvas" data-diagram="03-closed-loop"><span class="diagram-msg">Loading the diagram…</span></div>
     <figcaption><span>The full loop, with the planned feedback loops drawn dotted.</span><a href="https://github.com/miguelmog10/knowledge-automata/blob/main/docs/diagrams/03-closed-loop.md">Source</a></figcaption>
@@ -213,10 +212,10 @@ footer { margin-top: 80px; padding: 24px 0 56px; border-top: 2px solid var(--ink
   <p class="kicker">Service report:</p>
   <h2 id="status-title">Where v0.1 stands</h2>
   <div class="figures">
-    <div><b>730+</b><span>tests, all offline</span></div>
-    <div><b>17</b><span>architecture decision records</span></div>
-    <div><b>5</b><span>meetings recorded by real runs</span></div>
-    <div><b>3</b><span>decision records, committed unedited</span></div>
+    <div><b>950+</b><span>tests, all offline</span></div>
+    <div><b>18</b><span>architecture decision records</span></div>
+    <div><b>8</b><span>meetings processed by real runs</span></div>
+    <div><b>7</b><span>decision records, committed unedited</span></div>
   </div>
   <div class="columns">
     <div>
@@ -226,13 +225,14 @@ footer { margin-top: 80px; padding: 24px 0 56px; border-top: 2px solid var(--ink
         <li>Decision Registrar (specialist record keeper) with one retry, validated records and Markdown views</li>
         <li>Sensor (intake and input guardrail) and the Artifact Ledger</li>
         <li>Comparator (reconciliation): new, update, reaffirmation and supersession, tested on four real meetings</li>
+        <li>Governor (orchestrator): one work order per decision or risk, resumable runs and a hold for unusual artifacts, tested on three real meetings</li>
       </ul>
     </div>
     <div>
       <span class="eyebrow">Next</span>
       <ul>
-        <li>Governor (orchestrator)</li>
-        <li>Risk Registrar</li>
+        <li>Risk Registrar, for the risks the Governor already finds</li>
+        <li>A command that processes a whole folder</li>
         <li>Sample project as an evaluation set, then v0.1.0</li>
       </ul>
     </div>
@@ -305,8 +305,8 @@ footer { margin-top: 80px; padding: 24px 0 56px; border-top: 2px solid var(--ink
 </main>
 
 <footer>
-  <span>Refreshed from README, STATUS, handoff 006 and ADRs 0001 to 0017.</span>
-  <span class="mono">Last refresh 2026-10-31 · feat/comparator at 41bb989, before the merge</span>
+  <span>Refreshed from README, STATUS, handoff 007 and ADRs 0001 to 0018.</span>
+  <span class="mono">Last refresh 2026-11-01 · feat/governor at a6a29cb, before the merge</span>
 </footer>
 </div>
 

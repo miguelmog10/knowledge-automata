@@ -1,6 +1,6 @@
 # Containers
 
-What runs inside Knowledge Automata (C4 level 2): one Python command-line app and two file stores. The roles are components of the app. A pipeline stand-in for the Governor (orchestrator) does every file write, because agents never import storage.
+What runs inside Knowledge Automata (C4 level 2): one Python command-line app and two file stores. The roles are components of the app. The pipeline runs the Governor (orchestrator) and each work order, and does every file write, because agents never import storage.
 
 ```mermaid
 ---
@@ -46,17 +46,17 @@ flowchart LR
   classDef planned fill:#e9e5de,stroke:#57524b,stroke-width:1.5px,stroke-dasharray:6 4,color:#57524b
   classDef focus fill:#e9e5de,stroke:#9c4426,stroke-width:3px,color:#22201d
   accTitle: Knowledge Automata containers
-  accDescr: Knowledge Automata is one Python command-line app plus two file stores. Inside the app, a pipeline stand-in for the Governor runs the Sensor, the Decision Registrar and the Comparator, and does every file write to the memory folder. Every model call goes through the LLM service layer to Cohere and is logged to the event log. The Governor, Risk Registrar, Observer and Oracle are planned.
+  accDescr: Knowledge Automata is one Python command-line app plus two file stores. Inside the app, the pipeline runs the Sensor, then the Governor, which writes one work order per item, then the Decision Registrar and the Comparator for each work order, and does every file write to the memory folder. Every model call goes through the LLM service layer to Cohere and is logged to the event log. The Risk Registrar, Observer and Oracle are planned; risk work orders wait, not routed.
 
   operator["Operator<br/>(human in the loop)<br/>[Person]"]:::built
 
   subgraph ka["Knowledge Automata"]
-    pipeline["CLI and pipeline<br/>[Container: Python app]<br/>stand-in for the Governor,<br/>does every file write"]:::built
+    pipeline["CLI and pipeline<br/>[Container: Python app]<br/>runs the roles,<br/>does every file write"]:::built
     subgraph roles["Roles [Components of the app]"]
       sensor["Sensor<br/>(intake and input guardrail)"]:::built
       decision["Decision Registrar<br/>(specialist record keeper)"]:::built
       risk["Risk Registrar<br/>(specialist record keeper)"]:::planned
-      governor["Governor<br/>(orchestrator)"]:::planned
+      governor["Governor<br/>(orchestrator)"]:::built
       comparator["Comparator<br/>(reconciliation)"]:::built
       observer["Observer (quality control)<br/>Oracle (query interface)"]:::planned
     end
@@ -66,7 +66,7 @@ flowchart LR
       rerank["Rerank"]:::built
     end
     subgraph memory["Memory folder [Container: files]"]
-      ledger[("Artifact Ledger<br/>and read-only copies")]:::built
+      ledger[("Artifact Ledger,<br/>work orders<br/>and read-only copies")]:::built
       declog[("Decision log")]:::built
       risklog[("Risk register")]:::planned
       views[("Markdown views")]:::built
@@ -78,10 +78,12 @@ flowchart LR
 
   operator -- "commands" --> pipeline
   pipeline -- "checks bytes" --> sensor
-  pipeline -- "drafts" --> decision
+  pipeline -- "reads the artifact" --> governor
   pipeline -- "compares the draft" --> comparator
   pipeline -- "writes" --> memory
-  governor -. "work orders" .-> decision
+  governor -- "work orders" --> decision
+  governor -. "risk work orders" .-> risk
+  governor --> command
   decision --> command
   risk -.-> command
   comparator --> embed
