@@ -197,6 +197,7 @@ Suggested improvement (Claude): write escape sequences in file content literally
 
 Note: with `thinking` disabled and a JSON schema in `response_format`, `command-a-plus-05-2026` often returned one text block that starts with its reasoning in prose ("We need to draft a decision record...") and ends with the JSON object, with `finish_reason` COMPLETE. Five of six first attempts in the handoff 006 real run failed this way, at 1,100 to 2,700 output tokens each. With thinking enabled, the reasoning went to a `thinking` block and the text block was the JSON object only (two of two). The smoke check of 2026-10-25 had seen two clean thinking-off replies on a different artifact, so the problem was not visible then.
 Suggested improvement: enforce the schema from the first token whatever the thinking setting, or document that structured outputs on reasoning models need thinking enabled.
+Update (2026-11-02): the cause was on our side; see the 2026-11-02 entry.
 
 ### 2026-10-31: GitHub Copilot chat in VS Code, copy button (missing)
 
@@ -227,3 +228,8 @@ Suggested improvement: a slow request with no error and no status incident is ha
 
 Note: the cause of the 2026-10-28 entry. The bridge does not re-encode PNG files: it inserts one signed `caBX` chunk (C2PA Content Credentials, about 5.8 KB, "Claude provided this file at the request of a user", signed by Anthropic) right after the header, and keeps every other chunk byte for byte. Found when the guide previews were retaken after handoff 007: the SHA-256 differed again, the pixels matched, and comparing the chunks showed the one added chunk. It holds no personal data.
 Suggested improvement (Claude): say in the bridge's documentation or result that images get a Content Credentials label, so a hash check that fails is expected. For us: verify images by pixels (or by every chunk except `caBX`), text files by hash.
+
+### 2026-11-02: Cohere structured outputs docs, JSON mode with thinking disabled (confusing, cause found)
+
+Note: the cause of the 2026-10-31 entry was on our side. Cohere's structured outputs page asks, in an Important box, that a JSON-mode request also tell the model to generate JSON. None of our prompts did; they relied on the schema alone. A standalone reproduction (Miguel and Claude, published as [cohere-feedback](https://github.com/miguelmog10/cohere-feedback)) with the public `decision-registrar.v1` prompt and ART-0003, thinking disabled: with the full schema, prose then JSON, `finish_reason` COMPLETE (1,265 output tokens); with one line added at the end of the system prompt, "Reply with one JSON object that matches the response schema, and nothing else.", clean JSON three times out of three (272 output tokens); with a reduced four-field schema, clean even without the line. Thinking enabled was clean in every variant (1,165 to 2,214 output tokens). One model, SDK 7.3.0, one prompt and one artifact.
+Suggested improvement: this replaces the one in the 2026-10-31 entry. The docs warn that without the instruction the model may generate endlessly, but what we saw was a normal, complete reply with prose first, and only with the larger schema. The page does not mention reasoning models or the thinking setting; a note on both would help. For us: add the line to every JSON-mode prompt (backlog).

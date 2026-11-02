@@ -350,7 +350,7 @@ footer { margin-top: 80px; padding: 24px 0 56px; border-top: 2px solid var(--ink
       code: 'The Sensor (intake and input guardrail) checks format, encoding, size and the delimiter, hashes the text and records the artifact in the Artifact Ledger. For this first run, the Ledger entry was backfilled in handoff 005.',
       facts: [['ID', 'ART-0001'], ['Size', '1,433 bytes'], ['Hash', 'sha256:ea5866af…']] },
     { title: 'Draft, attempt 1',
-      model: 'The Decision Registrar (specialist record keeper) sent the artifact to Command with prompt decision-registrar.v1, thinking disabled, the default until 2026-10-31. The response was unusable, most likely because the model wrote its reasoning as prose before the JSON, which a later diagnostic showed happens with thinking disabled (ADR-0014).',
+      model: 'The Decision Registrar (specialist record keeper) sent the artifact to Command with prompt decision-registrar.v1, thinking disabled, the default until 2026-10-31. The response was unusable, most likely because the model wrote its reasoning as prose before the JSON. Later diagnostics showed this happens with thinking disabled when the prompt does not ask for JSON, as the Cohere docs require (ADR-0014).',
       code: 'The LLM service layer raised LLMResponseError and logged the call: billed tokens, latency and request ID, never the text.',
       facts: [['Model', 'command-a-plus-05-2026'], ['Time', '10.3 s'], ['Billed', '697 in / 2,390 out']] },
     { title: 'The one retry',

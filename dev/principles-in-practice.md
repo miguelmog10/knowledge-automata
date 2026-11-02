@@ -251,3 +251,8 @@ Evidence: `dev/handoffs/007-governor.md` (decision 9, sections 3.7 and 3.8), ADR
 
 Miguel asked whether a team using Knowledge Automata could add record types that the PMBOK Guide does not define, as the decision log already is, without an architecture change. Mostly yes: schemas and prompts are data files and the core works from a register spec. The one thing handoff 007 could have hardcoded, what counts as a decision or a risk, became a versioned definition file per register, named by its spec, and the Governor's prompt is built from those files. A register configurator later needs generic defaults for what is still code (semantic checks, views, write rules), not a redesign.
 Evidence: `prompts/project-management/definitions/`, `dev/handoffs/007-governor.md` (section 3.2), `dev/backlog.md` (register configurator).
+
+### 2026-11-02: P10 Distrust the happy path (product)
+
+The thinking-disabled failure of 2026-10-31 had a cause on our side. A standalone reproduction for a Cohere community report failed only with the full schema; a reduced schema hid the problem. Rereading Cohere's structured outputs page found the requirement we had missed: a JSON-mode prompt must also ask for JSON. One line in the system prompt gave clean JSON with thinking disabled. Two lessons: read the provider's docs again before reporting a provider problem, and a minimal reproduction must keep whatever triggers the bug. Strict parsing is what made the problem visible: no record was ever written from a bad reply.
+Evidence: `dev/tool-feedback.md` (2026-11-02), ADR-0014 (note of 2026-11-02), `dev/backlog.md`.
