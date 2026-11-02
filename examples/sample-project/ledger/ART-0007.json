@@ -1,0 +1,145 @@
+{
+  "schema_version": "1.2",
+  "id": "ART-0007",
+  "title": "Tallyleaf tech sync",
+  "source": {
+    "type": "file",
+    "name": "tech-sync-2026-06-09.md"
+  },
+  "artifact_date": "2026-06-09",
+  "media_type": "text/markdown",
+  "size_bytes": 1384,
+  "content_hash": "sha256:c6c447daa83a0b6987c0e5aebf5c00226511a98a8d9cdc32b0476df617f7c43f",
+  "stored_path": "artifacts/ART-0007-tech-sync-2026-06-09.md",
+  "status": "processed",
+  "created_at": "2026-11-01T23:16:04Z",
+  "updated_at": "2026-11-02T00:48:02Z",
+  "governor": {
+    "model": "command-a-plus-05-2026",
+    "prompt_version": "governor.v1",
+    "attempts": 1,
+    "definitions": [
+      "decision-log.v1",
+      "risk-register.v1"
+    ],
+    "run_id": "98b81324-173e-4c44-9e4c-43919265e5c0",
+    "work_orders": [
+      {
+        "register": "decision-log",
+        "count": 3,
+        "routed": true
+      },
+      {
+        "register": "risk-register",
+        "count": 1,
+        "routed": false
+      }
+    ]
+  },
+  "produced": [
+    {
+      "register": "decision-log",
+      "work_order": 1,
+      "record_id": "DEC-0004",
+      "change": "update",
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v2",
+      "schema_version": "1.0",
+      "comparison": {
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-comparator.v1",
+        "attempts": 1,
+        "candidates": [
+          {
+            "record_id": "DEC-0004",
+            "score": 0.744995
+          },
+          {
+            "record_id": "DEC-0001",
+            "score": 0.017049424
+          },
+          {
+            "record_id": "DEC-0003",
+            "score": 0.0064989934
+          }
+        ]
+      }
+    },
+    {
+      "register": "decision-log",
+      "work_order": 2,
+      "record_id": "DEC-0006",
+      "change": "supersession",
+      "related_id": "DEC-0005",
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v2",
+      "schema_version": "1.0",
+      "comparison": {
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-comparator.v1",
+        "attempts": 1,
+        "candidates": [
+          {
+            "record_id": "DEC-0005",
+            "score": 0.7157932
+          },
+          {
+            "record_id": "DEC-0001",
+            "score": 0.05423169
+          },
+          {
+            "record_id": "DEC-0004",
+            "score": 0.028523367
+          }
+        ]
+      }
+    },
+    {
+      "register": "decision-log",
+      "work_order": 3,
+      "record_id": "DEC-0007",
+      "change": "new",
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v2+registrar-retry.v1",
+      "schema_version": "1.0",
+      "comparison": {
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-comparator.v1",
+        "attempts": 1,
+        "candidates": [
+          {
+            "record_id": "DEC-0006",
+            "score": 0.10988485
+          },
+          {
+            "record_id": "DEC-0001",
+            "score": 0.08398288
+          },
+          {
+            "record_id": "DEC-0003",
+            "score": 0.07088036
+          }
+        ]
+      }
+    }
+  ],
+  "rejected": [],
+  "history": [
+    {
+      "at": "2026-11-01T23:16:04Z",
+      "status": "received",
+      "by": "sensor"
+    },
+    {
+      "at": "2026-11-01T23:16:04Z",
+      "status": "accepted",
+      "by": "sensor"
+    },
+    {
+      "at": "2026-11-02T00:48:02Z",
+      "status": "processed",
+      "by": "governor",
+      "run_id": "98b81324-173e-4c44-9e4c-43919265e5c0"
+    }
+  ]
+}

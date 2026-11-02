@@ -1,0 +1,150 @@
+{
+  "schema_version": "1.2",
+  "id": "ART-0006",
+  "title": "Tallyleaf greenhouse inventory app: project board meeting",
+  "source": {
+    "type": "file",
+    "name": "project-board-2026-05-26.md"
+  },
+  "artifact_date": "2026-05-26",
+  "media_type": "text/markdown",
+  "size_bytes": 1880,
+  "content_hash": "sha256:b5311602197be16c006804916bccc20bd726d959f3582348e43cbebc01f8e08e",
+  "stored_path": "artifacts/ART-0006-project-board-2026-05-26.md",
+  "status": "processed",
+  "created_at": "2026-11-01T23:16:03Z",
+  "updated_at": "2026-11-02T00:14:28Z",
+  "governor": {
+    "model": "command-a-plus-05-2026",
+    "prompt_version": "governor.v1",
+    "attempts": 1,
+    "definitions": [
+      "decision-log.v1",
+      "risk-register.v1"
+    ],
+    "run_id": "23feff57-1c1d-4cb7-83b7-107f174fd8c3",
+    "work_orders": [
+      {
+        "register": "decision-log",
+        "count": 3,
+        "routed": true
+      },
+      {
+        "register": "risk-register",
+        "count": 1,
+        "routed": false
+      }
+    ]
+  },
+  "produced": [
+    {
+      "register": "decision-log",
+      "work_order": 1,
+      "record_id": "DEC-0003",
+      "change": "update",
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v2",
+      "schema_version": "1.0",
+      "comparison": {
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-comparator.v1",
+        "attempts": 1,
+        "candidates": [
+          {
+            "record_id": "DEC-0003",
+            "score": 0.6558646
+          },
+          {
+            "record_id": "DEC-0001",
+            "score": 0.011047408
+          }
+        ]
+      }
+    },
+    {
+      "register": "decision-log",
+      "work_order": 2,
+      "record_id": "DEC-0004",
+      "change": "new",
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v2",
+      "schema_version": "1.0",
+      "comparison": {
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-comparator.v1",
+        "attempts": 1,
+        "candidates": [
+          {
+            "record_id": "DEC-0001",
+            "score": 0.020737903
+          },
+          {
+            "record_id": "DEC-0003",
+            "score": 0.010112563
+          }
+        ]
+      }
+    },
+    {
+      "register": "decision-log",
+      "work_order": 4,
+      "record_id": "DEC-0005",
+      "change": "new",
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v2",
+      "schema_version": "1.0",
+      "comparison": {
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-comparator.v1",
+        "attempts": 1,
+        "candidates": [
+          {
+            "record_id": "DEC-0001",
+            "score": 0.007257791
+          },
+          {
+            "record_id": "DEC-0003",
+            "score": 0.0037385128
+          },
+          {
+            "record_id": "DEC-0004",
+            "score": 0.0012092434
+          }
+        ]
+      }
+    }
+  ],
+  "rejected": [],
+  "history": [
+    {
+      "at": "2026-11-01T23:16:03Z",
+      "status": "received",
+      "by": "sensor"
+    },
+    {
+      "at": "2026-11-01T23:16:03Z",
+      "status": "accepted",
+      "by": "sensor"
+    },
+    {
+      "at": "2026-11-01T23:16:14Z",
+      "status": "failed",
+      "by": "governor",
+      "run_id": "19abb35e-b01e-4322-87ec-eef4d057be8b",
+      "error_type": "LLMUnavailableError"
+    },
+    {
+      "at": "2026-11-01T23:28:52Z",
+      "status": "failed",
+      "by": "governor",
+      "run_id": "e8083665-5a93-415f-b341-3da571628b92",
+      "error_type": "LLMUnavailableError"
+    },
+    {
+      "at": "2026-11-02T00:14:28Z",
+      "status": "processed",
+      "by": "governor",
+      "run_id": "23feff57-1c1d-4cb7-83b7-107f174fd8c3"
+    }
+  ]
+}

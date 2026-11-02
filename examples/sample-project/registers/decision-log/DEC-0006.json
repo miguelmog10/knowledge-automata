@@ -1,0 +1,64 @@
+{
+  "id": "DEC-0006",
+  "register": "decision-log",
+  "schema_version": "1.0",
+  "record_status": "active",
+  "revision": 1,
+  "created_at": "2026-11-02T00:48:02Z",
+  "updated_at": "2026-11-02T00:48:02Z",
+  "content": {
+    "title": "Offline count conflict handling",
+    "statement": "The app will keep the most recent count and ask the grower to confirm which count is correct.",
+    "context": "Conflicting offline counts caused the app to double batch counts when multiple growers counted the same bench.",
+    "rationale": "To fix the failure where conflicting offline counts caused the app to double batch counts.",
+    "decided_by": [
+      "Marc Gagnon",
+      "Sofia Ramos"
+    ],
+    "impacts": "The app will display both counts and require grower confirmation, preventing double counting."
+  },
+  "sources": [
+    {
+      "artifact_id": "ART-0007",
+      "artifact_date": "2026-06-09",
+      "excerpt": "- Offline count conflicts: keep the most recent count and ask the grower to confirm.",
+      "added_at": "2026-11-02T00:48:02Z"
+    },
+    {
+      "artifact_id": "ART-0007",
+      "artifact_date": "2026-06-09",
+      "excerpt": "Marc and Sofia agreed to replace that rule: the app now keeps the most recent count and shows both counts to the grower, who confirms which one is right.",
+      "added_at": "2026-11-02T00:48:02Z"
+    },
+    {
+      "artifact_id": "ART-0007",
+      "artifact_date": "2026-06-09",
+      "excerpt": "Adding conflicting counts together failed in testing.",
+      "added_at": "2026-11-02T00:48:02Z"
+    }
+  ],
+  "relations": {
+    "supersedes": [
+      "DEC-0005"
+    ]
+  },
+  "history": [
+    {
+      "revision": 1,
+      "at": "2026-11-02T00:48:02Z",
+      "change": "supersession",
+      "artifact_id": "ART-0007",
+      "fields": [
+        "title",
+        "statement",
+        "context",
+        "rationale",
+        "decided_by",
+        "impacts"
+      ],
+      "related_id": "DEC-0005",
+      "model": "command-a-plus-05-2026",
+      "prompt_version": "decision-registrar.v2"
+    }
+  ]
+}
