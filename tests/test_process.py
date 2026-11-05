@@ -34,9 +34,9 @@ from knowledge_automata.storage.work_order_store import WorkOrderStore
 RUN_ID = "7d1c6a52-3b0e-4c47-9a57-0e6f2d1f9a10"
 OTHER_RUN_ID = "0b6c1f0e-8c1d-4f57-b3a2-5d9e6c4a7f21"
 SENTINEL = "SENTINEL-ARTIFACT-91c3 do not print this line"
-COMPARATOR_RETRY = "decision-comparator.v1+comparator-retry.v1"
+COMPARATOR_RETRY = "decision-comparator.v2+comparator-retry.v2"
 FOUND = (
-    "in 1 attempt (model fake-chat, prompt governor.v1, definitions decision-log.v1, "
+    "in 1 attempt (model fake-chat, prompt governor.v2, definitions decision-log.v1, "
     "risk-register.v1, thinking enabled)"
 )
 
@@ -327,7 +327,7 @@ def test_the_four_classifications_from_an_empty_memory_folder(memory, clock, cap
         f"Found 1 work order in ART-0001 {FOUND}: 1 decision-log",
         'Work order 1 of 1, decision-log: "We agreed to build one Flutter app for iOS and '
         'Android."',
-        "  Drafted in 1 attempt (prompt decision-registrar.v2)",
+        "  Drafted in 1 attempt (prompt decision-registrar.v3)",
         "  No active decisions to compare with: recorded as new without a comparison",
         "  Recorded DEC-0001 as a new decision",
         "Recorded 1 of 1 routed work order; 0 rejected; 0 not routed",
@@ -341,7 +341,7 @@ def test_the_four_classifications_from_an_empty_memory_folder(memory, clock, cap
     out = capsys.readouterr().out.splitlines()
     assert out[4:7] == [
         "  Compared with 1 active decision; candidates: DEC-0001 (0.08)",
-        "  Classified as new in 1 attempt (prompt decision-comparator.v1): Another topic.",
+        "  Classified as new in 1 attempt (prompt decision-comparator.v2): Another topic.",
         "  Recorded DEC-0002 as a new decision",
     ]
     assert [call.operation for call in build.fake.calls] == [
@@ -368,7 +368,7 @@ def test_the_four_classifications_from_an_empty_memory_folder(memory, clock, cap
     assert out[4:7] == [
         "  Compared with 2 active decisions; candidates: DEC-0002 (0.93), DEC-0001 (0.08)",
         "  Classified as reaffirmation of DEC-0001 in 1 attempt "
-        "(prompt decision-comparator.v1): Says it again.",
+        "(prompt decision-comparator.v2): Says it again.",
         "  Reaffirmed DEC-0001 (revision 2): added 1 source",
     ]
 
@@ -380,7 +380,7 @@ def test_the_four_classifications_from_an_empty_memory_folder(memory, clock, cap
     assert out[4:9] == [
         "  Compared with 2 active decisions; candidates: DEC-0002 (0.93), DEC-0001 (0.08)",
         "  Classified as update of DEC-0002 in 1 attempt "
-        "(prompt decision-comparator.v1): Same ladder, with a reason.",
+        "(prompt decision-comparator.v2): Same ladder, with a reason.",
         "  Updated DEC-0002 to revision 2: filled rationale",
         "  Kept the existing statement in DEC-0002 (the draft's wording differs; a change of "
         "substance would be a supersession)",
@@ -412,7 +412,7 @@ def test_the_four_classifications_from_an_empty_memory_folder(memory, clock, cap
     ]
     assert [source["artifact_id"] for source in flutter["sources"]] == ["ART-0001", "ART-0003"]
     assert flutter["content"] == FLUTTER["content"]
-    assert flutter["history"][0]["prompt_version"] == "decision-registrar.v2"
+    assert flutter["history"][0]["prompt_version"] == "decision-registrar.v3"
 
     assert ladder["revision"] == 2 and ladder["record_status"] == "active"
     assert ladder["content"] == LADDER["content"] | {"rationale": "Growers learn one screen."}
@@ -435,7 +435,7 @@ def test_the_four_classifications_from_an_empty_memory_folder(memory, clock, cap
             "record_id": "DEC-0001",
             "change": "new",
             "model": "fake-chat",
-            "prompt_version": "decision-registrar.v2",
+            "prompt_version": "decision-registrar.v3",
             "schema_version": "1.0",
             "work_order": 1,
         }
@@ -455,7 +455,7 @@ def test_the_four_classifications_from_an_empty_memory_folder(memory, clock, cap
     assert superseding["record_id"] == "DEC-0003" and superseding["related_id"] == "DEC-0001"
     assert superseding["comparison"] == {
         "model": "fake-chat",
-        "prompt_version": "decision-comparator.v1",
+        "prompt_version": "decision-comparator.v2",
         "attempts": 1,
         "candidates": [
             {"record_id": "DEC-0002", "score": 0.93},
@@ -795,7 +795,7 @@ def test_a_reason_cp1252_cannot_encode_prints_as_utf8(memory, clock, monkeypatch
     assert process(build, clock, memory, "ART-0002") == 0
     out.flush()
     printed = out.buffer.getvalue().decode("utf-8")
-    assert f"(prompt decision-comparator.v1): {reason}" in printed
+    assert f"(prompt decision-comparator.v2): {reason}" in printed
     assert "Recorded DEC-0002 as a new decision" in printed
     assert out.encoding == err.encoding == "utf-8"
 
@@ -869,13 +869,13 @@ def test_two_decisions_and_a_risk_record_both_decisions_and_list_the_risk(memory
         f"Found 3 work orders in ART-0006 {FOUND}: 2 decision-log, 1 risk-register "
         "(no Registrar yet, not routed)",
         f'Work order 1 of 3, decision-log: "{REPORTS_QUOTE}"',
-        "  Drafted in 1 attempt (prompt decision-registrar.v2)",
+        "  Drafted in 1 attempt (prompt decision-registrar.v3)",
         "  No active decisions to compare with: recorded as new without a comparison",
         "  Recorded DEC-0001 as a new decision",
         f'Work order 2 of 3, decision-log: "{STALL_QUOTE}"',
-        "  Drafted in 1 attempt (prompt decision-registrar.v2)",
+        "  Drafted in 1 attempt (prompt decision-registrar.v3)",
         "  Compared with 1 active decision; candidates: DEC-0001 (0.01)",
-        "  Classified as new in 1 attempt (prompt decision-comparator.v1): Another topic.",
+        "  Classified as new in 1 attempt (prompt decision-comparator.v2): Another topic.",
         "  Recorded DEC-0002 as a new decision",
         "Work order 3 of 3, risk-register: not routed (no Registrar yet)",
         "Recorded 2 of 2 routed work orders; 0 rejected; 1 not routed",

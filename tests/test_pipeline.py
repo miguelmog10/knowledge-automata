@@ -12,12 +12,12 @@ from knowledge_automata.storage.ledger_store import LedgerStore
 NOW = datetime(2026, 10, 26, 14, 3, 12, tzinfo=UTC)
 
 
-def test_decision_registrar_uses_the_v2_prompt_with_work_orders():
+def test_decision_registrar_uses_the_v3_prompt_with_work_orders():
     registrar = pipeline.decision_registrar()
     assert registrar.agent == "decision-registrar"
     assert registrar.spec.name == "decision-log"
-    assert registrar.prompt.version == "decision-registrar.v2"
-    assert registrar.retry_version == "decision-registrar.v2+registrar-retry.v1"
+    assert registrar.prompt.version == "decision-registrar.v3"
+    assert registrar.retry_version == "decision-registrar.v3+registrar-retry.v2"
     assert registrar.takes_work_order
 
 
@@ -26,11 +26,20 @@ def test_only_the_decision_log_has_a_registrar():
     assert pipeline.REGISTER_NAMES == ("decision-log", "risk-register")
 
 
-def test_the_governor_uses_its_v1_prompts_and_every_definition():
+def test_the_governor_uses_its_v2_prompts_and_every_definition():
     governor = pipeline.governor()
     assert governor.agent == "governor"
-    assert governor.prompt.version == "governor.v1"
+    assert governor.prompt.version == "governor.v2"
+    assert governor.retry_version == "governor.v2+governor-retry.v2"
     assert governor.definition_versions == ("decision-log.v1", "risk-register.v1")
+
+
+def test_the_comparator_uses_its_v2_prompts():
+    comparator = pipeline.decision_comparator()
+    assert comparator.agent == "comparator"
+    assert comparator.spec.name == "decision-log"
+    assert comparator.prompt.version == "decision-comparator.v2"
+    assert comparator.retry_prompt.version == "comparator-retry.v2"
 
 
 def test_thinking_defaults_to_enabled_unless_set():

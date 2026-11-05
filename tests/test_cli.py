@@ -28,8 +28,8 @@ RUN_ID = "7d1c6a52-3b0e-4c47-9a57-0e6f2d1f9a10"
 NOW = datetime(2026, 10, 26, 14, 3, 12, tzinfo=UTC)
 ARTIFACT_SENTINEL = "SENTINEL-ARTIFACT-4b81 do not print this line"
 PROMPT_SENTINEL = "SENTINEL-PROMPT-c27e"
-RETRY_VERSION = "decision-registrar.v2+registrar-retry.v1"
-GOVERNOR_RETRY = "governor.v1+governor-retry.v1"
+RETRY_VERSION = "decision-registrar.v3+registrar-retry.v2"
+GOVERNOR_RETRY = "governor.v2+governor-retry.v2"
 QUOTE = "Supplier B is rejected for this season."
 AGREED = "the group agreed to buy the drip irrigation kit from supplier A"
 RISK = "Ana will call the permits office every week"
@@ -218,10 +218,10 @@ def test_process_stores_the_record_the_views_the_work_orders_and_the_ledger(
     lines = out.splitlines()
     assert lines[:7] == [
         f"Run ID: {RUN_ID}",
-        "Found 1 work order in ART-0001 in 1 attempt (model fake-chat, prompt governor.v1, "
+        "Found 1 work order in ART-0001 in 1 attempt (model fake-chat, prompt governor.v2, "
         "definitions decision-log.v1, risk-register.v1, thinking enabled): 1 decision-log",
         f'Work order 1 of 1, decision-log: "{QUOTE}"',
-        "  Drafted in 1 attempt (prompt decision-registrar.v2)",
+        "  Drafted in 1 attempt (prompt decision-registrar.v3)",
         "  No active decisions to compare with: recorded as new without a comparison",
         "  Recorded DEC-0001 as a new decision",
         "Recorded 1 of 1 routed work order; 0 rejected; 0 not routed",
@@ -238,7 +238,7 @@ def test_process_stores_the_record_the_views_the_work_orders_and_the_ledger(
     assert stored["created_at"] == "2026-10-26T14:03:12Z"
     assert stored["sources"][0]["artifact_date"] == "2026-03-12"
     assert stored["history"][0]["model"] == "fake-chat"
-    assert stored["history"][0]["prompt_version"] == "decision-registrar.v2"
+    assert stored["history"][0]["prompt_version"] == "decision-registrar.v3"
 
     page = (memory / "views" / "decision-log" / "DEC-0001.md").read_text(encoding="utf-8")
     assert "### [ART-0001](../../artifacts/ART-0001-steering-group.md), 2026-03-12\n" in page
@@ -253,7 +253,7 @@ def test_process_stores_the_record_the_views_the_work_orders_and_the_ledger(
     assert file["run_id"] == RUN_ID
     assert file["governor"] == {
         "model": "fake-chat",
-        "prompt_version": "governor.v1",
+        "prompt_version": "governor.v2",
         "attempts": 1,
         "definitions": ["decision-log.v1", "risk-register.v1"],
     }
@@ -276,7 +276,7 @@ def test_process_stores_the_record_the_views_the_work_orders_and_the_ledger(
             "record_id": "DEC-0001",
             "change": "new",
             "model": "fake-chat",
-            "prompt_version": "decision-registrar.v2",
+            "prompt_version": "decision-registrar.v3",
             "schema_version": stored["schema_version"],
             "work_order": 1,
         }
@@ -425,7 +425,7 @@ def test_an_artifact_with_nothing_to_record_exits_0(ingested, memory, capsys):
     assert process(build, memory) == 0
     lines = capsys.readouterr().out.splitlines()
     assert lines[1] == (
-        "Found no work orders in ART-0001 in 1 attempt (model fake-chat, prompt governor.v1, "
+        "Found no work orders in ART-0001 in 1 attempt (model fake-chat, prompt governor.v2, "
         "definitions decision-log.v1, risk-register.v1, thinking enabled)"
     )
     assert lines[2] == "The Governor found nothing to record in ART-0001."
