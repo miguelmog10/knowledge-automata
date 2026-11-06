@@ -1,7 +1,8 @@
 name: Pages
 
 # Publishes the visual guide and the diagram sources it renders (ADR-0016).
-# Only docs/guide/index.html and docs/diagrams/*.md are published, never the rest of docs/.
+# # Only docs/guide/index.html, docs/guide/animation.html and docs/diagrams/*.md are published,
+# never the rest of docs/.
 # One-time setup: Settings, Pages, Source: GitHub Actions.
 
 on:
@@ -9,6 +10,7 @@ on:
     branches: [main]
     paths:
       - "docs/guide/index.html"
+      - "docs/guide/animation.html"
       - "docs/diagrams/*.md"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
@@ -33,6 +35,7 @@ jobs:
         run: |
           mkdir -p _site/guide _site/diagrams
           cp docs/guide/index.html _site/guide/index.html
+          cp docs/guide/animation.html _site/guide/animation.html
           cp docs/diagrams/*.md _site/diagrams/
           cat > _site/index.html <<'HTML'
           <!doctype html>
