@@ -22,7 +22,7 @@ Knowledge Automata is a general-purpose institutional memory for any group that 
 
 ## Status
 
-v0.1 in progress. Works today:
+[v0.0.1](https://github.com/miguelmog10/knowledge-automata/releases/tag/v0.0.1) is the first pre-release (see the [changelog](CHANGELOG.md)); v0.1 is in progress. Works today:
 
 - An LLM service layer on Cohere's SDK: Command, Embed and Rerank behind provider-neutral interfaces, with a metadata-only log of billed units, latency and request IDs.
 - The first end-to-end slice: one artifact goes through the Decision Registrar (specialist record keeper) on real Command calls and becomes one validated decision record, with generated Markdown views.

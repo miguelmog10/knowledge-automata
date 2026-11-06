@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-11-05
+2026-11-06
 
 ## Current phase
 
@@ -133,7 +133,13 @@ Handoffs 001 to 007 merged, the last as PR #15 (the Governor, orchestrator, squa
 
 - Handoff 008, the JSON instruction, then the v0.0.1 pre-release (`dev/handoffs/008-json-instruction.md`, on `feat/json-instruction`), designed by Miguel and Claude in chat on 2026-11-05. Main decisions: new versions of the six prompts the pipeline uses (`governor.v2`, `decision-registrar.v3`, `decision-comparator.v2` and the three retry prompts), each the previous version plus one last line asking for one JSON object, and nothing else changed; a conformance test that keeps the line in every prompt the pipeline uses; thinking stays enabled by default; a diagnostic of every agent with thinking disabled (a measurement) and enabled (a gate), then one real run on a new artifact, ART-0009, within 80 calls; the evaluation harness waits for its own step; an annotated `v0.0.1` tag and a GitHub pre-release after the merge, with a new `CHANGELOG.md`. The Risk Registrar is renumbered to handoff 009.
   - On the branch (Claude): the handoff and its inputs file, the six prompt files, tool feedback and backlog updates from the Cohere side quest, ADR-0016 accepted. Next: part 8A (Copilot, offline).
-  - Part 8A built (Copilot): the Governor, the Decision Registrar and the Comparator load the six new prompts; the comment on the thinking default gives today's reason (value unchanged); a conformance test, one case per agent built by the pipeline (the Registrars collected from `REGISTRARS`), checks that the prompt, the retry prompt, the Governor's rendered system text and every retry message end with the instruction; `decision-registrar.v1` stays frozen; the pipeline-level tests in `test_pipeline.py`, `test_cli.py` and `test_process.py` cite the new versions. 970 tests passing (951 before), every LLM call mocked. Next: Claude's review, then part 8B with Miguel's go.
+  - Part 8A built (Copilot): the Governor, the Decision Registrar and the Comparator load the six new prompts; the comment on the thinking default gives today's reason (value unchanged); a conformance test, one case per agent built by the pipeline (the Registrars collected from `REGISTRARS`), checks that the prompt, the retry prompt, the Governor's rendered system text and every retry message end with the instruction; `decision-registrar.v1` stays frozen; the pipeline-level tests in `test_pipeline.py`, `test_cli.py` and `test_process.py` cite the new versions. 970 tests passing (951 before), every LLM call mocked. Copilot credits: 137.6.
+  - Claude's review of 8A (2026-11-05): no findings; checks run in a clean copy rebuilt from the index (801 tests offline; the SDK tests ran in CI, all green). Miguel pushed the branch and opened a draft pull request.
+  - Part 8B, the evidence (2026-11-05 and 2026-11-06), 67 calls of the 80 budgeted (details in the handoff, section 9):
+    - A diagnostic of every agent (Claude's git-ignored script with its data file; requests checked offline to be identical to the agents'; one call per input, outside the event log), run by Miguel. Thinking disabled: the Governor's replies were clean but right on 4 of 8 artifacts, and the Decision Registrar (0 of 6 on artifacts with several items) and the Comparator (0 of 3) still wrote reasoning before the JSON, so the instruction is necessary but not sufficient without thinking. Thinking enabled, the gate: 26 of 26 first attempts and 3 of 3 retries clean, all matching except ART-0002, where the Governor also routed an untested-labels sentence as a risk (a diagnosed borderline, left to the evaluation set).
+    - Two more Governor timeouts at 180 s, both on ART-0006, which answered in 13.5 s and 26.8 s when rerun: every timeout so far was this request (backlog: streaming, per-agent timeouts).
+    - The real run on ART-0009 (run `13d7f5e8-71a0-499d-83f6-85c2e818ac66`, 11 calls): new `DEC-0008` and an update of `DEC-0007` (alternatives filled), and the risk kept as not routed, as expected; committed unedited.
+    - Docs (Claude): the handoff results, the sample project README, ADR-0014 amended, backlog, tool feedback, principles in practice. Next: part 8C, the changelog and the pre-release.
 
 ## Next
 

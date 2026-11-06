@@ -146,3 +146,55 @@ Claude puts the file in `runtime/inbox/` on the computer (git-ignored, never com
 ## 8. Out of scope
 
 Changing the thinking default; a token budget; the content fixes for `decided_on` and for an update that fills nothing; the Risk Registrar; the evaluation harness; logging `x-debug-trace-id` and Cohere's server time; streaming; per-agent timeouts; the SBOM and the release workflow (v0.1.0); the diagrams (no architecture change).
+
+## 9. Results (part 8B)
+
+Run by Miguel on 2026-11-05 and 2026-11-06 with SDK 7.3.0 and Command A+ (`command-a-plus-05-2026`). The diagnostic's reports are in `runtime/diagnostics/reports/` (git-ignored); the numbers that matter are below. 67 calls in all, within the cap of 80: 56 for the diagnostic (two of them timed out) and 11 for the real run.
+
+### 9.1 Pass 1: thinking disabled (a measurement)
+
+24 calls. C4 to C7 and the Comparator retry did not run, because their drafts had failed.
+
+| Inputs | Clean JSON | Matched | Output tokens | Latency |
+|---|---|---|---|---|
+| Governor, ART-0001 to ART-0008 | 8 of 8 | 4 of 8 | 4 to 156 (median 62) | 0.2 to 0.9 s |
+| Decision Registrar, one-quote orders (ART-0001 to ART-0005) | 5 of 5 | 4 of 5 (R-ART-0002: a quote failed the evidence check) | 161 to 322 | 0.7 to 1.1 s |
+| Decision Registrar, the Governor's orders (ART-0006, ART-0007) | **0 of 6** | 0 of 6 | 2,284 to 4,424 | 8.5 to 16.6 s |
+| Comparator, C1 to C3 | **0 of 3** | 0 of 3 | 376 to 1,165 | 1.6 to 4.5 s |
+| Retries (Governor, Registrar) | 1 of 2 | 1 of 2 | 117 and 2,476 | 0.6 and 8.7 s |
+
+Every unusable reply ended with `finish_reason` COMPLETE and did not start with `{`: 1,800 to 21,300 characters came before any JSON, the failure of handoff 006, Addendum A. The Governor's replies were clean but its counts were off on four artifacts: an extra risk in ART-0002, an extra decision in ART-0005, a missing decision in ART-0006 and a missing risk in ART-0007.
+
+**Finding: the instruction is necessary but not sufficient with thinking disabled.** It fixed the case of the 2026-11-02 reproduction (one decision, a short work order) but not the Registrar on artifacts with several items, nor the Comparator. Where the model has to judge, it seems to write that reasoning into the reply when its thinking is disabled (inferred from the replies' length and first character; the diagnostic never stores model text). Thinking disabled is not viable today for the Registrar and the Comparator on these inputs, and it lowered the Governor's recall. This is the third time one artifact gave a misleading result: the 2026-10-25 smoke check, the reduced schema of the reproduction, and "3 of 3" on ART-0003.
+
+### 9.2 Pass 2: thinking enabled (the gate)
+
+All 29 inputs answered, in five runs and 32 calls: two calls timed out, and one draft ran twice as a dependency of the Comparator retry.
+
+| Inputs | Clean JSON | Matched | Output tokens | Reasoning tokens (median) | Latency |
+|---|---|---|---|---|---|
+| Governor | 8 of 8 | 7 of 8 | 344 to 5,628 (median 2,185) | 2,094 | 1.7 to 24.4 s |
+| Decision Registrar | 11 of 11 | 11 of 11 | 1,393 to 3,136 (median 2,168) | 1,929 | 5.5 to 16.4 s |
+| Comparator | 7 of 7 | 7 of 7 | 184 to 782 (median 357) | 313 | 1.0 to 4.3 s |
+| Retries | 3 of 3 | 3 of 3 | 172 to 8,315 | 3,886 | 0.9 to 26.8 s |
+
+**The gate passes.** Every reply was clean JSON and passed its check. The Comparator gave the expected class all seven times (C2 and C4 as the expected class, not the accepted borderline). The QR code draft (ART-0006, order 2) invented no rationale or alternatives. Each retry agreed with its first attempt; the Governor's retry on ART-0006 found exactly the four expected items.
+
+- **G-ART-0002, a diagnosed borderline.** It returned (1, 1) in both passes, against (1, 0) expected. ART-0002 says "nobody has tested printed labels in a wet greenhouse", which fits the risk definition (an uncertain event); `governor.v1` returned (1, 0) in the handoff 007 spike. One sample per pass cannot tell the new line from ordinary variation. The expected results were not changed after the fact; the evaluation set decides.
+- **The Governor on ART-0006 timed out again, twice:** the first attempt and the retry message, each at 180 s. The same requests then answered in 13.5 s (step A, 600 s timeout, 2,603 reasoning tokens) and 26.8 s (step D, 900 s timeout, 8,138 reasoning tokens). Every timeout in handoffs 007 and 008, four calls, was the Governor on ART-0006, two of them with `governor.v1`; every other call finished, the slowest in 27 s. So the instruction did not cause it, and a general slowdown is unlikely. Very long reasoning on this input is one explanation, a stall at Cohere for this request another. A call that times out returns nothing, so only streaming can tell them apart (backlog). A run that stops this way writes nothing and can be rerun.
+
+### 9.3 The real run on ART-0009
+
+Run `13d7f5e8-71a0-499d-83f6-85c2e818ac66` on 2026-11-06, thinking enabled, 180 s timeout: 11 calls (5 chat, 4 embed, 2 rerank), all OK. The Governor answered in 10.4 s. The outputs were committed unedited.
+
+| Work order | Expected | Actual |
+|---|---|---|
+| 1, decision | new `DEC-0008` | new `DEC-0008`: first release on 21 July 2026, for the pilot growers only, with the stated rationale; `decided_by` "the board", `decided_on` 2026-06-30. Its candidates were `DEC-0004`, `DEC-0001` and `DEC-0006` (0.08 or less), so the related-topic borderline did not arise |
+| 2, decision | update of `DEC-0007`, alternatives filled | update of `DEC-0007` to revision 2: alternatives filled (translating every screen; launching in English only), and `impacts` ("available in both English and French at launch"). That is the accepted borderline: an impact that restates the decision, not the September consequence of an alternative |
+| 3, risk | not routed | not routed: the first app store review could delay the release. Its quotes are the slip and Marc's warning, not Sofia's test build, the agreed response |
+
+The Ledger entry is `processed` (schema 1.2) and cites `decision-registrar.v3`; `views --check` passes. Billed tokens: Governor 1,234 input and 3,256 output; drafts 2,001 and 3,779; comparisons 2,572 and 827; Embed 737 input; Rerank 1,114 input.
+
+### 9.4 What follows
+
+In the backlog: the thinking comparison starts from these reports, and thinking disabled needs prompt work for judging tasks before a fair comparison; streaming moves up, as the only way to see what a stuck call does; the ART-0002 risk and the weak impact go to the evaluation set. For handoff 009: the Governor's risk work order left out the response, so the Risk Registrar should look for the response in the artifact, not only in the work order's quotes.
