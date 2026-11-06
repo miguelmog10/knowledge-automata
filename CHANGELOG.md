@@ -2,7 +2,7 @@
 
 All notable changes to Knowledge Automata are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions 0.0.x are pre-releases: the pipeline works on real meetings, and anything can still change.
 
-## [0.0.1] - YYYY-MM-DD
+## [0.0.1] - 2026-11-06
 
 The first pre-release, after handoffs 001 to 008: a whole meeting goes in, and every decision in it becomes a checked record in an institutional memory that keeps its sources and history.
 
