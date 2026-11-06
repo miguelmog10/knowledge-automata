@@ -19,6 +19,6 @@ Short records of significant decisions: why the system looks the way it does. Ne
 | [0013](0013-record-storage-json-files.md) | Record storage: one JSON file per record | Accepted (amended 2026-10-30) |
 | [0014](0014-registrar-drafting-loop.md) | Registrar drafting loop | Accepted (amended 2026-10-31) |
 | [0015](0015-artifact-ledger-storage-and-sensor-checks.md) | Artifact Ledger storage and Sensor checks | Accepted (amended 2026-11-01) |
-| [0016](0016-guide-on-github-pages.md) | Guide published with GitHub Pages | Proposed |
+| [0016](0016-guide-on-github-pages.md) | Guide published with GitHub Pages | Accepted |
 | [0017](0017-comparator-reconciliation.md) | Comparator (reconciliation): compare checked drafts before writing | Accepted |
 | [0018](0018-governor-work-orders.md) | Governor (orchestrator): work orders and resumable runs | Accepted |

@@ -234,3 +234,23 @@ Suggested improvement (Claude): say in the bridge's documentation or result that
 Note: the cause of the 2026-10-31 entry was on our side. Cohere's structured outputs page asks, in an Important box, that a JSON-mode request also tell the model to generate JSON. None of our prompts did; they relied on the schema alone. A standalone reproduction (Miguel and Claude, published as [cohere-feedback](https://github.com/miguelmog10/cohere-feedback)) with the public `decision-registrar.v1` prompt and ART-0003, thinking disabled: with the full schema, prose then JSON, `finish_reason` COMPLETE (1,265 output tokens); with one line added at the end of the system prompt, "Reply with one JSON object that matches the response schema, and nothing else.", clean JSON three times out of three (272 output tokens); with a reduced four-field schema, clean even without the line. Thinking enabled was clean in every variant (1,165 to 2,214 output tokens). One model, SDK 7.3.0, one prompt and one artifact.
 Suggested improvement: this replaces the one in the 2026-10-31 entry. The docs warn that without the instruction the model may generate endlessly, but what we saw was a normal, complete reply with prose first, and only with the larger schema. The page does not mention reasoning models or the thinking setting; a note on both would help. For us: add the line to every JSON-mode prompt (backlog).
 Shared: Cohere's Discord, #api-discussions, 2026-11-02 ([thread](https://discord.com/channels/954421988141711382/1566840867090600018); join the Cohere server to open it).
+
+### 2026-11-02: Cohere Chat API reference, reasoning tokens (missing)
+
+Note: with thinking enabled, the response's `usage.tokens` includes `reasoning_tokens` (for example 1,189 of 1,421 output tokens in the side-quest reproduction), but the Chat API reference does not list the field under `usage`. This replaces the 2026-10-31 entry's "none for Cohere": the field is returned, it is just not documented.
+Suggested improvement: list `reasoning_tokens` in the API reference, say whether it is part of the billed output tokens, and add it to the SDK's typed usage model.
+
+### 2026-11-02: Cohere Chat API, response headers (missing)
+
+Note: every chat reply carries an `x-debug-trace-id` header, different from the body `id`, and `x-envoy-upstream-service-time` (milliseconds behind Cohere's proxy: 961 ms against 1.2 s measured at the client in one call). Neither is documented, so it is unclear which ID Cohere support needs, or whether the server time is stable enough to log. The SDK exposes headers only through `client.with_raw_response.chat(...)`. Found in the Cohere side quest; logging both is a backlog item.
+Suggested improvement: document the headers a client should keep for support requests, and which of them identifies a request.
+
+### 2026-11-06: Cohere JSON mode with thinking disabled, even with the instruction (finding)
+
+Note: handoff 008 added the JSON instruction that Cohere's structured outputs page asks for to every JSON-mode prompt, as the last line, with `response_format` `json_object` and a schema. With Command A+ and thinking disabled, the replies were still not JSON from their first character for the Decision Registrar on artifacts with several decisions (6 of 6) and for the Comparator (3 of 3): `finish_reason` COMPLETE, 376 to 4,424 output tokens, and 1,800 to 21,300 characters before any JSON. Short tasks passed (the Governor 8 of 8, one-quote drafts 5 of 5). With thinking enabled, every reply was clean (29 of 29). The diagnostic stores no model text, so the content of those replies is inferred, not seen. The 2026-11-02 reproduction (one prompt, one artifact) had suggested the instruction was enough.
+Suggested improvement: say in the structured outputs and reasoning docs whether JSON mode constrains the reply from its first token when thinking is disabled, and recommend thinking for reasoning models in JSON mode if it does not.
+
+### 2026-11-06: Cohere Chat API, one request that intermittently returns nothing (open)
+
+Note: the Governor's request for one sample artifact (ART-0006) timed out four times at 60 s or 180 s (handoffs 007 and 008, two prompt versions), and answered in 13.5 to 26.8 s the other times, with 2,603 to 8,138 reasoning tokens. No other call has timed out. A non-streaming call that times out returns no ID or headers, so there is nothing to give Cohere support. Next step on our side: streaming (backlog).
+Suggested improvement: document a server-side limit on reasoning length or generation time, and whether a request the client abandons is billed.

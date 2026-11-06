@@ -1,0 +1,105 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "ART-0009",
+  "created_at": "2026-11-06T10:54:36Z",
+  "updated_at": "2026-11-06T10:54:36Z",
+  "run_id": "13d7f5e8-71a0-499d-83f6-85c2e818ac66",
+  "governor": {
+    "model": "command-a-plus-05-2026",
+    "prompt_version": "governor.v2",
+    "attempts": 1,
+    "definitions": [
+      "decision-log.v1",
+      "risk-register.v1"
+    ]
+  },
+  "max_items": 10,
+  "orders": [
+    {
+      "number": 1,
+      "register": "decision-log",
+      "label": "Decision: the board set the first release for 21 July 2026,...",
+      "evidence": [
+        "Decision: the board set the first release for 21 July 2026, for the pilot growers only.",
+        "Other greenhouses join after the pilot review in September."
+      ],
+      "state": "recorded",
+      "produced": {
+        "register": "decision-log",
+        "record_id": "DEC-0008",
+        "change": "new",
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-registrar.v3",
+        "schema_version": "1.0",
+        "comparison": {
+          "model": "command-a-plus-05-2026",
+          "prompt_version": "decision-comparator.v2",
+          "attempts": 1,
+          "candidates": [
+            {
+              "record_id": "DEC-0004",
+              "score": 0.07982141
+            },
+            {
+              "record_id": "DEC-0001",
+              "score": 0.051608358
+            },
+            {
+              "record_id": "DEC-0006",
+              "score": 0.036808893
+            }
+          ]
+        }
+      },
+      "rejected": []
+    },
+    {
+      "number": 2,
+      "register": "decision-log",
+      "label": "The board kept the plan to launch the count screen and the...",
+      "evidence": [
+        "The board kept the plan to launch the count screen and the status picker in English and French."
+      ],
+      "state": "recorded",
+      "produced": {
+        "register": "decision-log",
+        "record_id": "DEC-0007",
+        "change": "update",
+        "model": "command-a-plus-05-2026",
+        "prompt_version": "decision-registrar.v3",
+        "schema_version": "1.0",
+        "comparison": {
+          "model": "command-a-plus-05-2026",
+          "prompt_version": "decision-comparator.v2",
+          "attempts": 1,
+          "candidates": [
+            {
+              "record_id": "DEC-0007",
+              "score": 0.6141842
+            },
+            {
+              "record_id": "DEC-0001",
+              "score": 0.03822891
+            },
+            {
+              "record_id": "DEC-0006",
+              "score": 0.021884477
+            }
+          ]
+        }
+      },
+      "rejected": []
+    },
+    {
+      "number": 3,
+      "register": "risk-register",
+      "label": "If the build is rejected, the release could slip past 21...",
+      "evidence": [
+        "If the build is rejected, the release could slip past 21 July.",
+        "Marc warned that the first app store review could take more than a week."
+      ],
+      "state": "not-routed",
+      "rejected": []
+    }
+  ]
+}

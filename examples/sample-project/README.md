@@ -1,6 +1,6 @@
 # Sample project: Tallyleaf
 
-Tallyleaf is a small team building a mobile app for plant inventory in commercial greenhouses. Its project board meets regularly, and this folder is the team's institutional memory as Knowledge Automata keeps it. It follows the team's decisions over eight meetings and status updates so far and will grow into a small evaluation set with expected records.
+Tallyleaf is a small team building a mobile app for plant inventory in commercial greenhouses. Its project board meets regularly, and this folder is the team's institutional memory as Knowledge Automata keeps it. It follows the team's decisions over nine meetings and status updates so far and will grow into a small evaluation set with expected records.
 
 The team, the app and the meetings are fictional.
 
@@ -83,6 +83,24 @@ Every work order pointed to the expected item, and the items meant to be left ou
 | ART-0006 | 1,267, 3,383 | 3,088, 6,839 | 3,407, 1,145 | 611 | 744 |
 | ART-0007 | 1,160, 4,696 | 3,805, 9,376 | 3,744, 1,356 | 860 | 1,164 |
 | ART-0008 | 924, 300 | none | none | none | none |
+
+### The JSON instruction: ART-0009 (handoff 008)
+
+One more meeting was written for handoff 008: the board meeting that ART-0008 announced, with a new decision on a topic close to an existing record, a confirmation that adds the alternatives the team set aside, a risk with its response, an open question and actions. It was ingested and processed on 2026-11-06 with the new prompt versions, each ending with an instruction to reply with one JSON object (`governor.v2`, `decision-registrar.v3`, `decision-comparator.v2`), thinking enabled. Everything was committed as written, without edits.
+
+| Artifact | Meeting | Run ID | Work orders (decision, risk) | Calls |
+|---|---|---|---|---|
+| [ART-0009](artifacts/ART-0009-project-board-2026-06-30.md) | project board, 30 June | `13d7f5e8-71a0-499d-83f6-85c2e818ac66` | 2, 1 (expected 2, 1) | 11 |
+
+| Work order | Expected | Actual |
+|---|---|---|
+| 1 | new `DEC-0008`, the first release date, `decided_by` "the board" or absent, `decided_on` 2026-06-30 | new `DEC-0008`: first release on 21 July 2026 for the pilot growers only, with the stated rationale; `decided_by` "the board", `decided_on` 2026-06-30 |
+| 2 | update of `DEC-0007`, alternatives filled | update of `DEC-0007`, revision 2: alternatives filled (translating every screen; launching in English only), **and `impacts`**, which restates the decision |
+| 3 | not routed (risk) | not routed: the first app store review could delay the release |
+
+**What the run shows.** Every item matched, and the open question about label printers and the actions were left out. The release date was not mistaken for the launch decision: `DEC-0007` was not among its candidates, while for the confirmation it ranked first at 0.61. Two notes for the evaluation set: the `impacts` filled in `DEC-0007` only restates the decision, and the risk work order quotes the warning but not the agreed response (Sofia's test build), which the Risk Registrar (handoff 009) will need.
+
+**Calls and tokens.** 11 calls (5 chat, 4 Embed, 2 Rerank), all on the first attempt; the Governor answered in 10.4 s. Billed tokens: Governor 1,234 input and 3,256 output; drafts 2,001 and 3,779; comparisons 2,572 and 827; Embed 737 input; Rerank 1,114 input. Before the run, a diagnostic checked every agent with the new prompts, with thinking disabled and enabled; its results are in [handoff 008, section 9](../../dev/handoffs/008-json-instruction.md).
 
 ## Views
 

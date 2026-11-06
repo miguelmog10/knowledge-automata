@@ -256,3 +256,8 @@ Evidence: `prompts/project-management/definitions/`, `dev/handoffs/007-governor.
 
 The thinking-disabled failure of 2026-10-31 had a cause on our side. A standalone reproduction for a Cohere community report failed only with the full schema; a reduced schema hid the problem. Rereading Cohere's structured outputs page found the requirement we had missed: a JSON-mode prompt must also ask for JSON. One line in the system prompt gave clean JSON with thinking disabled. Two lessons: read the provider's docs again before reporting a provider problem, and a minimal reproduction must keep whatever triggers the bug. Strict parsing is what made the problem visible: no record was ever written from a bad reply.
 Evidence: `dev/tool-feedback.md` (2026-11-02), ADR-0014 (note of 2026-11-02), `dev/backlog.md`.
+
+### 2026-11-06: P11 Build evidence, not just confidence (product)
+
+The fix for the thinking-disabled failure had worked three times out of three, on one prompt and one artifact, and it was already public. Handoff 008 checked every agent on 29 inputs before claiming more, with thinking disabled as a measurement and enabled as the gate. With thinking disabled the fix held only for the simple cases: the Registrar on meetings with several decisions and the Comparator still failed. The default stays thinking enabled, which passed everything, and the release notes say so instead of repeating three out of three. A diagnostic that refuses to store model text still gave enough to diagnose: the length of each reply and its first character.
+Evidence: `dev/handoffs/008-json-instruction.md` (section 9), `CHANGELOG.md` (Known issues), `dev/tool-feedback.md` (2026-11-06).

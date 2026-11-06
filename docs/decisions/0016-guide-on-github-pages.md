@@ -1,6 +1,6 @@
 # 0016. Guide published with GitHub Pages
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-11-05: the workflow publishes the guide at the address below)
 - **Date:** 2026-10-28
 
 ## Context

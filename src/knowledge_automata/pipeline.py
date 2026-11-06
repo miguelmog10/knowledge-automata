@@ -83,8 +83,10 @@ RERUN_REASON = "Rerun: the earlier run recorded nothing"
 REBUILD_REASON = "Rebuilt from the work orders file"
 NOTHING_SENT = "nothing was sent to the model"
 
-# Command A+ is a reasoning model: with thinking disabled it wrote its reasoning as prose
-# before the JSON, and most replies were rejected (handoff 006, Addendum A; ADR-0014).
+# With thinking disabled, Command A+ wrote its reasoning as prose before the JSON, and most
+# replies were rejected (handoff 006, Addendum A). The cause was prompts that never asked
+# for JSON (ADR-0014); every prompt now ends with that instruction (handoff 008). Thinking
+# stays enabled until the evaluation set measures thinking disabled.
 # Sent explicitly rather than left to the provider's default.
 CHAT_THINKING_DEFAULT: Thinking = "enabled"
 
@@ -97,8 +99,8 @@ class InputError(Exception):
 def governor() -> Governor:
     return Governor(
         agent="governor",
-        prompt=load_prompt("core/governor.v1"),
-        retry_prompt=load_prompt("core/governor-retry.v1"),
+        prompt=load_prompt("core/governor.v2"),
+        retry_prompt=load_prompt("core/governor-retry.v2"),
         registers=load_register_definitions(REGISTERS),
     )
 
@@ -107,8 +109,8 @@ def decision_registrar() -> Registrar:
     return Registrar(
         agent="decision-registrar",
         spec=DECISION_LOG,
-        prompt=load_prompt("project-management/decision-registrar.v2"),
-        retry_prompt=load_prompt("core/registrar-retry.v1"),
+        prompt=load_prompt("project-management/decision-registrar.v3"),
+        retry_prompt=load_prompt("core/registrar-retry.v2"),
         takes_work_order=True,
     )
 
@@ -122,8 +124,8 @@ def decision_comparator() -> Comparator:
     return Comparator(
         agent="comparator",
         spec=DECISION_LOG,
-        prompt=load_prompt("project-management/decision-comparator.v1"),
-        retry_prompt=load_prompt("core/comparator-retry.v1"),
+        prompt=load_prompt("project-management/decision-comparator.v2"),
+        retry_prompt=load_prompt("core/comparator-retry.v2"),
     )
 
 
