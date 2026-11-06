@@ -11,3 +11,4 @@ Generated from the JSON records in `registers/decision-log/`. Do not edit this f
 | [DEC-0005](decision-log/DEC-0005.md) | Offline count conflict: add counts instead of overwrite |  | superseded by [DEC-0006](decision-log/DEC-0006.md) |
 | [DEC-0006](decision-log/DEC-0006.md) | Offline count conflict handling |  | active |
 | [DEC-0007](decision-log/DEC-0007.md) | Launch count screen and status picker in English and French | 2026-06-09 | active |
+| [DEC-0008](decision-log/DEC-0008.md) | First release set to 21 July 2026 for pilot growers | 2026-06-30 | active |
